@@ -14,10 +14,6 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_PATH
-        value: /var/data/pisowifi-admin.db
+        value: /tmp/pisowifi-admin.db
       - key: UPLOADS_DIR
-        value: /var/data/package-images
-    disk:
-      name: cynetwork-data
-      mountPath: /var/data
-      sizeGB: 1
+        value: /tmp/package-images
