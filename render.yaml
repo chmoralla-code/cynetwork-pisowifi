@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: cynetwork-pisowifi
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/pisowifi-admin.db
+      - key: UPLOADS_DIR
+        value: /var/data/package-images
+    disk:
+      name: cynetwork-data
+      mountPath: /var/data
+      sizeGB: 1

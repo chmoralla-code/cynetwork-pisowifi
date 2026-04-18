@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
+    <link rel="stylesheet" href="styles.css?v=20260419-4">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">🌐</span>
+                <span class="logo-text">CYNETWORK</span>
+                <span class="logo-subtext">PISOWIFI</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#packages" class="nav-link">Packages</a></li>
+                <li><a href="#tutorials" class="nav-link">Tutorials</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#contact" class="nav-link">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>Premium WiFi Solutions for Everyone</h1>
+            <p>Experience ultra-fast, reliable internet with CYNETWORK PISOWIFI</p>
+            <button class="cta-button" onclick="scrollToPackages()">Explore Packages</button>
+        </div>
+    </section>
+
+    <!-- Packages Section -->
+    <section id="packages" class="packages-section">
+        <div class="section-header">
+            <h2>Our Packages</h2>
+            <p class="section-subtitle">Choose the perfect plan for your needs</p>
+        </div>
+        
+        <div class="packages-grid">
+            <!-- Package 1 -->
+            <div class="package-card" data-package="1">
+                <div class="package-image-container">
+                    <img src="assets/images/package1.png" alt="Starter Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(1)">View Full Picture</button>
+                </div>
+                <div class="package-content">
+                    <h3>Starter</h3>
+                    <p class="package-duration">1 Year License | 50 Meters</p>
+                    <p class="package-price">₱5,800</p>
+                    <ul class="package-features">
+                        <li>✓ 1 Year License</li>
+                        <li>✓ Telegram Sales Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Anti Lag</li>
+                        <li>✓ Voucher Code Generation</li>
+                        <li>✓ Own Local Server</li>
+                        <li>✓ Customized Portal</li>
+                        <li>✓ Perfect for 20-30 Clients</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(1)">Get Started</button>
+                </div>
+            </div>
+
+            <!-- Package 2 -->
+            <div class="package-card featured" data-package="2">
+                <div class="package-label">Most Popular</div>
+                <div class="package-image-container">
+                    <img src="assets/images/package2.png" alt="Professional Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(2)">View Full Picture</button>
+                </div>
+                <div class="package-content">
+                    <h3>Professional</h3>
+                    <p class="package-duration">3 Years License | 100 Meters</p>
+                    <p class="package-price">₱8,500</p>
+                    <ul class="package-features">
+                        <li>✓ 3 Year License</li>
+                        <li>✓ Telegram Sales Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Anti Lag</li>
+                        <li>✓ Voucher Code Generation</li>
+                        <li>✓ Own Local Server</li>
+                        <li>✓ Customized Portal</li>
+                        <li>✓ Perfect for 40-60 Clients</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(2)">Get Started</button>
+                </div>
+            </div>
+
+            <!-- Package 3 -->
+            <div class="package-card" data-package="3">
+                <div class="package-image-container">
+                    <img src="assets/images/package3.png" alt="Enterprise Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(3)">View Full Picture</button>
+                </div>
+                <div class="package-content">
+                    <h3>Enterprise</h3>
+                    <p class="package-duration">LIFETIME LICENSE | 250 Meters</p>
+                    <p class="package-price">₱11,000</p>
+                    <ul class="package-features">
+                        <li>✓ Lifetime License</li>
+                        <li>✓ Telegram Sales Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Voucher Code Generation</li>
+                        <li>✓ Own Local Server</li>
+                        <li>✓ Customized Portal</li>
+                        <li>✓ Perfect for 80-100 Clients</li>
+                        <li>✓ Advanced Anti Lag Feature</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(3)">Get Started</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Tutorials Section -->
+    <section id="tutorials" class="tutorials-section">
+        <div class="section-header">
+            <h2>Installation Tutorials</h2>
+            <p class="section-subtitle">Diagram pictures and setup walkthrough for each package</p>
+        </div>
+
+        <div class="tutorials-grid">
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package1.png" alt="Starter package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Starter Installation Tutorial</h3>
+                    <p class="tutorial-caption">Best for small coverage setup (1 Year License | 50 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Mount the Starter unit near your modem with stable power.</li>
+                        <li>Connect WAN/LAN cable and verify portal access from your phone.</li>
+                        <li>Set SSID, password, and bandwidth limit in setup panel.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(1)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package2.png" alt="Professional package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Professional Installation Tutorial</h3>
+                    <p class="tutorial-caption">Recommended for wider service area (3 Years License | 100 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Install central router point and connect Professional unit.</li>
+                        <li>Enable voucher/telegram monitoring and test payment workflow.</li>
+                        <li>Run signal and speed checks in peak-hour conditions.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(2)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package3.png" alt="Enterprise package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Enterprise Installation Tutorial</h3>
+                    <p class="tutorial-caption">For high-capacity deployment (Lifetime License | 250 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Deploy main unit plus access points based on coverage map.</li>
+                        <li>Apply anti-lag and user limit profiles before launch.</li>
+                        <li>Perform full activation test: payment, voucher, and portal login.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(3)">View Diagram</button>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <h2>About CYNETWORK PISOWIFI</h2>
+        <p>We provide premium WiFi solutions for affordable, high-speed internet access. Trust CYNETWORK for reliable connectivity.</p>
+    </section>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Complete Your Payment</h2>
+            
+            <!-- Step 1: QR Code Payment -->
+            <div id="step1" class="payment-step active">
+                <h3>Step 1: Scan QR Code to Pay via GCash</h3>
+                <p class="package-selected">Package <span id="selectedPackageText">1</span> - ₱<span id="selectedPrice">10</span>.00</p>
+                
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay</p>
+                </div>
+                
+                <button class="next-btn" onclick="nextStep()">I've Completed Payment</button>
+            </div>
+
+            <!-- Step 2: Upload Proof of Payment -->
+            <div id="step2" class="payment-step">
+                <h3>Step 2: Upload Proof of Payment</h3>
+                <p>Upload a screenshot showing your successful GCash transaction</p>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="proofImage" accept="image/*" onchange="handleFileUpload(event)">
+                    <label for="proofImage">
+                        <span class="upload-icon">📸</span>
+                        <span class="upload-text">Click to upload or drag and drop</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+                
+                <div id="uploadPreview" class="upload-preview"></div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validateProof()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Personal Information -->
+            <div id="step3" class="payment-step">
+                <h3>Step 3: Personal Information</h3>
+                <p>Please provide your details for WiFi access</p>
+                
+                <form id="personalForm">
+                    <div class="form-group">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contactNumber">Contact Number (Philippine) *</label>
+                        <input type="tel" id="contactNumber" placeholder="+63 9XX XXX XXXX" pattern="^\+?63[0-9]{10}$" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="address">Full Address *</label>
+                        <textarea id="address" placeholder="Street Address, Barangay, City, Province, Postal Code" rows="3" required></textarea>
+                    </div>
+                </form>
+
+                <div class="saved-details-helper">
+                    <p class="saved-details-note">Your customer details are saved on this device to make your next order faster.</p>
+                    <button type="button" class="saved-details-clear" onclick="clearSavedCustomerDetails()">Clear Saved Details</button>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validatePersonalInfo()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 4: WiFi Configuration -->
+            <div id="step4" class="payment-step">
+                <h3>Step 4: WiFi Configuration</h3>
+                <p>Set up your WiFi network details</p>
+                
+                <form id="wifiForm">
+                    <div class="form-group">
+                        <label for="wifiName">WiFi Name (SSID) *</label>
+                        <input type="text" id="wifiName" placeholder="e.g., MyWiFi_Home" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiPassword">WiFi Password *</label>
+                        <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiRate">Data Rate Limit (Mbps) *</label>
+                        <select id="wifiRate" required>
+                            <option value="">Select rate limit</option>
+                            <option value="5">5 Mbps - Basic</option>
+                            <option value="10">10 Mbps - Standard</option>
+                            <option value="25">25 Mbps - Fast</option>
+                            <option value="50">50 Mbps - Ultra Fast</option>
+                            <option value="100">100 Mbps - Premium</option>
+                        </select>
+                    </div>
+                </form>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="submit-btn" onclick="completeTransaction()">Complete & Activate</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Success -->
+            <div id="step5" class="payment-step">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    <h3>Payment Successful!</h3>
+                    <p>Your order has been received and is now pending review.</p>
+                    
+                    <div class="success-details">
+                        <p><strong>Order ID:</strong> <span id="confirmOrderId">--</span></p>
+                        <p><strong>Tracking Number:</strong> <span id="confirmTrackingNumber">--</span></p>
+                        <p><strong>Order Status:</strong> <span id="confirmOrderStatus">PENDING</span></p>
+                        <p><strong>WiFi Name:</strong> <span id="confirmWifiName"></span></p>
+                        <p><strong>Duration:</strong> <span id="confirmDuration"></span></p>
+                        <p><strong>Name:</strong> <span id="confirmName"></span></p>
+                    </div>
+
+                    <p id="pendingOrderNotice" class="pending-order-notice">Your order is pending. Use tracking to check updates anytime.</p>
+
+                    <div class="success-actions">
+                        <button id="trackPendingOrderBtn" class="next-btn track-order-btn" onclick="trackPendingOrder()">Track Pending Order</button>
+                        <button class="cta-button" onclick="location.reload()">Start New Transaction</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Track Order Modal -->
+    <div id="trackOrderModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTrackOrderModal()">&times;</span>
+            <h2>Track Your Order</h2>
+            <p>Enter your order ID to check the latest status.</p>
+
+            <div class="form-group">
+                <label for="trackOrderIdInput">Order ID *</label>
+                <input type="text" id="trackOrderIdInput" placeholder="e.g., CYN-20260419-000101 or 101">
+            </div>
+
+            <div class="form-actions">
+                <button class="back-btn" onclick="closeTrackOrderModal()">Close</button>
+                <button class="next-btn" onclick="trackOrder()">Track Order</button>
+            </div>
+
+            <div id="trackOrderResult" class="track-order-result" style="display: none;">
+                <h3>Tracking Result</h3>
+                <p><strong>Order ID:</strong> <span id="trackResultOrderId"></span></p>
+                <p><strong>Tracking Number:</strong> <span id="trackResultTracking"></span></p>
+                <p><strong>Status:</strong> <span id="trackResultStatus" class="track-status-badge">PENDING</span></p>
+                <p><strong>Package:</strong> <span id="trackResultPackage"></span></p>
+                <p><strong>Date Submitted:</strong> <span id="trackResultDate"></span></p>
+                <p><strong>Last Updated:</strong> <span id="trackResultUpdated"></span></p>
+                <p id="trackResultReasonWrap" style="display: none;"><strong>Notes:</strong> <span id="trackResultReason"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <h2>Get in Touch</h2>
+        <div class="contact-info">
+            <div class="contact-item">
+                <span class="contact-icon">📞</span>
+                <div>
+                    <p class="contact-label">Phone</p>
+                    <a href="tel:09505339963" class="contact-link">0950-533-9963</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">📧</span>
+                <div>
+                    <p class="contact-label">Email</p>
+                    <a href="mailto:cyrhielmaot@gmail.com" class="contact-link">cyrhielmaot@gmail.com</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">📘</span>
+                <div>
+                    <p class="contact-label">Facebook</p>
+                    <a href="https://www.facebook.com/profile.php?id=61584774638218" target="_blank" class="contact-link">Follow Us</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>CYNETWORK PISOWIFI</h4>
+                <p>High-speed WiFi solutions for your business</p>
+            </div>
+            <div class="footer-section">
+                <h4>Contact</h4>
+                <p>📞 0950-533-9963</p>
+                <p><a href="mailto:cyrhielmaot@gmail.com" class="social-link">cyrhielmaot@gmail.com</a></p>
+            </div>
+            <div class="footer-section">
+                <h4>Follow Us</h4>
+                <a href="https://www.facebook.com/profile.php?id=61584774638218" target="_blank" class="social-link">Facebook</a>
+            </div>
+        </div>
+        <p class="footer-bottom">&copy; 2026 CYNETWORK PISOWIFI. All rights reserved.</p>
+    </footer>
+
+    <!-- AI Customer Support Chat -->
+    <button id="supportChatToggle" class="support-chat-toggle" aria-label="Open AI customer support">
+        <span class="support-chat-toggle-icon">AI</span>
+        <span id="supportUnreadBadge" class="support-unread-badge" style="display: none;">0</span>
+    </button>
+
+    <div id="supportChatPanel" class="support-chat-panel" aria-live="polite" aria-label="AI customer support chat">
+        <div class="support-chat-header">
+            <div>
+                <h4>PisoWiFi AI Support</h4>
+                <p id="supportChatStatusText">AI Chat Status: AI Assistant</p>
+            </div>
+            <button id="supportChatClose" class="support-chat-close" aria-label="Close support chat">&times;</button>
+        </div>
+
+        <div id="supportMessages" class="support-chat-messages"></div>
+
+        <div class="support-quick-actions">
+            <button type="button" class="support-quick-btn" data-query="What are your package prices?">Package Prices</button>
+            <button type="button" class="support-quick-btn" data-query="How do I pay using GCash?">GCash Payment</button>
+            <button type="button" class="support-quick-btn" data-query="Track my pending order status">Track Order</button>
+            <button type="button" class="support-quick-btn" data-query="My internet is slow, what should I do?">Speed Help</button>
+            <button type="button" class="support-quick-btn" data-query="How long is installation and activation?">Activation Time</button>
+            <button type="button" class="support-quick-btn" data-query="I need live customer support">Live Support</button>
+        </div>
+
+        <div class="support-chat-input-wrap">
+            <input id="supportInput" type="text" placeholder="Ask about pricing, setup, speed, vouchers..." autocomplete="off">
+            <button id="supportSendBtn" type="button">Send</button>
+        </div>
+    </div>
+
+    <!-- Picture Viewer Modal -->
+    <div id="pictureModal" class="picture-modal">
+        <div class="picture-modal-content">
+            <button class="picture-modal-close" onclick="closePictureModal()">&times;</button>
+            <img id="pictureModalImg" src="" alt="Full Picture" class="picture-modal-img">
+        </div>
+    </div>
+
+    <script src="script.js?v=20260419-4"></script>
+</body>
+</html>

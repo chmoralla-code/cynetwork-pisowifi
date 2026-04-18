@@ -1,0 +1,21 @@
+{
+  "name": "cynetwork-pisowifi-backend",
+  "version": "1.0.0",
+  "description": "Admin backend for CYNETWORK PISOWIFI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["pisowifi", "admin", "backend"],
+  "author": "CYNETWORK",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "sqlite3": "^5.1.6",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "body-parser": "^1.20.2"
+  }
+}

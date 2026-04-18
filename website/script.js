@@ -1,0 +1,1246 @@
+// =====================================================
+// GLOBAL VARIABLES
+// =====================================================
+
+let currentStep = 1;
+let selectedPackage = null;
+let uploadedProofImage = null;
+let latestOrderId = null;
+let latestOrderStatus = 'pending';
+let latestTrackingNumber = null;
+
+let supportClientId = null;
+let supportChatSessionId = null;
+let supportChatStatus = 'ai';
+let supportChatPollTimer = null;
+let supportLastMessageId = 0;
+const renderedSupportMessageIds = new Set();
+
+const API_URL = '/api';
+
+const packages = {
+    1: { name: 'Starter', price: '5800', duration: '1 Year License | 50 Meters' },
+    2: { name: 'Professional', price: '8500', duration: '3 Years License | 100 Meters' },
+    3: { name: 'Enterprise', price: '11000', duration: 'LIFETIME LICENSE | 250 Meters' }
+};
+
+const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
+
+function loadSavedCustomerDetails() {
+    try {
+        const raw = localStorage.getItem(CUSTOMER_DETAILS_STORAGE_KEY);
+        if (!raw) {
+            return null;
+        }
+        return JSON.parse(raw);
+    } catch (error) {
+        console.warn('Unable to read saved customer details:', error.message);
+        return null;
+    }
+}
+
+function saveCustomerDetails(details) {
+    const normalized = {
+        fullName: String(details?.fullName || '').trim(),
+        contactNumber: String(details?.contactNumber || '').trim(),
+        address: String(details?.address || '').trim()
+    };
+
+    if (!normalized.fullName && !normalized.contactNumber && !normalized.address) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(CUSTOMER_DETAILS_STORAGE_KEY, JSON.stringify(normalized));
+    } catch (error) {
+        console.warn('Unable to save customer details:', error.message);
+    }
+}
+
+function applySavedCustomerDetailsToForm() {
+    const saved = loadSavedCustomerDetails();
+    if (!saved) {
+        return;
+    }
+
+    const fullNameInput = document.getElementById('fullName');
+    const contactNumberInput = document.getElementById('contactNumber');
+    const addressInput = document.getElementById('address');
+
+    if (fullNameInput) {
+        fullNameInput.value = saved.fullName || '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = saved.contactNumber || '';
+    }
+    if (addressInput) {
+        addressInput.value = saved.address || '';
+    }
+}
+
+function clearSavedCustomerDetails() {
+    localStorage.removeItem(CUSTOMER_DETAILS_STORAGE_KEY);
+
+    const fullNameInput = document.getElementById('fullName');
+    const contactNumberInput = document.getElementById('contactNumber');
+    const addressInput = document.getElementById('address');
+
+    if (fullNameInput) {
+        fullNameInput.value = '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = '';
+    }
+    if (addressInput) {
+        addressInput.value = '';
+    }
+
+    alert('Saved customer details were cleared from this device.');
+}
+
+// =====================================================
+// PACKAGE SELECTION
+// =====================================================
+
+function selectPackage(packageNum) {
+    selectedPackage = packageNum;
+    const packageData = packages[packageNum];
+    
+    // Show modal
+    document.getElementById('paymentModal').classList.add('show');
+    
+    // Set package info in step 1
+    document.getElementById('selectedPackageText').textContent = packageNum;
+    document.getElementById('selectedPrice').textContent = packageData.price;
+    
+    // Generate QR code
+    generateQRCode(packageData);
+    
+    // Reset steps
+    currentStep = 1;
+    showStep(1);
+    resetForm();
+    applySavedCustomerDetailsToForm();
+}
+
+// =====================================================
+// QR CODE GENERATION
+// =====================================================
+
+function generateQRCode(packageData) {
+    document.getElementById('qrcode').innerHTML = '';
+    
+    const gcashNumber = '09XX XXX XXXX';
+    const qrData = `https://gcash.com/pay?number=${gcashNumber}&amount=${packageData.price}&ref=${packageData.name}`;
+    
+    new QRCode(document.getElementById('qrcode'), {
+        text: qrData,
+        width: 200,
+        height: 200,
+        colorDark: '#2A2A2A',
+        colorLight: '#FFFFFF',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+}
+
+// =====================================================
+// PAYMENT FLOW
+// =====================================================
+
+function showStep(stepNum) {
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`step${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+    document.getElementById(`step${stepNum}`).classList.add('active');
+}
+
+function nextStep() {
+    if (currentStep < 5) {
+        currentStep++;
+        showStep(currentStep);
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+    }
+}
+
+// =====================================================
+// FILE UPLOAD HANDLING
+// =====================================================
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            uploadedProofImage = e.target.result;
+            const preview = document.getElementById('uploadPreview');
+            preview.innerHTML = `<img src="${e.target.result}" alt="Proof Preview">`;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        alert('Please select a valid image file');
+    }
+}
+
+function validateProof() {
+    if (!uploadedProofImage) {
+        alert('Please upload a proof image');
+        return;
+    }
+    nextStep();
+}
+
+// =====================================================
+// FORM VALIDATION
+// =====================================================
+
+function validatePersonalInfo() {
+    const fullName = document.getElementById('fullName').value.trim();
+    const contactNumber = document.getElementById('contactNumber').value.trim();
+    const address = document.getElementById('address').value.trim();
+    
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+        alert('Please enter a valid Philippine phone number');
+        return;
+    }
+
+    saveCustomerDetails({ fullName, contactNumber, address });
+    
+    nextStep();
+}
+
+// =====================================================
+// TRANSACTION COMPLETION
+// =====================================================
+
+async function completeTransaction() {
+    const wifiName = document.getElementById('wifiName').value.trim();
+    const wifiPassword = document.getElementById('wifiPassword').value.trim();
+    const wifiRate = document.getElementById('wifiRate').value;
+    
+    if (!wifiName || !wifiPassword || !wifiRate) {
+        alert('Please fill in all WiFi configuration fields');
+        return;
+    }
+    
+    const isOfflineFileMode = window.location.protocol === 'file:';
+
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    // Prepare transaction data
+    const transactionData = {
+        packageId: selectedPackage,
+        packageName: packages[selectedPackage].name,
+        price: packages[selectedPackage].price,
+        duration: packages[selectedPackage].duration,
+        fullName: document.getElementById('fullName').value.trim(),
+        contactNumber: document.getElementById('contactNumber').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        wifiName: wifiName,
+        wifiPassword: wifiPassword,
+        wifiRate: wifiRate,
+        proofImage: uploadedProofImage
+    };
+
+    saveCustomerDetails({
+        fullName: transactionData.fullName,
+        contactNumber: transactionData.contactNumber,
+        address: transactionData.address
+    });
+    
+    // Try to submit to backend
+    try {
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transactionData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Order submitted to backend:', result);
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the order request.';
+            console.warn('Backend submission failed:', backendFailureMessage);
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+        console.warn('Backend not available:', error.message);
+    }
+
+    // Public mode should only finish transaction after real server save.
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Order was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('Submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    // Local fallback is allowed only in offline file mode.
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+    
+    // Also save to localStorage as backup
+    try {
+        let transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    // Show success screen
+    document.getElementById('confirmOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('confirmTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('confirmOrderStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('confirmWifiName').textContent = wifiName;
+    document.getElementById('confirmDuration').textContent = packages[selectedPackage].duration;
+    document.getElementById('confirmName').textContent = document.getElementById('fullName').value.trim();
+
+    syncSupportSessionWithLatestOrder();
+
+    const trackBtn = document.getElementById('trackPendingOrderBtn');
+    const pendingNotice = document.getElementById('pendingOrderNotice');
+    const isPending = resolvedOrderStatus === 'pending' && Boolean(resolvedOrderId);
+    if (trackBtn) {
+        trackBtn.style.display = isPending ? 'inline-block' : 'none';
+    }
+    if (pendingNotice) {
+        pendingNotice.style.display = isPending ? 'block' : 'none';
+    }
+    
+    currentStep = 5;
+    showStep(5);
+}
+
+// =====================================================
+// MODAL FUNCTIONS
+// =====================================================
+
+function closeModal() {
+    document.getElementById('paymentModal').classList.remove('show');
+    resetForm();
+}
+
+function resetForm() {
+    document.getElementById('fullName').value = '';
+    document.getElementById('contactNumber').value = '';
+    document.getElementById('address').value = '';
+    document.getElementById('wifiName').value = '';
+    document.getElementById('wifiPassword').value = '';
+    document.getElementById('wifiRate').value = '';
+    document.getElementById('proofImage').value = '';
+    document.getElementById('uploadPreview').innerHTML = '';
+    uploadedProofImage = null;
+}
+
+function scrollToPackages() {
+    document.getElementById('packages').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+    const paymentModal = document.getElementById('paymentModal');
+    const trackingModal = document.getElementById('trackOrderModal');
+
+    if (event.target === paymentModal) {
+        closeModal();
+    }
+
+    if (event.target === trackingModal) {
+        closeTrackOrderModal();
+    }
+});
+
+function openTrackOrderModal(prefillOrderId = '') {
+    const modal = document.getElementById('trackOrderModal');
+    const input = document.getElementById('trackOrderIdInput');
+    const result = document.getElementById('trackOrderResult');
+
+    if (!modal || !input || !result) {
+        return;
+    }
+
+    input.value = prefillOrderId || '';
+    result.style.display = 'none';
+    modal.classList.add('show');
+    input.focus();
+}
+
+function closeTrackOrderModal() {
+    const modal = document.getElementById('trackOrderModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function trackPendingOrder() {
+    const lookupToTrack = latestTrackingNumber
+        || latestOrderId
+        || document.getElementById('confirmTrackingNumber')?.textContent?.trim()
+        || document.getElementById('confirmOrderId')?.textContent?.trim()
+        || '';
+    openTrackOrderModal(lookupToTrack);
+    if (lookupToTrack) {
+        trackOrder();
+    }
+}
+
+function getLocalTrackedOrder(orderLookup) {
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        return transactions.find((item) => {
+            const orderIdMatch = String(item.orderId || '') === String(orderLookup);
+            const trackingMatch = String(item.trackingNumber || '') === String(orderLookup);
+            return orderIdMatch || trackingMatch;
+        }) || null;
+    } catch (error) {
+        console.error('Error reading local transactions:', error);
+        return null;
+    }
+}
+
+function setTrackStatusBadge(status) {
+    const statusEl = document.getElementById('trackResultStatus');
+    if (!statusEl) {
+        return;
+    }
+
+    const normalized = String(status || 'pending').toLowerCase();
+    statusEl.textContent = normalized.toUpperCase();
+    statusEl.className = `track-status-badge ${normalized}`;
+}
+
+function formatTrackDate(dateValue) {
+    if (!dateValue) {
+        return '--';
+    }
+    const date = new Date(dateValue);
+    return Number.isNaN(date.getTime()) ? String(dateValue) : date.toLocaleString();
+}
+
+function renderTrackOrderResult(orderData) {
+    const resultWrap = document.getElementById('trackOrderResult');
+    if (!resultWrap) {
+        return;
+    }
+
+    document.getElementById('trackResultOrderId').textContent = orderData.orderId || '--';
+    document.getElementById('trackResultTracking').textContent = orderData.trackingNumber || '--';
+    document.getElementById('trackResultPackage').textContent = orderData.packageName || '--';
+    document.getElementById('trackResultDate').textContent = formatTrackDate(orderData.createdAt || orderData.timestamp);
+    document.getElementById('trackResultUpdated').textContent = formatTrackDate(orderData.updatedAt || orderData.timestamp);
+    setTrackStatusBadge(orderData.status || 'pending');
+
+    const reasonWrap = document.getElementById('trackResultReasonWrap');
+    const reasonText = document.getElementById('trackResultReason');
+    const normalizedStatus = String(orderData.status || 'pending').toLowerCase();
+
+    let notes = '';
+    if (orderData.rejectionReason) {
+        notes = orderData.rejectionReason;
+    } else if (normalizedStatus === 'pending') {
+        notes = 'Your order is pending review. Please check back later for updates.';
+    } else if (normalizedStatus === 'approved') {
+        notes = 'Your order is approved. Please prepare for setup and activation instructions.';
+    } else if (normalizedStatus === 'delivery') {
+        notes = 'Wait for the tracking number of the order that will be sent to you on Facebook. It will be shipped within 7 days ASAP.';
+    } else if (normalizedStatus === 'completed') {
+        notes = 'Your order is completed. Thank you for choosing CYNETWORK PISOWIFI.';
+    }
+
+    if (notes) {
+        reasonWrap.style.display = 'block';
+        reasonText.textContent = notes;
+    } else {
+        reasonWrap.style.display = 'none';
+        reasonText.textContent = '';
+    }
+
+    resultWrap.style.display = 'block';
+}
+
+async function trackOrder() {
+    const orderIdInput = document.getElementById('trackOrderIdInput');
+    if (!orderIdInput) {
+        return;
+    }
+
+    const orderId = orderIdInput.value.trim();
+    if (!orderId) {
+        alert('Please enter your order ID');
+        return;
+    }
+
+    const localOrder = getLocalTrackedOrder(orderId);
+    if (String(orderId).startsWith('LOCAL-') && localOrder) {
+        renderTrackOrderResult({
+            orderId: localOrder.orderId,
+            trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+            packageName: localOrder.packageName,
+            status: localOrder.status || 'pending',
+            createdAt: localOrder.timestamp,
+            updatedAt: localOrder.timestamp
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/track-order/${encodeURIComponent(orderId)}`);
+        if (response.ok) {
+            const result = await response.json();
+            renderTrackOrderResult(result);
+            return;
+        }
+
+        if (localOrder) {
+            renderTrackOrderResult({
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp
+            });
+            return;
+        }
+
+        alert('Order not found. Please check your order ID and try again.');
+    } catch (error) {
+        if (localOrder) {
+            renderTrackOrderResult({
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp
+            });
+            return;
+        }
+        alert('Unable to track order right now. Please try again later.');
+    }
+}
+
+// =====================================================
+// PICTURE VIEWER MODAL
+// =====================================================
+
+const packageImages = {
+    1: ['assets/images/package1.png'],
+    2: ['assets/images/package2.png'],
+    3: ['assets/images/package3.png']
+};
+
+const packageImageFallbacks = {
+    1: 'assets/images/package1.png',
+    2: 'assets/images/package2.png',
+    3: 'assets/images/package3.png'
+};
+
+function initPackageImagesFromServer() {
+    [1, 2, 3].forEach((packageNum) => {
+        const remoteImageSrc = `${API_URL}/images/package/${packageNum}?t=${Date.now()}`;
+        packageImages[packageNum] = [remoteImageSrc];
+
+        const packageCardImage = document.querySelector(`.package-card[data-package="${packageNum}"] .package-image`);
+        if (packageCardImage) {
+            packageCardImage.onerror = () => {
+                packageCardImage.onerror = null;
+                packageCardImage.src = packageImageFallbacks[packageNum];
+            };
+            packageCardImage.src = remoteImageSrc;
+        }
+    });
+}
+
+let currentImageIndex = 0;
+
+function viewFullPicture(packageNum) {
+    const images = packageImages[packageNum];
+    if (images && images.length > 0) {
+        currentImageIndex = 0;
+        const modal = document.getElementById('pictureModal');
+        const imgElement = document.getElementById('pictureModalImg');
+        imgElement.onerror = () => {
+            imgElement.onerror = null;
+            imgElement.src = packageImageFallbacks[packageNum] || images[0];
+        };
+        imgElement.src = images[0];
+        modal.classList.add('active');
+    }
+}
+
+function closePictureModal() {
+    const modal = document.getElementById('pictureModal');
+    modal.classList.remove('active');
+    currentImageIndex = 0;
+}
+
+// =====================================================
+// AI CUSTOMER SUPPORT CHAT
+// =====================================================
+
+function getOrCreateSupportClientId() {
+    let clientId = localStorage.getItem('cynetworkSupportClientId');
+    if (!clientId) {
+        clientId = `client-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+        localStorage.setItem('cynetworkSupportClientId', clientId);
+    }
+    return clientId;
+}
+
+function setSupportUnreadBadge(count) {
+    const badge = document.getElementById('supportUnreadBadge');
+    if (!badge) {
+        return;
+    }
+
+    if (count > 0) {
+        badge.style.display = 'inline-flex';
+        badge.textContent = String(count > 99 ? '99+' : count);
+    } else {
+        badge.style.display = 'none';
+        badge.textContent = '0';
+    }
+}
+
+function updateSupportChatStatus(status) {
+    const normalized = String(status || 'ai').toLowerCase();
+    supportChatStatus = normalized;
+
+    const statusText = document.getElementById('supportChatStatusText');
+    if (!statusText) {
+        return;
+    }
+
+    if (normalized === 'live') {
+        statusText.textContent = 'AI Chat Status: Live Customer Support Active';
+        return;
+    }
+
+    if (normalized === 'closed') {
+        statusText.textContent = 'AI Chat Status: Closed by Admin';
+        return;
+    }
+
+    statusText.textContent = 'AI Chat Status: AI Assistant';
+}
+
+async function ensureSupportSession() {
+    if (!supportClientId) {
+        supportClientId = getOrCreateSupportClientId();
+    }
+
+    const payload = {
+        clientId: supportClientId,
+        orderId: latestOrderId && /^\d+$/.test(String(latestOrderId)) ? Number(latestOrderId) : null,
+        trackingNumber: latestTrackingNumber || null,
+        customerName: document.getElementById('fullName')?.value?.trim() || null,
+        customerContact: document.getElementById('contactNumber')?.value?.trim() || null
+    };
+
+    const response = await fetch(`${API_URL}/chat/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error('Unable to initialize support chat session');
+    }
+
+    const result = await response.json();
+    supportChatSessionId = result?.session?.id || supportChatSessionId;
+    updateSupportChatStatus(result?.session?.status || 'ai');
+    return result?.session || null;
+}
+
+function syncSupportSessionWithLatestOrder() {
+    if (!supportClientId) {
+        return;
+    }
+
+    ensureSupportSession().catch((error) => {
+        console.warn('Unable to sync support session metadata:', error.message);
+    });
+}
+
+async function sendSupportMessageToServer(senderType, text) {
+    if (!supportChatSessionId) {
+        await ensureSupportSession();
+    }
+
+    const response = await fetch(`${API_URL}/chat/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: supportChatSessionId,
+            clientId: supportClientId,
+            senderType,
+            message: text
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to send support message');
+    }
+
+    const result = await response.json();
+    return result?.message || null;
+}
+
+async function requestLiveSupport() {
+    if (!supportChatSessionId) {
+        await ensureSupportSession();
+    }
+
+    const response = await fetch(`${API_URL}/chat/live-support-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: supportChatSessionId,
+            clientId: supportClientId
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to request live support');
+    }
+
+    const result = await response.json();
+    updateSupportChatStatus(result?.status || 'live');
+}
+
+function mapSupportSenderToUiType(senderType) {
+    if (senderType === 'client') {
+        return 'user';
+    }
+    if (senderType === 'admin') {
+        return 'agent';
+    }
+    if (senderType === 'system') {
+        return 'status';
+    }
+    return 'bot';
+}
+
+async function fetchSupportMessages({ markRead = null } = {}) {
+    if (!supportChatSessionId || !supportClientId) {
+        return;
+    }
+
+    const chatPanel = document.getElementById('supportChatPanel');
+    const isOpen = chatPanel?.classList.contains('open');
+    const shouldMarkRead = typeof markRead === 'boolean' ? markRead : isOpen;
+    const startingAfterId = supportLastMessageId;
+
+    try {
+        const response = await fetch(
+            `${API_URL}/chat/messages/${supportChatSessionId}?clientId=${encodeURIComponent(supportClientId)}&afterId=${supportLastMessageId}&markRead=${shouldMarkRead ? '1' : '0'}`
+        );
+
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        updateSupportChatStatus(result?.session?.status || supportChatStatus);
+
+        const incomingMessages = result?.messages || [];
+        incomingMessages.forEach((message) => {
+            supportLastMessageId = Math.max(supportLastMessageId, Number(message.id || 0));
+
+            if (!isOpen && message.senderType === 'admin' && startingAfterId > 0) {
+                const badge = document.getElementById('supportUnreadBadge');
+                const existing = parseInt(badge?.textContent || '0', 10) || 0;
+                setSupportUnreadBadge(existing + 1);
+            }
+
+            addSupportMessage(mapSupportSenderToUiType(message.senderType), message.message, message.id);
+        });
+    } catch (error) {
+        console.warn('Support message polling failed:', error.message);
+    }
+}
+
+function startSupportPolling() {
+    if (supportChatPollTimer) {
+        return;
+    }
+
+    supportChatPollTimer = setInterval(() => {
+        fetchSupportMessages();
+    }, 4000);
+}
+
+function isLiveSupportRequest(text) {
+    return hasKeyword(text, ['live support', 'live agent', 'human agent', 'talk to admin', 'talk to support', 'customer support']);
+}
+
+function isTrackingIntent(text) {
+    return hasKeyword(text, [
+        'track',
+        'tracking',
+        'order status',
+        'status',
+        'pending order',
+        'pending status',
+        'follow up',
+        'follow-up',
+        'followup',
+        'nasaan order',
+        'status ng order',
+        'check order'
+    ]);
+}
+
+function extractTrackingLookupFromText(message) {
+    const raw = String(message || '').trim();
+    if (!raw) {
+        return '';
+    }
+
+    const trackingMatch = raw.toUpperCase().match(/CYN-\d{8}-\d{6}/);
+    if (trackingMatch) {
+        return trackingMatch[0];
+    }
+
+    const orderMatch = raw.match(/(?:order(?:\s*id)?|\bid\b|#)\s*[:#-]?\s*(\d{1,9})/i);
+    if (orderMatch && orderMatch[1]) {
+        return orderMatch[1];
+    }
+
+    if (/^\d{1,9}$/.test(raw)) {
+        return raw;
+    }
+
+    return '';
+}
+
+function getLatestKnownOrderLookup() {
+    const candidates = [
+        latestTrackingNumber,
+        latestOrderId,
+        document.getElementById('confirmTrackingNumber')?.textContent?.trim(),
+        document.getElementById('confirmOrderId')?.textContent?.trim()
+    ];
+
+    return candidates.find((item) => item && item !== '--') || '';
+}
+
+function getStatusNoteForOrder(orderData) {
+    const normalizedStatus = String(orderData?.status || 'pending').toLowerCase();
+
+    if (orderData?.rejectionReason) {
+        return `Notes: ${orderData.rejectionReason}`;
+    }
+
+    if (normalizedStatus === 'pending') {
+        return 'Your order is still pending review. Please keep this tracking number and check again later.';
+    }
+
+    if (normalizedStatus === 'approved') {
+        return 'Your order is approved. Our team will proceed with activation and setup instructions.';
+    }
+
+    if (normalizedStatus === 'delivery') {
+        return 'Wait for the tracking number of the order that will be sent to you on Facebook. It will be shipped within 7 days ASAP.';
+    }
+
+    if (normalizedStatus === 'completed') {
+        return 'Your order is completed. Thank you for choosing CYNETWORK PISOWIFI.';
+    }
+
+    if (normalizedStatus === 'cancelled') {
+        return 'Your order is currently marked as cancelled. Contact support if you need assistance.';
+    }
+
+    return 'Please keep your tracking number for your next follow-up.';
+}
+
+async function getTrackedOrderFromLookup(lookup) {
+    const normalizedLookup = String(lookup || '').trim();
+    if (!normalizedLookup) {
+        return { error: 'missing_lookup' };
+    }
+
+    const localOrder = getLocalTrackedOrder(normalizedLookup);
+    if (String(normalizedLookup).startsWith('LOCAL-') && localOrder) {
+        return {
+            orderId: localOrder.orderId,
+            trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+            packageName: localOrder.packageName,
+            status: localOrder.status || 'pending',
+            createdAt: localOrder.timestamp,
+            updatedAt: localOrder.timestamp,
+            isLocal: true
+        };
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/track-order/${encodeURIComponent(normalizedLookup)}`);
+
+        if (response.ok) {
+            const result = await response.json();
+            latestOrderId = result?.orderId ? String(result.orderId) : latestOrderId;
+            latestTrackingNumber = result?.trackingNumber ? String(result.trackingNumber) : latestTrackingNumber;
+            latestOrderStatus = String(result?.status || latestOrderStatus || 'pending').toLowerCase();
+            return result;
+        }
+
+        if (localOrder) {
+            return {
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp,
+                isLocal: true
+            };
+        }
+
+        if (response.status === 404) {
+            return { error: 'not_found' };
+        }
+
+        return { error: 'server_error' };
+    } catch (error) {
+        if (localOrder) {
+            return {
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp,
+                isLocal: true
+            };
+        }
+
+        return { error: 'network_error' };
+    }
+}
+
+async function generateTrackingSupportReply(lowerText, rawMessage) {
+    if (!isTrackingIntent(lowerText)) {
+        return null;
+    }
+
+    let lookup = extractTrackingLookupFromText(rawMessage);
+    if (!lookup && hasKeyword(lowerText, ['my', 'current', 'latest', 'pending', 'order'])) {
+        lookup = getLatestKnownOrderLookup();
+    }
+
+    if (!lookup) {
+        return 'I can track your pending order right now.\nPlease send your Tracking Number (example: CYN-20260419-000123) or Order ID (example: 123).';
+    }
+
+    const trackedOrder = await getTrackedOrderFromLookup(lookup);
+    if (trackedOrder?.error === 'not_found') {
+        return `I could not find an order for "${lookup}". Please verify your Tracking Number or Order ID and try again.`;
+    }
+
+    if (trackedOrder?.error) {
+        return 'I cannot check your order status right now due to a connection issue. Please try again in a few moments.';
+    }
+
+    const trackingNumberText = trackedOrder.trackingNumber || '--';
+    const orderIdText = trackedOrder.orderId || '--';
+    const statusText = String(trackedOrder.status || 'pending').toUpperCase();
+    const submittedText = formatTrackDate(trackedOrder.createdAt || trackedOrder.timestamp);
+    const updatedText = formatTrackDate(trackedOrder.updatedAt || trackedOrder.timestamp);
+
+    return `Order Tracking Update:\nTracking Number: ${trackingNumberText}\nOrder ID: ${orderIdText}\nStatus: ${statusText}\nPackage: ${trackedOrder.packageName || '--'}\nDate Submitted: ${submittedText}\nLast Updated: ${updatedText}\n\n${getStatusNoteForOrder(trackedOrder)}`;
+}
+
+function initSupportChat() {
+    const chatToggle = document.getElementById('supportChatToggle');
+    const chatPanel = document.getElementById('supportChatPanel');
+    const chatClose = document.getElementById('supportChatClose');
+    const chatMessages = document.getElementById('supportMessages');
+    const chatInput = document.getElementById('supportInput');
+    const chatSend = document.getElementById('supportSendBtn');
+    const quickButtons = document.querySelectorAll('.support-quick-btn');
+
+    if (!chatToggle || !chatPanel || !chatMessages || !chatInput || !chatSend) {
+        return;
+    }
+
+    supportClientId = getOrCreateSupportClientId();
+    setSupportUnreadBadge(0);
+
+    ensureSupportSession()
+        .then(() => {
+            if (chatMessages.children.length === 0) {
+                addSupportMessage(
+                    'bot',
+                    'Hello! I am your PisoWiFi AI support bot.\nI can help with package pricing, payment, activation, WiFi setup, vouchers, and speed concerns.\n\nType "I need live customer support" anytime to connect with admin.',
+                    'welcome-bot'
+                );
+            }
+            fetchSupportMessages({ markRead: false });
+            startSupportPolling();
+        })
+        .catch((error) => {
+            console.warn('Support session initialization failed:', error.message);
+        });
+
+    const openChat = () => {
+        chatPanel.classList.add('open');
+        chatToggle.classList.add('active');
+        setSupportUnreadBadge(0);
+        fetchSupportMessages({ markRead: true });
+        chatInput.focus();
+    };
+
+    const closeChat = () => {
+        chatPanel.classList.remove('open');
+        chatToggle.classList.remove('active');
+    };
+
+    const sendUserMessage = async () => {
+        const message = chatInput.value.trim();
+        if (!message) {
+            return;
+        }
+
+        chatInput.value = '';
+
+        try {
+            const userMessage = await sendSupportMessageToServer('client', message);
+            if (userMessage) {
+                supportLastMessageId = Math.max(supportLastMessageId, Number(userMessage.id || 0));
+                addSupportMessage('user', message, userMessage.id);
+            } else {
+                addSupportMessage('user', message);
+            }
+        } catch (error) {
+            addSupportMessage('user', message);
+            addSupportMessage('status', 'Message saved locally. Support server is temporarily unreachable.');
+            return;
+        }
+
+        if (isLiveSupportRequest(message) && supportChatStatus !== 'live') {
+            try {
+                await requestLiveSupport();
+                addSupportMessage('status', 'Live support requested. Admin has been notified and can now reply here.');
+            } catch (error) {
+                addSupportMessage('status', 'Unable to request live support right now. Please try again in a moment.');
+            }
+            return;
+        }
+
+        const normalizedMessage = message.toLowerCase();
+        const messageIsTrackingIntent = isTrackingIntent(normalizedMessage);
+
+        if (supportChatStatus === 'live' && !messageIsTrackingIntent) {
+            addSupportMessage('status', 'Your message has been forwarded to live support. Please wait for admin reply.');
+            return;
+        }
+
+        showSupportTyping();
+        setTimeout(async () => {
+            const aiReply = await generateSupportReply(message);
+            removeSupportTyping();
+
+            try {
+                const aiMessage = await sendSupportMessageToServer('ai', aiReply);
+                if (aiMessage) {
+                    supportLastMessageId = Math.max(supportLastMessageId, Number(aiMessage.id || 0));
+                    addSupportMessage('bot', aiReply, aiMessage.id);
+                } else {
+                    addSupportMessage('bot', aiReply);
+                }
+            } catch (error) {
+                addSupportMessage('bot', aiReply);
+            }
+        }, 450);
+    };
+
+    chatToggle.addEventListener('click', () => {
+        if (chatPanel.classList.contains('open')) {
+            closeChat();
+        } else {
+            openChat();
+        }
+    });
+
+    chatClose.addEventListener('click', closeChat);
+    chatSend.addEventListener('click', () => {
+        sendUserMessage();
+    });
+
+    chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            sendUserMessage();
+        }
+    });
+
+    quickButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            chatInput.value = button.dataset.query || '';
+            sendUserMessage();
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && chatPanel.classList.contains('open')) {
+            closeChat();
+        }
+    });
+}
+
+function addSupportMessage(type, text, messageId = null) {
+    const chatMessages = document.getElementById('supportMessages');
+    if (!chatMessages) {
+        return;
+    }
+
+    const normalizedId = messageId ? String(messageId) : '';
+    if (normalizedId && renderedSupportMessageIds.has(normalizedId)) {
+        return;
+    }
+
+    if (normalizedId) {
+        renderedSupportMessageIds.add(normalizedId);
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `support-message ${type}`;
+    messageEl.textContent = text;
+    if (normalizedId) {
+        messageEl.dataset.messageId = normalizedId;
+    }
+
+    chatMessages.appendChild(messageEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showSupportTyping() {
+    const chatMessages = document.getElementById('supportMessages');
+    if (!chatMessages || document.getElementById('supportTyping')) {
+        return;
+    }
+
+    const typingEl = document.createElement('div');
+    typingEl.id = 'supportTyping';
+    typingEl.className = 'support-typing';
+    typingEl.textContent = 'AI Support is typing...';
+    chatMessages.appendChild(typingEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeSupportTyping() {
+    const typingEl = document.getElementById('supportTyping');
+    if (typingEl) {
+        typingEl.remove();
+    }
+}
+
+function hasKeyword(text, keywords) {
+    return keywords.some((keyword) => text.includes(keyword));
+}
+
+async function generateSupportReply(userMessage) {
+    const text = userMessage.toLowerCase();
+
+    const trackingReply = await generateTrackingSupportReply(text, userMessage);
+    if (trackingReply) {
+        return trackingReply;
+    }
+
+    if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
+        return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about pricing, payment, setup, or troubleshooting.';
+    }
+
+    if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
+        return `Here are our current packages:\n\n1) Starter - PHP ${packages[1].price} (${packages[1].duration})\n2) Professional - PHP ${packages[2].price} (${packages[2].duration})\n3) Enterprise - PHP ${packages[3].price} (${packages[3].duration})\n\nTell me your target number of users and I can suggest the best package.`;
+    }
+
+    if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
+        return 'Payment steps:\n1) Click Get Started on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
+    }
+
+    if (hasKeyword(text, ['proof', 'screenshot', 'receipt', 'resibo'])) {
+        return 'Please upload a clear screenshot of successful GCash payment showing amount, reference, and date/time.\n\nAccepted format: image file (PNG or JPG) with readable details.';
+    }
+
+    if (hasKeyword(text, ['activation', 'activate', 'install', 'installation', 'setup', 'gaano katagal'])) {
+        return 'Typical flow:\n- Payment and form submission: 5 to 10 minutes\n- Initial review and activation: usually same day\n\nFor urgent activation, type: I need live customer support.';
+    }
+
+    if (hasKeyword(text, ['wifi', 'ssid', 'password', 'voucher', 'portal'])) {
+        return 'For WiFi setup, prepare these details:\n- WiFi Name (SSID)\n- WiFi Password\n- Data rate limit\n\nAfter activation, keep your password secure and update it regularly.';
+    }
+
+    if (hasKeyword(text, ['slow', 'lag', 'mabagal', 'buffer', 'speed', 'internet'])) {
+        return 'Troubleshooting tips for slow PisoWiFi:\n1) Reboot modem/router and PisoWiFi unit\n2) Check number of active users vs package capacity\n3) Place router in open area for better signal\n4) Set proper user speed limits\n\nIf issue continues, type: I need live customer support.';
+    }
+
+    if (hasKeyword(text, ['refund', 'cancel', 'cancellation'])) {
+        return 'For cancellation or refund concerns, request live support so admin can review your payment and order status in real-time.';
+    }
+
+    if (hasKeyword(text, ['contact', 'agent', 'human', 'support', 'facebook'])) {
+        return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
+    }
+
+    return 'I can help with package pricing, payment steps, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+}
+
+// Close picture modal when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    initPackageImagesFromServer();
+    applySavedCustomerDetailsToForm();
+
+    const modal = document.getElementById('pictureModal');
+    if (modal) {
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closePictureModal();
+            }
+        });
+    }
+
+    initSupportChat();
+});

@@ -1,0 +1,15 @@
+# Node modules
+backend/node_modules/
+
+# Runtime data
+backend/*.db
+backend/public/package-images/
+backend/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

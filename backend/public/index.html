@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYNETWORK PISOWIFI - Admin Dashboard</title>
+    <link rel="stylesheet" href="/admin/admin-styles.css?v=20260419-4">
+</head>
+<body>
+    <!-- LOGIN PAGE -->
+    <div id="loginPage" class="page active">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-logo">
+                    <span class="logo-icon">🌐</span>
+                    <h1>CYNETWORK</h1>
+                    <p>PISOWIFI Admin</p>
+                </div>
+                
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">Login</button>
+                    
+                    <div id="loginError" class="error-message"></div>
+                </form>
+                
+                <div class="login-info">
+                    <p>Demo Credentials:</p>
+                    <p><strong>Username:</strong> admin</p>
+                    <p><strong>Password:</strong> admin123</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD PAGE -->
+    <div id="dashboardPage" class="page">
+        <nav class="admin-navbar">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <span class="logo-icon">🌐</span>
+                    <span>CYNETWORK PISOWIFI</span>
+                </div>
+                <div class="nav-user">
+                    <span id="adminUsername">Admin</span>
+                    <button id="logoutBtn" class="logout-btn">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="dashboard-container">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
+                <ul class="sidebar-menu">
+            <li><a href="#" data-view="dashboard" class="menu-item active">📊 Dashboard</a></li>
+                    <li><a href="#" data-view="orders" class="menu-item">📋 Orders</a></li>
+                    <li><a href="#" data-view="pending" class="menu-item">⏳ Pending Orders</a></li>
+                    <li><a href="#" data-view="chat" class="menu-item">💬 AI Chat <span id="chatUnreadBadge" class="menu-badge" style="display: none;">0</span></a></li>
+                    <li><a href="#" data-view="images" class="menu-item">🖼️ Image Management</a></li>
+                    <li><a href="#" data-view="settings" class="menu-item">⚙️ Settings</a></li>
+                </ul>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="main-content">
+                <!-- DASHBOARD VIEW -->
+                <section id="dashboardView" class="view active">
+                    <div class="view-title-row">
+                        <h2>Dashboard Overview</h2>
+                        <div class="view-actions">
+                            <button id="refreshDashboardBtn" class="btn btn-secondary" type="button">Refresh Data</button>
+                            <a href="/" target="_blank" class="btn btn-primary open-client-btn">Open Client Site</a>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📦</div>
+                            <h3>Total Orders</h3>
+                            <p id="totalOrders" class="stat-value">0</p>
+                        </div>
+                        
+                        <div class="stat-card pending">
+                            <div class="stat-icon">⏳</div>
+                            <h3>Pending</h3>
+                            <p id="pendingOrders" class="stat-value">0</p>
+                        </div>
+                        
+                        <div class="stat-card approved">
+                            <div class="stat-icon">✅</div>
+                            <h3>Approved</h3>
+                            <p id="approvedOrders" class="stat-value">0</p>
+                        </div>
+
+                        <div class="stat-card delivery">
+                            <div class="stat-icon">🚚</div>
+                            <h3>For Delivery</h3>
+                            <p id="deliveryOrders" class="stat-value">0</p>
+                        </div>
+                        
+                        <div class="stat-card rejected">
+                            <div class="stat-icon">❌</div>
+                            <h3>Rejected</h3>
+                            <p id="rejectedOrders" class="stat-value">0</p>
+                        </div>
+
+                        <div class="stat-card approved">
+                            <div class="stat-icon">🏁</div>
+                            <h3>Completed</h3>
+                            <p id="completedOrders" class="stat-value">0</p>
+                        </div>
+
+                        <div class="stat-card rejected">
+                            <div class="stat-icon">🚫</div>
+                            <h3>Cancelled</h3>
+                            <p id="cancelledOrders" class="stat-value">0</p>
+                        </div>
+                    </div>
+
+                    <div class="recent-orders">
+                        <h3>Recent Orders</h3>
+                        <div id="recentOrdersList" class="orders-table-container">
+                            <table class="orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Customer</th>
+                                        <th>Package</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentOrdersBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ORDERS VIEW -->
+                <section id="ordersView" class="view">
+                    <div class="view-header">
+                        <h2>All Orders</h2>
+                        <div class="view-controls">
+                            <input type="text" id="searchInput" placeholder="Search by customer name...">
+                            <select id="filterStatus">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="delivery">For Delivery</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="orders-table-container">
+                        <table class="orders-table">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Customer Name</th>
+                                    <th>Package</th>
+                                    <th>Price</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- PENDING ORDERS VIEW -->
+                <section id="pendingView" class="view">
+                    <h2>Pending Orders</h2>
+                    <div id="pendingOrdersList" class="orders-list"></div>
+                </section>
+
+                <!-- AI CHAT VIEW -->
+                <section id="chatView" class="view">
+                    <div class="view-title-row">
+                        <h2>AI Chat Support</h2>
+                        <div class="view-actions">
+                            <button id="refreshChatsBtn" class="btn btn-secondary" type="button">Refresh Chats</button>
+                        </div>
+                    </div>
+
+                    <div class="chat-admin-layout">
+                        <aside class="chat-sessions-panel">
+                            <h3>Client Conversations</h3>
+                            <div id="chatSessionsList" class="chat-sessions-list">
+                                <p class="chat-empty-state">No chat sessions yet.</p>
+                            </div>
+                        </aside>
+
+                        <div class="chat-thread-panel">
+                            <div class="chat-thread-header">
+                                <div>
+                                    <h3 id="chatSessionTitle">Select a chat session</h3>
+                                    <p id="chatSessionMeta">No active conversation selected</p>
+                                </div>
+
+                                <div class="chat-status-controls">
+                                    <label for="chatStatusSelect">Status</label>
+                                    <select id="chatStatusSelect" disabled>
+                                        <option value="ai">AI Assistant</option>
+                                        <option value="live">Live Support</option>
+                                        <option value="closed">Closed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div id="chatMessagesContainer" class="chat-messages-container">
+                                <p class="chat-empty-state">Select a session to view messages.</p>
+                            </div>
+
+                            <div class="chat-reply-bar">
+                                <input type="text" id="chatReplyInput" placeholder="Type your reply to the client..." disabled>
+                                <button id="chatSendBtn" class="btn btn-primary" type="button" disabled>Send Reply</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- IMAGE MANAGEMENT VIEW -->
+                <section id="imagesView" class="view">
+                    <h2>Package Image Management</h2>
+                    <p class="view-subtitle">Upload and manage package images</p>
+                    
+                    <div class="images-grid">
+                        <!-- Package 1 -->
+                        <div class="image-card">
+                            <h3>📦 Starter Package</h3>
+                            <div class="current-image">
+                                <p class="image-label">Current Image:</p>
+                                <img id="package1Img" src="" alt="Package 1" class="package-preview">
+                            </div>
+                            <div class="upload-section">
+                                <label for="package1Upload" class="upload-label">
+                                    <input type="file" id="package1Upload" accept="image/*" style="display: none;">
+                                    <span class="upload-btn">📤 Upload New Image</span>
+                                </label>
+                                <p class="upload-hint">Supported: PNG, JPG, WEBP</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Package 2 -->
+                        <div class="image-card">
+                            <h3>📦 Professional Package</h3>
+                            <div class="current-image">
+                                <p class="image-label">Current Image:</p>
+                                <img id="package2Img" src="" alt="Package 2" class="package-preview">
+                            </div>
+                            <div class="upload-section">
+                                <label for="package2Upload" class="upload-label">
+                                    <input type="file" id="package2Upload" accept="image/*" style="display: none;">
+                                    <span class="upload-btn">📤 Upload New Image</span>
+                                </label>
+                                <p class="upload-hint">Supported: PNG, JPG, WEBP</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Package 3 -->
+                        <div class="image-card">
+                            <h3>📦 Enterprise Package</h3>
+                            <div class="current-image">
+                                <p class="image-label">Current Image:</p>
+                                <img id="package3Img" src="" alt="Package 3" class="package-preview">
+                            </div>
+                            <div class="upload-section">
+                                <label for="package3Upload" class="upload-label">
+                                    <input type="file" id="package3Upload" accept="image/*" style="display: none;">
+                                    <span class="upload-btn">📤 Upload New Image</span>
+                                </label>
+                                <p class="upload-hint">Supported: PNG, JPG, WEBP</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SETTINGS VIEW -->
+                <section id="settingsView" class="view">
+                    <h2>Settings</h2>
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h3>Admin Account</h3>
+                            <p><strong>Username:</strong> <span id="settingsUsername">-</span></p>
+                            <button class="btn btn-danger" onclick="alert('Change password feature coming soon!')">Change Password</button>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>Public Links</h3>
+                            <p><strong>Client Site:</strong> <a href="/" target="_blank" class="external-link">Open Website</a></p>
+                            <p><strong>Admin Site:</strong> <a href="/admin" target="_blank" class="external-link">Open Dashboard</a></p>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>Support Contact</h3>
+                            <p><strong>Phone:</strong> 0950-533-9963</p>
+                            <p><strong>Email:</strong> <a href="mailto:cyrhielmaot@gmail.com" class="external-link">cyrhielmaot@gmail.com</a></p>
+                            <p><strong>Facebook:</strong> <a href="https://www.facebook.com/profile.php?id=61584774638218" target="_blank" class="external-link">Open Page</a></p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ORDER DETAILS MODAL -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Order Details</h2>
+                <button class="close-btn" onclick="closeOrderModal()">×</button>
+            </div>
+            
+            <div class="modal-body" id="orderModalBody">
+                <!-- Content loaded dynamically -->
+            </div>
+            
+            <div class="modal-footer" id="modalActions">
+                <!-- Actions loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- REJECT REASON MODAL -->
+    <div id="rejectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reject Order</h2>
+                <button class="close-btn" onclick="closeRejectModal()">×</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="rejectReason">Reason for Rejection:</label>
+                    <textarea id="rejectReason" rows="4" placeholder="Enter reason..."></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRejectModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="submitReject()">Reject Order</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/admin/admin-script.js?v=20260419-4"></script>
+</body>
+</html>

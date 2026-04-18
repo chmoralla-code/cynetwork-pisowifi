@@ -1,0 +1,123 @@
+╔═══════════════════════════════════════════════════════════════════════╗
+║     CYNETWORK PISOWIFI - ADMIN BACKEND QUICK START GUIDE              ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+STEP 1: INSTALL DEPENDENCIES
+─────────────────────────────────────────────────────────────────────────
+1. Open PowerShell
+2. Copy and paste this command:
+
+   cd "C:\Users\Cyrhiel\Documents\CYNETWORK PISOWIFI\backend"; npm install
+
+3. Wait for installation to complete (it will download all required packages)
+
+
+STEP 2: START THE BACKEND SERVER
+─────────────────────────────────────────────────────────────────────────
+1. In the same PowerShell, run:
+
+   npm start
+
+2. You should see:
+   ✓ Server running at: http://localhost:3000
+   ✓ Admin Dashboard: http://localhost:3000/admin
+   
+   Keep this window open!
+
+
+STEP 3: ACCESS ADMIN DASHBOARD
+─────────────────────────────────────────────────────────────────────────
+1. Open your web browser
+2. Go to: http://localhost:3000/admin
+3. Login with:
+   - Username: admin
+   - Password: admin123
+
+
+STEP 4: OPEN CUSTOMER WEBSITE
+─────────────────────────────────────────────────────────────────────────
+1. Open a new browser tab
+2. Go to: 
+   file:///C:/Users/Cyrhiel/Documents/CYNETWORK%20PISOWIFI/website/index.html
+
+3. Now you can:
+   - Browse packages
+   - Submit orders from the website
+   - Admin dashboard will show new orders immediately
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+ADMIN DASHBOARD FEATURES
+─────────────────────────────────────────────────────────────────────────
+
+📊 DASHBOARD TAB
+   • View total, pending, approved, rejected orders
+   • See recent orders list
+   
+📋 ORDERS TAB
+   • View all orders
+   • Search by customer name
+   • Filter by status
+   
+⏳ PENDING ORDERS TAB
+   • Quick view of orders awaiting approval
+   • Click to review and approve/reject
+   
+⚙️ SETTINGS TAB
+   • View admin account info
+   
+ORDER ACTIONS
+   • VIEW: See full order details with proof image
+   • APPROVE: Accept the order
+   • REJECT: Decline with reason
+   • UPDATE STATUS: Mark as completed
+
+═══════════════════════════════════════════════════════════════════════════
+
+TROUBLESHOOTING
+─────────────────────────────────────────────────────────────────────────
+
+❌ "Port 3000 already in use"
+   → Close the terminal and try again, or use different port
+
+❌ "npm not found"
+   → Reinstall Node.js from nodejs.org
+
+❌ "Module not found"
+   → Run "npm install" again in the backend folder
+
+❌ Orders not showing in admin panel
+   → Make sure backend is running
+   → Check if orders are submitted from website
+
+❌ Can't submit orders from website
+   → Backend may not be running
+   → Website works offline (saves locally too)
+
+═══════════════════════════════════════════════════════════════════════════
+
+DEFAULT CREDENTIALS
+─────────────────────────────────────────────────────────────────────────
+Username: admin
+Password: admin123
+
+⚠️  CHANGE THESE IN PRODUCTION
+
+═══════════════════════════════════════════════════════════════════════════
+
+FILE LOCATIONS
+─────────────────────────────────────────────────────────────────────────
+Website:  C:\Users\Cyrhiel\Documents\CYNETWORK PISOWIFI\website\
+Backend:  C:\Users\Cyrhiel\Documents\CYNETWORK PISOWIFI\backend\
+Database: C:\Users\Cyrhiel\Documents\CYNETWORK PISOWIFI\backend\pisowifi-admin.db
+
+═══════════════════════════════════════════════════════════════════════════
+
+Need Help?
+─────────────────────────────────────────────────────────────────────────
+1. Check the README.md file in the backend folder
+2. Open browser developer tools (F12) to see console errors
+3. Check server output in PowerShell window
+
+═══════════════════════════════════════════════════════════════════════════
