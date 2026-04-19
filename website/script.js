@@ -26,6 +26,13 @@ const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_VAT_PHP = 15;
 const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
+const AMAZON_LEO_RESERVATION_NOTICE = 'OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!';
+const AMAZON_LEO_PACKAGE = {
+    id: 4,
+    name: 'AMAZON LEO',
+    duration: 'OFFICIAL PRICE TO BE ANNOUNCED',
+    price: 0
+};
 
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
@@ -1053,6 +1060,227 @@ function resetForm() {
     uploadedProofImage = null;
 }
 
+function showAmazonLeoStep(stepNum) {
+    for (let i = 1; i <= 2; i++) {
+        const step = document.getElementById(`amazonLeoStep${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+
+    const activeStep = document.getElementById(`amazonLeoStep${stepNum}`);
+    if (activeStep) {
+        activeStep.classList.add('active');
+    }
+}
+
+function applySavedCustomerDetailsToAmazonLeoForm() {
+    const saved = loadSavedCustomerDetails();
+    if (!saved) {
+        return;
+    }
+
+    const fullNameInput = document.getElementById('amazonLeoFullName');
+    const contactNumberInput = document.getElementById('amazonLeoContactNumber');
+    const addressInput = document.getElementById('amazonLeoAddress');
+
+    if (fullNameInput) {
+        fullNameInput.value = saved.fullName || '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = saved.contactNumber || '';
+    }
+    if (addressInput) {
+        addressInput.value = saved.address || '';
+    }
+}
+
+function resetAmazonLeoReservationForm() {
+    const quantityInput = document.getElementById('amazonLeoQuantity');
+    const fullNameInput = document.getElementById('amazonLeoFullName');
+    const contactNumberInput = document.getElementById('amazonLeoContactNumber');
+    const addressInput = document.getElementById('amazonLeoAddress');
+
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+    if (fullNameInput) {
+        fullNameInput.value = '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = '';
+    }
+    if (addressInput) {
+        addressInput.value = '';
+    }
+
+    const orderIdEl = document.getElementById('amazonLeoConfirmOrderId');
+    const trackingEl = document.getElementById('amazonLeoConfirmTrackingNumber');
+    const statusEl = document.getElementById('amazonLeoConfirmStatus');
+    const quantityEl = document.getElementById('amazonLeoConfirmQuantity');
+    const nameEl = document.getElementById('amazonLeoConfirmName');
+    const noticeEl = document.getElementById('amazonLeoReservationNotice');
+
+    if (orderIdEl) {
+        orderIdEl.textContent = '--';
+    }
+    if (trackingEl) {
+        trackingEl.textContent = '--';
+    }
+    if (statusEl) {
+        statusEl.textContent = 'PENDING';
+    }
+    if (quantityEl) {
+        quantityEl.textContent = '1';
+    }
+    if (nameEl) {
+        nameEl.textContent = '';
+    }
+    if (noticeEl) {
+        noticeEl.textContent = AMAZON_LEO_RESERVATION_NOTICE;
+    }
+}
+
+function openAmazonLeoReservationModal() {
+    const modal = document.getElementById('amazonLeoModal');
+    if (!modal) {
+        return;
+    }
+
+    resetAmazonLeoReservationForm();
+    applySavedCustomerDetailsToAmazonLeoForm();
+    showAmazonLeoStep(1);
+    modal.classList.add('show');
+}
+
+function closeAmazonLeoReservationModal() {
+    const modal = document.getElementById('amazonLeoModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('show');
+    resetAmazonLeoReservationForm();
+    showAmazonLeoStep(1);
+}
+
+async function submitAmazonLeoReservation() {
+    const quantity = normalizeQuantity(document.getElementById('amazonLeoQuantity')?.value || 1);
+    const fullName = document.getElementById('amazonLeoFullName')?.value?.trim() || '';
+    const contactNumber = document.getElementById('amazonLeoContactNumber')?.value?.trim() || '';
+    const address = document.getElementById('amazonLeoAddress')?.value?.trim() || '';
+
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+        alert('Please enter a valid Philippine phone number');
+        return;
+    }
+
+    saveCustomerDetails({ fullName, contactNumber, address });
+
+    const transactionData = {
+        packageId: AMAZON_LEO_PACKAGE.id,
+        packageName: AMAZON_LEO_PACKAGE.name,
+        price: AMAZON_LEO_PACKAGE.price,
+        unitPrice: AMAZON_LEO_PACKAGE.price,
+        totalPrice: AMAZON_LEO_PACKAGE.price,
+        shippingFee: FREE_SHIPPING_FEE,
+        quantity,
+        duration: AMAZON_LEO_PACKAGE.duration,
+        fullName,
+        contactNumber,
+        address,
+        wifiName: 'PREORDER',
+        wifiPassword: 'PREORDER',
+        wifiRate: 'N/A',
+        proofImage: null
+    };
+
+    const isOfflineFileMode = window.location.protocol === 'file:';
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the reservation request.';
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+    }
+
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Reservation was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('Amazon LEO reservation submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving Amazon LEO reservation locally:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    document.getElementById('amazonLeoConfirmOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('amazonLeoConfirmTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('amazonLeoConfirmStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('amazonLeoConfirmQuantity').textContent = String(quantity);
+    document.getElementById('amazonLeoConfirmName').textContent = fullName;
+    document.getElementById('amazonLeoReservationNotice').textContent = AMAZON_LEO_RESERVATION_NOTICE;
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+
+    syncSupportSessionWithLatestOrder();
+    showAmazonLeoStep(2);
+}
+
 function scrollToPackages() {
     document.getElementById('packages').scrollIntoView({ behavior: 'smooth' });
 }
@@ -1060,11 +1288,16 @@ function scrollToPackages() {
 // Close modal when clicking outside
 window.addEventListener('click', function(event) {
     const paymentModal = document.getElementById('paymentModal');
+    const amazonLeoModal = document.getElementById('amazonLeoModal');
     const trackingModal = document.getElementById('trackOrderModal');
     const accountModal = document.getElementById('accountModal');
 
     if (event.target === paymentModal) {
         closeModal();
+    }
+
+    if (event.target === amazonLeoModal) {
+        closeAmazonLeoReservationModal();
     }
 
     if (event.target === trackingModal) {
@@ -1909,8 +2142,12 @@ async function generateSupportReply(userMessage) {
         return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
+    if (hasKeyword(text, ['amazon leo', 'leo package'])) {
+        return `Amazon LEO transaction flow:\n1) Click PREORDER AMAZON LEO button\n2) Fill up shipping information and how many PCS order\n3) After transaction, this notice is shown:\n"${AMAZON_LEO_RESERVATION_NOTICE}"`;
+    }
+
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
-        return 'Payment steps:\n1) Click PREORDER on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
+        return 'Payment steps:\n1) Click BUY on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
     }
 
     if (hasKeyword(text, ['proof', 'screenshot', 'receipt', 'resibo'])) {
@@ -1937,7 +2174,7 @@ async function generateSupportReply(userMessage) {
         return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
     }
 
-    return 'I can help with package pricing, payment steps, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
 }
 
 // Close picture modal when clicking outside

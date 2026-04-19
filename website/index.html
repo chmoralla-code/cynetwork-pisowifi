@@ -67,7 +67,7 @@
                         <li>✓ Customized Portal</li>
                         <li>✓ Perfect for 20-30 Clients</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(1)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(1)">BUY</button>
                 </div>
             </div>
 
@@ -92,7 +92,7 @@
                         <li>✓ Customized Portal</li>
                         <li>✓ Perfect for 40-60 Clients</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(2)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(2)">BUY</button>
                 </div>
             </div>
 
@@ -116,7 +116,7 @@
                         <li>✓ Perfect for 80-100 Clients</li>
                         <li>✓ Advanced Anti Lag Feature</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(3)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(3)">BUY</button>
                 </div>
             </div>
         </div>
@@ -126,7 +126,7 @@
     <section id="other-offers" class="other-offers-section">
         <div class="section-header">
             <h2>Other Offer Packages</h2>
-            <p class="section-subtitle">Need Amazon LEO internet equipment? Visit our partner offer page.</p>
+            <p class="section-subtitle">Reserve Amazon LEO now. Official pricing will be announced once product release is official.</p>
         </div>
 
         <div class="other-offer-card">
@@ -134,17 +134,16 @@
                 <img src="assets/images/amazon-leo.webp" alt="Amazon LEO internet hardware offer" class="other-offer-image">
             </div>
             <div class="other-offer-content">
-                <span class="other-offer-tag">External Offer</span>
+                <span class="other-offer-tag">Reservation</span>
                 <h3>Amazon LEO Internet Package</h3>
-                <p>Open the dedicated offer page to view available Amazon LEO internet hardware, inclusions, and pricing.</p>
-                <a
+                <p>Follow the reservation flow: click preorder, fill your shipping details and quantity, then wait for official Amazon LEO price announcement.</p>
+                <button
+                    type="button"
                     class="other-offer-btn"
-                    href="https://www.amazon.com/s?k=amazon+leo+internet"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onclick="openAmazonLeoReservationModal()"
                 >
-                    Open Amazon LEO Offer
-                </a>
+                    PREORDER AMAZON LEO
+                </button>
             </div>
         </div>
     </section>
@@ -360,6 +359,63 @@
                     <div class="success-actions">
                         <button id="trackPendingOrderBtn" class="next-btn track-order-btn" onclick="trackPendingOrder()">Track Pending Order</button>
                         <button class="cta-button" onclick="location.reload()">Start New Transaction</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Amazon LEO Reservation Modal -->
+    <div id="amazonLeoModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeAmazonLeoReservationModal()">&times;</span>
+            <h2>Amazon LEO Reservation</h2>
+
+            <div id="amazonLeoStep1" class="payment-step active">
+                <h3>Step 1: Fill Up Shipping Information and Quantity</h3>
+                <p>Complete this reservation form to be listed in line for Amazon LEO release.</p>
+
+                <div class="form-group quantity-group">
+                    <label for="amazonLeoQuantity">How many PCS do you want to reserve? *</label>
+                    <input type="number" id="amazonLeoQuantity" min="1" max="100" value="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoFullName">Full Name *</label>
+                    <input type="text" id="amazonLeoFullName" placeholder="Juan Dela Cruz" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoContactNumber">Contact Number (Philippine) *</label>
+                    <input type="tel" id="amazonLeoContactNumber" placeholder="+63 9XX XXX XXXX" pattern="^\+?63[0-9]{10}$" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoAddress">Full Address *</label>
+                    <textarea id="amazonLeoAddress" placeholder="Street Address, Barangay, City, Province, Postal Code" rows="3" required></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="submit-btn" onclick="submitAmazonLeoReservation()">Submit Reservation</button>
+                </div>
+            </div>
+
+            <div id="amazonLeoStep2" class="payment-step">
+                <div class="success-container">
+                    <div class="success-icon">✓</div>
+                    <h3>Reservation Submitted!</h3>
+                    <p id="amazonLeoReservationNotice">OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!</p>
+
+                    <div class="success-details">
+                        <p><strong>Order ID:</strong> <span id="amazonLeoConfirmOrderId">--</span></p>
+                        <p><strong>Tracking Number:</strong> <span id="amazonLeoConfirmTrackingNumber">--</span></p>
+                        <p><strong>Status:</strong> <span id="amazonLeoConfirmStatus">PENDING</span></p>
+                        <p><strong>Quantity:</strong> <span id="amazonLeoConfirmQuantity">1</span> piece(s)</p>
+                        <p><strong>Name:</strong> <span id="amazonLeoConfirmName"></span></p>
+                    </div>
+
+                    <div class="success-actions">
+                        <button class="cta-button" onclick="closeAmazonLeoReservationModal()">Close</button>
                     </div>
                 </div>
             </div>
