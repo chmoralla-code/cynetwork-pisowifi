@@ -4,7 +4,6 @@
 
 let currentStep = 1;
 let selectedPackage = null;
-let uploadedProofImage = null;
 let latestOrderId = null;
 let latestOrderStatus = 'pending';
 let latestTrackingNumber = null;
@@ -25,12 +24,12 @@ const renderedSupportMessageIds = new Set();
 const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_VAT_PHP = 15;
-const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
+const CHECKOUT_STEP_COUNT = 2;
 
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', price: 8500, duration: '3 Years License | 100 Meters' },
-    3: { name: 'Enterprise', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
+    3: { name: 'AMAZON LEO', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
 };
 
 const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
@@ -656,32 +655,19 @@ function selectPackage(packageNum) {
     selectedUnitPrice = Number(packageData?.price || 0);
     selectedQuantity = 1;
     selectedTotalPrice = selectedUnitPrice;
-    
-    // Show modal
+
     document.getElementById('paymentModal').classList.add('show');
-    
-    // Set package info in step 1
-    document.getElementById('selectedPackageText').textContent = packageData.name;
-
-    const quantityInput = document.getElementById('orderQuantity');
-    if (quantityInput) {
-        quantityInput.value = '1';
-    }
-
-    recalculateSelectedTotal({ refreshQr: false });
-    updateCheckoutAccountNotice();
-    
-    // Generate QR code
-    generateQRCode({ ...packageData, price: selectedTotalPrice });
-    
-    // Reset steps
     currentStep = 1;
     showStep(1);
+
     resetForm();
+    document.getElementById('selectedPackageText').textContent = packageData.name;
+    recalculateSelectedTotal();
+    updateCheckoutAccountNotice();
     applySavedCustomerDetailsToForm();
 }
 
-function recalculateSelectedTotal({ refreshQr = true } = {}) {
+function recalculateSelectedTotal() {
     if (!selectedPackage || !packages[selectedPackage]) {
         return;
     }
@@ -719,33 +705,10 @@ function recalculateSelectedTotal({ refreshQr = true } = {}) {
     if (totalSummaryEl) {
         totalSummaryEl.textContent = formatMoney(selectedTotalPrice);
     }
-
-    if (refreshQr) {
-        generateQRCode({ ...packageData, price: selectedTotalPrice });
-    }
 }
 
 function handleQuantityChange() {
-    recalculateSelectedTotal({ refreshQr: true });
-}
-
-// =====================================================
-// QR CODE GENERATION
-// =====================================================
-
-function generateQRCode() {
-    const qrWrap = document.getElementById('qrcode');
-    if (!qrWrap) {
-        return;
-    }
-
-    qrWrap.innerHTML = '';
-
-    const qrImage = document.createElement('img');
-    qrImage.src = STATIC_GCASH_QR_IMAGE;
-    qrImage.alt = 'Official GCash payment QR code';
-    qrImage.className = 'static-gcash-qr-image';
-    qrWrap.appendChild(qrImage);
+    recalculateSelectedTotal();
 }
 
 // =====================================================
@@ -753,17 +716,21 @@ function generateQRCode() {
 // =====================================================
 
 function showStep(stepNum) {
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= CHECKOUT_STEP_COUNT; i++) {
         const step = document.getElementById(`step${i}`);
         if (step) {
             step.classList.remove('active');
         }
     }
-    document.getElementById(`step${stepNum}`).classList.add('active');
+
+    const activeStep = document.getElementById(`step${stepNum}`);
+    if (activeStep) {
+        activeStep.classList.add('active');
+    }
 }
 
 function nextStep() {
-    if (currentStep < 5) {
+    if (currentStep < CHECKOUT_STEP_COUNT) {
         currentStep++;
         showStep(currentStep);
     }
@@ -777,33 +744,6 @@ function previousStep() {
 }
 
 // =====================================================
-// FILE UPLOAD HANDLING
-// =====================================================
-
-function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            uploadedProofImage = e.target.result;
-            const preview = document.getElementById('uploadPreview');
-            preview.innerHTML = `<img src="${e.target.result}" alt="Proof Preview">`;
-        };
-        reader.readAsDataURL(file);
-    } else {
-        alert('Please select a valid image file');
-    }
-}
-
-function validateProof() {
-    if (!uploadedProofImage) {
-        alert('Please upload a proof image');
-        return;
-    }
-    nextStep();
-}
-
-// =====================================================
 // FORM VALIDATION
 // =====================================================
 
@@ -814,17 +754,16 @@ function validatePersonalInfo() {
     
     if (!fullName || !contactNumber || !address) {
         alert('Please fill in all required fields');
-        return;
+        return null;
     }
     
     if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
         alert('Please enter a valid Philippine phone number');
-        return;
+        return null;
     }
 
     saveCustomerDetails({ fullName, contactNumber, address });
-    
-    nextStep();
+    return { fullName, contactNumber, address };
 }
 
 // =====================================================
@@ -832,18 +771,19 @@ function validatePersonalInfo() {
 // =====================================================
 
 async function completeTransaction() {
-    const wifiName = document.getElementById('wifiName').value.trim();
-    const wifiPassword = document.getElementById('wifiPassword').value.trim();
-    const wifiRate = document.getElementById('wifiRate').value;
-
-    recalculateSelectedTotal({ refreshQr: false });
-    const orderQuantity = normalizeQuantity(selectedQuantity);
-    
-    if (!wifiName || !wifiPassword || !wifiRate) {
-        alert('Please fill in all WiFi configuration fields');
+    if (!selectedPackage || !packages[selectedPackage]) {
+        alert('Please select a package first.');
         return;
     }
-    
+
+    const shippingDetails = validatePersonalInfo();
+    if (!shippingDetails) {
+        return;
+    }
+
+    recalculateSelectedTotal();
+    const orderQuantity = normalizeQuantity(selectedQuantity);
+    const selectedPackageData = packages[selectedPackage];
     const isOfflineFileMode = window.location.protocol === 'file:';
 
     let resolvedOrderId = null;
@@ -860,20 +800,20 @@ async function completeTransaction() {
     // Prepare transaction data
     const transactionData = {
         packageId: selectedPackage,
-        packageName: packages[selectedPackage].name,
+        packageName: selectedPackageData.name,
         price: selectedTotalPrice,
         unitPrice: selectedUnitPrice,
         totalPrice: selectedTotalPrice,
         shippingFee: FREE_SHIPPING_FEE,
         quantity: orderQuantity,
-        duration: packages[selectedPackage].duration,
-        fullName: document.getElementById('fullName').value.trim(),
-        contactNumber: document.getElementById('contactNumber').value.trim(),
-        address: document.getElementById('address').value.trim(),
-        wifiName: wifiName,
-        wifiPassword: wifiPassword,
-        wifiRate: wifiRate,
-        proofImage: uploadedProofImage
+        duration: selectedPackageData.duration,
+        fullName: shippingDetails.fullName,
+        contactNumber: shippingDetails.contactNumber,
+        address: shippingDetails.address,
+        wifiName: 'PREORDER',
+        wifiPassword: 'PREORDER',
+        wifiRate: 'N/A',
+        proofImage: null
     };
 
     saveCustomerDetails({
@@ -963,9 +903,8 @@ async function completeTransaction() {
     document.getElementById('confirmOrderStatus').textContent = resolvedOrderStatus.toUpperCase();
     document.getElementById('confirmQuantity').textContent = String(orderQuantity);
     document.getElementById('confirmTotalPrice').textContent = formatMoney(resolvedTotalPrice);
-    document.getElementById('confirmWifiName').textContent = wifiName;
-    document.getElementById('confirmDuration').textContent = packages[selectedPackage].duration;
-    document.getElementById('confirmName').textContent = document.getElementById('fullName').value.trim();
+    document.getElementById('confirmDuration').textContent = selectedPackageData.duration;
+    document.getElementById('confirmName').textContent = shippingDetails.fullName;
 
     const rewardWrap = document.getElementById('confirmReferralRewardWrap');
     const rewardText = document.getElementById('confirmReferralRewardText');
@@ -995,8 +934,8 @@ async function completeTransaction() {
         pendingNotice.style.display = isPending ? 'block' : 'none';
     }
     
-    currentStep = 5;
-    showStep(5);
+    currentStep = 2;
+    showStep(2);
 }
 
 // =====================================================
@@ -1009,14 +948,19 @@ function closeModal() {
 }
 
 function resetForm() {
-    document.getElementById('fullName').value = '';
-    document.getElementById('contactNumber').value = '';
-    document.getElementById('address').value = '';
-    document.getElementById('wifiName').value = '';
-    document.getElementById('wifiPassword').value = '';
-    document.getElementById('wifiRate').value = '';
-    document.getElementById('proofImage').value = '';
-    document.getElementById('uploadPreview').innerHTML = '';
+    const fullNameInput = document.getElementById('fullName');
+    const contactNumberInput = document.getElementById('contactNumber');
+    const addressInput = document.getElementById('address');
+
+    if (fullNameInput) {
+        fullNameInput.value = '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = '';
+    }
+    if (addressInput) {
+        addressInput.value = '';
+    }
 
     const quantityInput = document.getElementById('orderQuantity');
     if (quantityInput) {
@@ -1028,9 +972,7 @@ function resetForm() {
         selectedUnitPrice = Number(packages[selectedPackage].price || 0);
     }
     selectedTotalPrice = selectedUnitPrice;
-    recalculateSelectedTotal({ refreshQr: false });
-
-    uploadedProofImage = null;
+    recalculateSelectedTotal();
 }
 
 function scrollToPackages() {
@@ -1247,13 +1189,13 @@ async function trackOrder() {
 const packageImages = {
     1: ['assets/images/package1.png'],
     2: ['assets/images/package2.png'],
-    3: ['assets/images/package3.png']
+    3: ['assets/images/amazon-leo.webp']
 };
 
 const packageImageFallbacks = {
     1: 'assets/images/package1.png',
     2: 'assets/images/package2.png',
-    3: 'assets/images/package3.png'
+    3: 'assets/images/amazon-leo.webp'
 };
 
 function initPackageImagesFromServer() {
@@ -1705,7 +1647,7 @@ function initSupportChat() {
             if (chatMessages.children.length === 0) {
                 addSupportMessage(
                     'bot',
-                    'Hello! I am your PisoWiFi AI support bot.\nI can help with package pricing, payment, activation, WiFi setup, vouchers, and speed concerns.\n\nType "I need live customer support" anytime to connect with admin.',
+                    'Hello! I am your PisoWiFi AI support bot.\nI can help with package pricing, preorder steps, shipping details, installation tips, and speed concerns.\n\nType "I need live customer support" anytime to connect with admin.',
                     'welcome-bot'
                 );
             }
@@ -1882,27 +1824,27 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
-        return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about pricing, payment, setup, or troubleshooting.';
+        return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about package pricing, preorder, setup, or troubleshooting.';
     }
 
     if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and total payment is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
+        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) AMAZON LEO - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
-        return 'Payment steps:\n1) Click Get Started on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
+        return 'Preorder steps:\n1) Click PREORDER on your selected package\n2) Set quantity and fill in shipping details (name, contact number, full address)\n3) Submit preorder\n4) Your order will be marked as PENDING and you can track it anytime\n\nIf you need urgent help, ask for live support.';
     }
 
     if (hasKeyword(text, ['proof', 'screenshot', 'receipt', 'resibo'])) {
-        return 'Please upload a clear screenshot of successful GCash payment showing amount, reference, and date/time.\n\nAccepted format: image file (PNG or JPG) with readable details.';
+        return 'No payment screenshot is required in the current preorder flow. Just complete the shipping details form and submit your preorder.';
     }
 
     if (hasKeyword(text, ['activation', 'activate', 'install', 'installation', 'setup', 'gaano katagal'])) {
-        return 'Typical flow:\n- Payment and form submission: 5 to 10 minutes\n- Initial review and activation: usually same day\n\nFor urgent activation, type: I need live customer support.';
+        return 'Typical flow:\n- Preorder form submission: a few minutes\n- Order review and shipping update: depends on queue and location\n\nFor urgent follow-up, type: I need live customer support.';
     }
 
     if (hasKeyword(text, ['wifi', 'ssid', 'password', 'voucher', 'portal'])) {
-        return 'For WiFi setup, prepare these details:\n- WiFi Name (SSID)\n- WiFi Password\n- Data rate limit\n\nAfter activation, keep your password secure and update it regularly.';
+        return 'For this preorder flow, we only collect shipping details first. WiFi setup and configuration are handled during installation and onboarding.';
     }
 
     if (hasKeyword(text, ['slow', 'lag', 'mabagal', 'buffer', 'speed', 'internet'])) {
@@ -1910,14 +1852,14 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['refund', 'cancel', 'cancellation'])) {
-        return 'For cancellation or refund concerns, request live support so admin can review your payment and order status in real-time.';
+        return 'For cancellation or refund concerns, request live support so admin can review your preorder status in real-time.';
     }
 
     if (hasKeyword(text, ['contact', 'agent', 'human', 'support', 'facebook'])) {
         return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
     }
 
-    return 'I can help with package pricing, payment steps, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+    return 'I can help with package pricing, preorder steps, order tracking, setup, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
 }
 
 // Close picture modal when clicking outside

@@ -401,6 +401,91 @@ body {
 }
 
 /* =====================================================
+   OTHER OFFERS SECTION
+   ===================================================== */
+
+.other-offers-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem 90px;
+}
+
+.other-offer-card {
+    display: grid;
+    grid-template-columns: minmax(260px, 420px) 1fr;
+    gap: 1.2rem;
+    border: 1px solid #E4E4E4;
+    border-radius: 14px;
+    background: #FFFFFF;
+    overflow: hidden;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.06);
+}
+
+.other-offer-media {
+    background: #F5F5F5;
+    min-height: 230px;
+}
+
+.other-offer-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.other-offer-content {
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.7rem;
+}
+
+.other-offer-tag {
+    display: inline-flex;
+    width: fit-content;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border-radius: 999px;
+    background: #FFE5E8;
+    color: #9C1C29;
+    padding: 0.22rem 0.56rem;
+}
+
+.other-offer-content h3 {
+    color: var(--text-dark);
+    font-size: 1.35rem;
+}
+
+.other-offer-content p {
+    color: #555;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.other-offer-btn {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    border-radius: 8px;
+    border: none;
+    background: var(--gradient-main);
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 0.72rem 1rem;
+    transition: var(--transition);
+}
+
+.other-offer-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(230, 57, 70, 0.3);
+}
+
+/* =====================================================
    INSTALLATION TUTORIALS
    ===================================================== */
 
@@ -1524,6 +1609,14 @@ body {
 
     .tutorials-grid {
         grid-template-columns: 1fr;
+    }
+
+    .other-offer-card {
+        grid-template-columns: 1fr;
+    }
+
+    .other-offer-media {
+        min-height: 200px;
     }
 
     .package-card.featured {
