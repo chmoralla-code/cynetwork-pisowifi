@@ -649,6 +649,11 @@ function initClientAccountFeatures() {
 // PACKAGE SELECTION
 // =====================================================
 
+function isAmazonLeoPackage(packageNum) {
+    const packageName = String(packages?.[packageNum]?.name || '').trim().toUpperCase();
+    return packageName.includes('AMAZON LEO');
+}
+
 function selectPackage(packageNum) {
     selectedPackage = packageNum;
     const packageData = packages[packageNum];
@@ -785,6 +790,7 @@ async function completeTransaction() {
     const orderQuantity = normalizeQuantity(selectedQuantity);
     const selectedPackageData = packages[selectedPackage];
     const isOfflineFileMode = window.location.protocol === 'file:';
+    const isAmazonLeo = isAmazonLeoPackage(selectedPackage);
 
     let resolvedOrderId = null;
     let resolvedTrackingNumber = null;
@@ -810,9 +816,9 @@ async function completeTransaction() {
         fullName: shippingDetails.fullName,
         contactNumber: shippingDetails.contactNumber,
         address: shippingDetails.address,
-        wifiName: 'PREORDER',
-        wifiPassword: 'PREORDER',
-        wifiRate: 'N/A',
+        wifiName: isAmazonLeo ? 'N/A' : 'PREORDER',
+        wifiPassword: isAmazonLeo ? 'N/A' : 'PREORDER',
+        wifiRate: isAmazonLeo ? 'N/A' : 'N/A',
         proofImage: null
     };
 
