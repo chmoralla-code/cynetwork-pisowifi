@@ -5,6 +5,7 @@
 let currentStep = 1;
 let selectedPackage = null;
 let uploadedProofImage = null;
+let uploadedAddingEapProofImage = null;
 let latestOrderId = null;
 let latestOrderStatus = 'pending';
 let latestTrackingNumber = null;
@@ -1320,6 +1321,8 @@ function resetAddingEapForm() {
     const macInput = document.getElementById('addingEapMacAddress');
     const usernameInput = document.getElementById('addingEapUsername');
     const passwordInput = document.getElementById('addingEapPassword');
+    const proofInput = document.getElementById('addingEapProofImage');
+    const proofPreview = document.getElementById('addingEapUploadPreview');
     const orderIdEl = document.getElementById('addingEapOrderId');
     const trackingEl = document.getElementById('addingEapTrackingNumber');
     const statusEl = document.getElementById('addingEapStatus');
@@ -1334,6 +1337,12 @@ function resetAddingEapForm() {
     if (passwordInput) {
         passwordInput.value = '';
     }
+    if (proofInput) {
+        proofInput.value = '';
+    }
+    if (proofPreview) {
+        proofPreview.innerHTML = '';
+    }
     if (orderIdEl) {
         orderIdEl.textContent = '--';
     }
@@ -1346,6 +1355,8 @@ function resetAddingEapForm() {
     if (noticeEl) {
         noticeEl.textContent = ADDING_EAP_APPROVAL_NOTICE;
     }
+
+    uploadedAddingEapProofImage = null;
 }
 
 function openAddingEapModal() {
@@ -1371,6 +1382,43 @@ function closeAddingEapModal() {
     showAddingEapStep(1);
 }
 
+function proceedAddingEapToPayment() {
+    const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
+    const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
+    const eapPassword = document.getElementById('addingEapPassword')?.value?.trim() || '';
+
+    if (!macAddress || !eapUsername || !eapPassword) {
+        alert('Please fill MAC address, username, and password.');
+        return;
+    }
+
+    const macPattern = /^(?:[0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$/;
+    if (!macPattern.test(macAddress)) {
+        alert('Please enter a valid MAC address format (e.g., AA:BB:CC:DD:EE:FF).');
+        return;
+    }
+
+    showAddingEapStep(2);
+}
+
+function handleAddingEapProofUpload(event) {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            uploadedAddingEapProofImage = e.target.result;
+            const preview = document.getElementById('addingEapUploadPreview');
+            if (preview) {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Adding EAP Proof Preview">`;
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        uploadedAddingEapProofImage = null;
+        alert('Please select a valid image file');
+    }
+}
+
 async function submitAddingEapTransaction() {
     const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
     const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
@@ -1384,6 +1432,11 @@ async function submitAddingEapTransaction() {
     const macPattern = /^(?:[0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$/;
     if (!macPattern.test(macAddress)) {
         alert('Please enter a valid MAC address format (e.g., AA:BB:CC:DD:EE:FF).');
+        return;
+    }
+
+    if (!uploadedAddingEapProofImage) {
+        alert('Please upload proof of payment.');
         return;
     }
 
@@ -1402,7 +1455,7 @@ async function submitAddingEapTransaction() {
         wifiName: macAddress,
         wifiPassword: eapUsername,
         wifiRate: eapPassword,
-        proofImage: null
+        proofImage: uploadedAddingEapProofImage
     };
 
     const isOfflineFileMode = window.location.protocol === 'file:';
@@ -2355,7 +2408,7 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['adding eap', 'eap', 'tplink', 'tp link', 'add tplink'])) {
-        return `ADDING EAP transaction flow:\n1) Click ADD TPLINK PRODUCT button\n2) Fill up MAC address, username, password\n3) Required to pay PHP 350 using the existing GCash QR code\n4) After transaction, this notice is shown:\n"${ADDING_EAP_APPROVAL_NOTICE}"`;
+        return `ADDING EAP transaction flow:\n1) Click ADD TPLINK PRODUCT button\n2) Fill up MAC address, username, password\n3) Pay PHP 350 using the existing GCash QR code and upload proof of payment\n4) After transaction, this notice is shown:\n"${ADDING_EAP_APPROVAL_NOTICE}"`;
     }
 
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {

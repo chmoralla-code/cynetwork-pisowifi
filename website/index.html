@@ -150,12 +150,12 @@
 
             <div class="other-offer-card">
                 <div class="other-offer-media">
-                    <img src="assets/images/package2-machine.jpg" alt="Adding EAP service offer" class="other-offer-image">
+                    <img src="assets/images/adding-eap.png" alt="Adding EAP service offer" class="other-offer-image">
                 </div>
                 <div class="other-offer-content">
                     <span class="other-offer-tag">Service Add-on</span>
                     <h3>ADDING EAP</h3>
-                    <p>Transaction flow: click ADD TPLINK PRODUCT, fill MAC address + username + password, pay PHP 350 using the existing GCash QR code, then wait for approval notice.</p>
+                    <p>Transaction flow: click ADD TPLINK PRODUCT, fill MAC address + username + password, pay PHP 350 using the existing GCash QR code, upload proof of payment, then wait for approval notice.</p>
                     <button
                         type="button"
                         class="other-offer-btn"
@@ -449,21 +449,8 @@
             <h2>ADDING EAP Transaction Flow</h2>
 
             <div id="addingEapStep1" class="payment-step active">
-                <h3>Step 1: Pay PHP 350 using GCash QR</h3>
-                <p>Required to pay PHP 350 using the existing QR code on other packages.</p>
-
-                <div class="qr-container">
-                    <div id="addingEapQrcode" class="qr-code"></div>
-                    <p class="qr-instruction">Scan this QR code with your GCash app to pay PHP 350.</p>
-                </div>
-
-                <div class="form-actions">
-                    <button class="next-btn" onclick="showAddingEapStep(2)">I've Paid PHP 350</button>
-                </div>
-            </div>
-
-            <div id="addingEapStep2" class="payment-step">
-                <h3>Step 2: Fill MAC Address, Username, Password</h3>
+                <h3>Step 1: Fill MAC Address, Username, Password</h3>
+                <p>Enter your TP-Link EAP details first.</p>
 
                 <div class="form-group">
                     <label for="addingEapMacAddress">MAC Address *</label>
@@ -479,6 +466,31 @@
                     <label for="addingEapPassword">Password *</label>
                     <input type="password" id="addingEapPassword" placeholder="Enter password" required>
                 </div>
+
+                <div class="form-actions">
+                    <button class="next-btn" onclick="proceedAddingEapToPayment()">Next</button>
+                </div>
+            </div>
+
+            <div id="addingEapStep2" class="payment-step">
+                <h3>Step 2: Pay PHP 350 and Upload Proof of Payment</h3>
+                <p>Required to pay PHP 350 using the existing GCash QR code on other packages and upload proof.</p>
+
+                <div class="qr-container">
+                    <div id="addingEapQrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay PHP 350.</p>
+                </div>
+
+                <div class="file-upload-area">
+                    <input type="file" id="addingEapProofImage" accept="image/*" onchange="handleAddingEapProofUpload(event)">
+                    <label for="addingEapProofImage">
+                        <span class="upload-icon">📸</span>
+                        <span class="upload-text">Upload proof of payment</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+
+                <div id="addingEapUploadPreview" class="upload-preview"></div>
 
                 <div class="form-actions">
                     <button class="back-btn" onclick="showAddingEapStep(1)">Back</button>
