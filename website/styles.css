@@ -410,6 +410,11 @@ body {
     padding: 0 2rem 90px;
 }
 
+.other-offers-list {
+    display: grid;
+    gap: 1.3rem;
+}
+
 .other-offer-card {
     display: grid;
     grid-template-columns: minmax(260px, 420px) 1fr;

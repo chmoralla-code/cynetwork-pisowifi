@@ -27,11 +27,18 @@ const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_VAT_PHP = 15;
 const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
 const AMAZON_LEO_RESERVATION_NOTICE = 'OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!';
+const ADDING_EAP_APPROVAL_NOTICE = 'approval will be within 24 hours business days';
 const AMAZON_LEO_PACKAGE = {
     id: 4,
     name: 'AMAZON LEO',
     duration: 'OFFICIAL PRICE TO BE ANNOUNCED',
     price: 0
+};
+const ADDING_EAP_PACKAGE = {
+    id: 5,
+    name: 'ADDING EAP',
+    duration: 'ADD TPLINK PRODUCT',
+    price: 350
 };
 
 const packages = {
@@ -1281,6 +1288,202 @@ async function submitAmazonLeoReservation() {
     showAmazonLeoStep(2);
 }
 
+function showAddingEapStep(stepNum) {
+    for (let i = 1; i <= 3; i++) {
+        const step = document.getElementById(`addingEapStep${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+
+    const activeStep = document.getElementById(`addingEapStep${stepNum}`);
+    if (activeStep) {
+        activeStep.classList.add('active');
+    }
+}
+
+function renderAddingEapQrCode() {
+    const qrWrap = document.getElementById('addingEapQrcode');
+    if (!qrWrap) {
+        return;
+    }
+
+    qrWrap.innerHTML = '';
+    const qrImage = document.createElement('img');
+    qrImage.src = STATIC_GCASH_QR_IMAGE;
+    qrImage.alt = 'GCash payment QR code for ADDING EAP';
+    qrImage.className = 'static-gcash-qr-image';
+    qrWrap.appendChild(qrImage);
+}
+
+function resetAddingEapForm() {
+    const macInput = document.getElementById('addingEapMacAddress');
+    const usernameInput = document.getElementById('addingEapUsername');
+    const passwordInput = document.getElementById('addingEapPassword');
+    const orderIdEl = document.getElementById('addingEapOrderId');
+    const trackingEl = document.getElementById('addingEapTrackingNumber');
+    const statusEl = document.getElementById('addingEapStatus');
+    const noticeEl = document.getElementById('addingEapApprovalNotice');
+
+    if (macInput) {
+        macInput.value = '';
+    }
+    if (usernameInput) {
+        usernameInput.value = '';
+    }
+    if (passwordInput) {
+        passwordInput.value = '';
+    }
+    if (orderIdEl) {
+        orderIdEl.textContent = '--';
+    }
+    if (trackingEl) {
+        trackingEl.textContent = '--';
+    }
+    if (statusEl) {
+        statusEl.textContent = 'PENDING';
+    }
+    if (noticeEl) {
+        noticeEl.textContent = ADDING_EAP_APPROVAL_NOTICE;
+    }
+}
+
+function openAddingEapModal() {
+    const modal = document.getElementById('addingEapModal');
+    if (!modal) {
+        return;
+    }
+
+    resetAddingEapForm();
+    renderAddingEapQrCode();
+    showAddingEapStep(1);
+    modal.classList.add('show');
+}
+
+function closeAddingEapModal() {
+    const modal = document.getElementById('addingEapModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('show');
+    resetAddingEapForm();
+    showAddingEapStep(1);
+}
+
+async function submitAddingEapTransaction() {
+    const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
+    const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
+    const eapPassword = document.getElementById('addingEapPassword')?.value?.trim() || '';
+
+    if (!macAddress || !eapUsername || !eapPassword) {
+        alert('Please fill MAC address, username, and password.');
+        return;
+    }
+
+    const macPattern = /^(?:[0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$/;
+    if (!macPattern.test(macAddress)) {
+        alert('Please enter a valid MAC address format (e.g., AA:BB:CC:DD:EE:FF).');
+        return;
+    }
+
+    const transactionData = {
+        packageId: ADDING_EAP_PACKAGE.id,
+        packageName: ADDING_EAP_PACKAGE.name,
+        price: ADDING_EAP_PACKAGE.price,
+        unitPrice: ADDING_EAP_PACKAGE.price,
+        totalPrice: ADDING_EAP_PACKAGE.price,
+        shippingFee: 0,
+        quantity: 1,
+        duration: ADDING_EAP_PACKAGE.duration,
+        fullName: `ADDING EAP - ${eapUsername}`,
+        contactNumber: 'N/A',
+        address: 'N/A',
+        wifiName: macAddress,
+        wifiPassword: eapUsername,
+        wifiRate: eapPassword,
+        proofImage: null
+    };
+
+    const isOfflineFileMode = window.location.protocol === 'file:';
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the ADDING EAP request.';
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+    }
+
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Transaction was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('ADDING EAP submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving ADDING EAP transaction locally:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    document.getElementById('addingEapOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('addingEapTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('addingEapStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('addingEapApprovalNotice').textContent = ADDING_EAP_APPROVAL_NOTICE;
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+
+    syncSupportSessionWithLatestOrder();
+    showAddingEapStep(3);
+}
+
 function scrollToPackages() {
     document.getElementById('packages').scrollIntoView({ behavior: 'smooth' });
 }
@@ -1289,6 +1492,7 @@ function scrollToPackages() {
 window.addEventListener('click', function(event) {
     const paymentModal = document.getElementById('paymentModal');
     const amazonLeoModal = document.getElementById('amazonLeoModal');
+    const addingEapModal = document.getElementById('addingEapModal');
     const trackingModal = document.getElementById('trackOrderModal');
     const accountModal = document.getElementById('accountModal');
 
@@ -1298,6 +1502,10 @@ window.addEventListener('click', function(event) {
 
     if (event.target === amazonLeoModal) {
         closeAmazonLeoReservationModal();
+    }
+
+    if (event.target === addingEapModal) {
+        closeAddingEapModal();
     }
 
     if (event.target === trackingModal) {
@@ -2146,6 +2354,10 @@ async function generateSupportReply(userMessage) {
         return `Amazon LEO transaction flow:\n1) Click PREORDER AMAZON LEO button\n2) Fill up shipping information and how many PCS order\n3) After transaction, this notice is shown:\n"${AMAZON_LEO_RESERVATION_NOTICE}"`;
     }
 
+    if (hasKeyword(text, ['adding eap', 'eap', 'tplink', 'tp link', 'add tplink'])) {
+        return `ADDING EAP transaction flow:\n1) Click ADD TPLINK PRODUCT button\n2) Fill up MAC address, username, password\n3) Required to pay PHP 350 using the existing GCash QR code\n4) After transaction, this notice is shown:\n"${ADDING_EAP_APPROVAL_NOTICE}"`;
+    }
+
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
         return 'Payment steps:\n1) Click BUY on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
     }
@@ -2174,7 +2386,7 @@ async function generateSupportReply(userMessage) {
         return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
     }
 
-    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, ADDING EAP flow, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
 }
 
 // Close picture modal when clicking outside

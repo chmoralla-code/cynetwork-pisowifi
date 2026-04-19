@@ -32,7 +32,8 @@ const PACKAGE_CATALOG = {
     1: { name: 'Starter', unitPrice: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', unitPrice: 8500, duration: '3 Years License | 100 Meters' },
     3: { name: 'Enterprise', unitPrice: 11000, duration: 'LIFETIME LICENSE | 250 Meters' },
-    4: { name: 'AMAZON LEO', unitPrice: 0, duration: 'OFFICIAL PRICE TO BE ANNOUNCED' }
+    4: { name: 'AMAZON LEO', unitPrice: 0, duration: 'OFFICIAL PRICE TO BE ANNOUNCED' },
+    5: { name: 'ADDING EAP', unitPrice: 350, duration: 'ADD TPLINK PRODUCT' }
 };
 const AMAZON_LEO_PACKAGE_ID = 4;
 const AMAZON_LEO_SMS_PROVIDER = String(process.env.AMAZON_LEO_SMS_PROVIDER || 'semaphore').trim().toLowerCase();
@@ -1650,7 +1651,7 @@ app.post('/api/submit-order', (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const normalizedPackageId = normalizePositiveInt(packageId, 1, 1, 4);
+    const normalizedPackageId = normalizePositiveInt(packageId, 1, 1, 5);
     const catalog = PACKAGE_CATALOG[normalizedPackageId];
     const resolvedPackageName = catalog?.name || String(packageName || `Package ${normalizedPackageId}`);
     const resolvedDuration = catalog?.duration || String(duration || 'Custom Duration');
