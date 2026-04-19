@@ -14,11 +14,29 @@ const fs = require('fs');
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const SECRET_KEY = process.env.JWT_SECRET || 'cynetwork-pisowifi-secret-2026';
+const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+const persistentDataDir = '/var/data';
 const adminPublicDir = path.join(__dirname, 'public');
 const clientPublicDir = path.join(__dirname, '..', 'website');
-const uploadedPackageImagesDir = process.env.UPLOADS_DIR
-    ? path.resolve(process.env.UPLOADS_DIR)
-    : path.join(adminPublicDir, 'package-images');
+const configuredDatabasePath = String(process.env.DATABASE_PATH || '').trim();
+const configuredUploadsDir = String(process.env.UPLOADS_DIR || '').trim();
+const dbPath = configuredDatabasePath
+    ? path.resolve(configuredDatabasePath)
+    : (isProduction
+        ? path.join(persistentDataDir, 'pisowifi-admin.db')
+        : path.join(__dirname, 'pisowifi-admin.db'));
+const uploadedPackageImagesDir = configuredUploadsDir
+    ? path.resolve(configuredUploadsDir)
+    : (isProduction
+        ? path.join(persistentDataDir, 'package-images')
+        : path.join(adminPublicDir, 'package-images'));
+
+if (isProduction && !configuredDatabasePath) {
+    console.warn(`DATABASE_PATH not set; using production default: ${dbPath}`);
+}
+if (isProduction && !configuredUploadsDir) {
+    console.warn(`UPLOADS_DIR not set; using production default: ${uploadedPackageImagesDir}`);
+}
 
 const defaultPackageImages = {
     1: 'assets/images/package1.png',
@@ -806,10 +824,6 @@ app.get('/', (req, res) => {
 // =====================================================
 // DATABASE SETUP
 // =====================================================
-
-const dbPath = process.env.DATABASE_PATH
-    ? path.resolve(process.env.DATABASE_PATH)
-    : path.join(__dirname, 'pisowifi-admin.db');
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -2601,10 +2615,31 @@ app.get('/package-images/:filename', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
+    const databaseExists = fs.existsSync(dbPath);
+    const uploadsDirExists = fs.existsSync(uploadedPackageImagesDir);
+    let databaseSizeBytes = null;
+    let databaseStatError = null;
+
+    if (databaseExists) {
+        try {
+            databaseSizeBytes = fs.statSync(dbPath).size;
+        } catch (error) {
+            databaseStatError = String(error.message || error);
+        }
+    }
+
     res.status(200).json({
         ok: true,
         service: 'cynetwork-pisowifi-backend',
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        storage: {
+            databasePath: dbPath,
+            databaseExists,
+            databaseSizeBytes,
+            databaseStatError,
+            uploadsDir: uploadedPackageImagesDir,
+            uploadsDirExists
+        }
     });
 });
 

@@ -192,9 +192,11 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - Render mounts a persistent disk at `/var/data`.
 - Orders database and uploaded package images stay available across restarts/redeploys.
 - Keep using the **same Render service + disk** (do not delete/recreate them) to retain accounts and sessions.
+- In production, the backend now automatically falls back to `/var/data/pisowifi-admin.db` and `/var/data/package-images` when env vars are missing, so it avoids writing to temporary container storage.
 
 ### 5. Verify deployment
 - Open `<your-render-url>/health` and confirm `ok: true`.
+- Check `storage.databasePath` in `/health` and confirm it points to `/var/data/pisowifi-admin.db`.
 - Open `<your-render-url>/` for customer site.
 - Open `<your-render-url>/admin` for admin dashboard.
 - Login with default admin credentials, then change the password.
