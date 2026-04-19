@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
-const { Pool } = require('pg');
+const { MongoClient } = require('mongodb');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
@@ -21,10 +21,11 @@ const adminPublicDir = path.join(__dirname, 'public');
 const clientPublicDir = path.join(__dirname, '..', 'website');
 const configuredDatabasePath = String(process.env.DATABASE_PATH || '').trim();
 const configuredUploadsDir = String(process.env.UPLOADS_DIR || '').trim();
-const accountBackupDatabaseUrl = String(process.env.ACCOUNT_BACKUP_DATABASE_URL || '').trim();
-const accountBackupUseSsl = ['1', 'true', 'yes', 'on'].includes(
-    String(process.env.ACCOUNT_BACKUP_USE_SSL || '').trim().toLowerCase()
-);
+const accountBackupMongoUri = String(process.env.ACCOUNT_BACKUP_MONGODB_URI || '').trim();
+const accountBackupMongoDbName = String(process.env.ACCOUNT_BACKUP_MONGODB_DB || 'cynetwork_pisowifi').trim();
+const accountBackupMongoCollectionName = String(
+    process.env.ACCOUNT_BACKUP_MONGODB_COLLECTION || 'client_account_backups'
+).trim();
 const dbPath = configuredDatabasePath
     ? path.resolve(configuredDatabasePath)
     : (isProduction
@@ -43,7 +44,8 @@ if (isProduction && !configuredUploadsDir) {
     console.warn(`UPLOADS_DIR not set; using production default: ${uploadedPackageImagesDir}`);
 }
 
-let accountBackupPool = null;
+let accountBackupMongoClient = null;
+let accountBackupCollection = null;
 let accountBackupSyncInProgress = false;
 let accountBackupSyncQueued = false;
 let accountBackupSyncTimer = null;
@@ -937,7 +939,7 @@ async function buildClientAccountSnapshot() {
 }
 
 async function restoreClientAccountSnapshotIfNeeded() {
-    if (!accountBackupPool) {
+    if (!accountBackupCollection) {
         return false;
     }
 
@@ -947,10 +949,11 @@ async function restoreClientAccountSnapshotIfNeeded() {
         return false;
     }
 
-    const remoteResult = await accountBackupPool.query(
-        'SELECT payload FROM client_account_backups WHERE id = 1 LIMIT 1'
+    const remoteDoc = await accountBackupCollection.findOne(
+        { _id: 'client-account-snapshot' },
+        { projection: { payload: 1 } }
     );
-    const payload = normalizeAccountBackupPayload(remoteResult?.rows?.[0]?.payload);
+    const payload = normalizeAccountBackupPayload(remoteDoc?.payload);
     if (!payload) {
         return false;
     }
@@ -1035,7 +1038,7 @@ async function restoreClientAccountSnapshotIfNeeded() {
 }
 
 async function pushClientAccountSnapshot(reason = 'manual') {
-    if (!accountBackupPool) {
+    if (!accountBackupCollection) {
         return;
     }
     if (accountBackupSyncInProgress) {
@@ -1047,13 +1050,15 @@ async function pushClientAccountSnapshot(reason = 'manual') {
     accountBackupSyncInProgress = true;
     try {
         const snapshot = await buildClientAccountSnapshot();
-        await accountBackupPool.query(
-            `INSERT INTO client_account_backups (id, payload, updated_at)
-             VALUES (1, $1::jsonb, NOW())
-             ON CONFLICT (id) DO UPDATE SET
-                payload = EXCLUDED.payload,
-                updated_at = NOW()`,
-            [JSON.stringify(snapshot)]
+        await accountBackupCollection.updateOne(
+            { _id: 'client-account-snapshot' },
+            {
+                $set: {
+                    payload: snapshot,
+                    updatedAt: new Date()
+                }
+            },
+            { upsert: true }
         );
         accountBackupLastSyncedAt = new Date().toISOString();
         accountBackupLastSyncReason = reason;
@@ -1074,7 +1079,7 @@ async function pushClientAccountSnapshot(reason = 'manual') {
 }
 
 function queueClientAccountBackup(reason = 'update') {
-    if (!accountBackupPool) {
+    if (!accountBackupCollection) {
         return;
     }
     accountBackupLastSyncReason = reason;
@@ -1088,41 +1093,36 @@ function queueClientAccountBackup(reason = 'update') {
 }
 
 async function initializeManagedAccountBackup() {
-    if (!accountBackupDatabaseUrl) {
-        console.log('Managed account backup is disabled (ACCOUNT_BACKUP_DATABASE_URL is not set).');
+    if (!accountBackupMongoUri) {
+        console.log('Managed account backup is disabled (ACCOUNT_BACKUP_MONGODB_URI is not set).');
         return;
     }
 
     try {
-        accountBackupPool = new Pool({
-            connectionString: accountBackupDatabaseUrl,
-            ssl: accountBackupUseSsl ? { rejectUnauthorized: false } : undefined,
-            max: 2
+        accountBackupMongoClient = new MongoClient(accountBackupMongoUri, {
+            serverSelectionTimeoutMS: 10000
         });
-
-        await accountBackupPool.query('SELECT 1');
-        await accountBackupPool.query(`
-            CREATE TABLE IF NOT EXISTS client_account_backups (
-                id SMALLINT PRIMARY KEY,
-                payload JSONB NOT NULL,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
+        await accountBackupMongoClient.connect();
+        accountBackupCollection = accountBackupMongoClient
+            .db(accountBackupMongoDbName)
+            .collection(accountBackupMongoCollectionName);
+        await accountBackupCollection.findOne({ _id: 'client-account-snapshot' });
 
         await restoreClientAccountSnapshotIfNeeded();
         await pushClientAccountSnapshot('startup');
-        console.log('Managed account backup is enabled.');
+        console.log('Managed account backup is enabled (MongoDB).');
     } catch (error) {
         accountBackupLastSyncError = String(error.message || error);
         console.error('Failed to initialize managed account backup:', accountBackupLastSyncError);
-        if (accountBackupPool) {
+        if (accountBackupMongoClient) {
             try {
-                await accountBackupPool.end();
+                await accountBackupMongoClient.close();
             } catch (closeError) {
                 console.error('Failed to close managed backup connection:', closeError.message || closeError);
             }
         }
-        accountBackupPool = null;
+        accountBackupMongoClient = null;
+        accountBackupCollection = null;
     }
 }
 
@@ -2951,8 +2951,11 @@ app.get('/health', (req, res) => {
             uploadsDirExists
         },
         accountBackup: {
-            enabled: Boolean(accountBackupPool),
-            configured: Boolean(accountBackupDatabaseUrl),
+            enabled: Boolean(accountBackupCollection),
+            configured: Boolean(accountBackupMongoUri),
+            provider: 'mongodb',
+            database: accountBackupMongoDbName,
+            collection: accountBackupMongoCollectionName,
             hydratedFromRemote: accountBackupHydratedFromRemote,
             lastSyncedAt: accountBackupLastSyncedAt,
             lastSyncReason: accountBackupLastSyncReason || null,

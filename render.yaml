@@ -14,10 +14,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
         sync: false
-      - key: ACCOUNT_BACKUP_DATABASE_URL
-        fromDatabase:
-          name: cynetwork-account-backup
-          property: connectionString
+      - key: ACCOUNT_BACKUP_MONGODB_URI
+        value: ""
+        sync: false
       - key: DATABASE_PATH
         value: /var/data/pisowifi-admin.db
       - key: UPLOADS_DIR
@@ -26,8 +25,3 @@ services:
       name: cynetwork-data
       mountPath: /var/data
       sizeGB: 1
-
-databases:
-  - name: cynetwork-account-backup
-    databaseName: cynetwork_account_backup
-    user: cynetwork_account_backup_user

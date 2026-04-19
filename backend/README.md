@@ -181,7 +181,9 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 ### 3. Production environment values
 - `NODE_ENV=production`
 - `JWT_SECRET` is auto-generated in the blueprint and kept stable across redeploys (`sync: false`).
-- `ACCOUNT_BACKUP_DATABASE_URL=<managed-postgres-connection-string>` (recommended for account durability even if the web service/disk is recreated)
+- `ACCOUNT_BACKUP_MONGODB_URI=<mongodb-connection-string>` (recommended for account durability even if the web service/disk is recreated)
+- `ACCOUNT_BACKUP_MONGODB_DB=cynetwork_pisowifi` (optional)
+- `ACCOUNT_BACKUP_MONGODB_COLLECTION=client_account_backups` (optional)
 - `DATABASE_PATH=/var/data/pisowifi-admin.db`
 - `UPLOADS_DIR=/var/data/package-images`
 - `SEMAPHORE_API_KEY=<your-semaphore-api-key>` (required for PH SMS sending)
@@ -194,7 +196,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - Orders database and uploaded package images stay available across restarts/redeploys.
 - Keep using the **same Render service + disk** (do not delete/recreate them) to retain accounts and sessions.
 - In production, the backend now automatically falls back to `/var/data/pisowifi-admin.db` and `/var/data/package-images` when env vars are missing, so it avoids writing to temporary container storage.
-- Client accounts/referral tables are also mirrored to managed Postgres when `ACCOUNT_BACKUP_DATABASE_URL` is set, then auto-restored if local SQLite storage is ever reset.
+- Client accounts/referral tables are also mirrored to MongoDB when `ACCOUNT_BACKUP_MONGODB_URI` is set, then auto-restored if local SQLite storage is ever reset.
 
 ### 5. Verify deployment
 - Open `<your-render-url>/health` and confirm `ok: true`.
