@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
-    <link rel="stylesheet" href="styles.css?v=20260419-4">
+    <link rel="stylesheet" href="styles.css?v=20260419-5">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -22,6 +22,7 @@
                 <li><a href="#tutorials" class="nav-link">Tutorials</a></li>
                 <li><a href="#about" class="nav-link">About</a></li>
                 <li><a href="#contact" class="nav-link">Contact</a></li>
+                <li><button type="button" class="account-nav-btn" onclick="openAccountModal()">Client Account</button></li>
             </ul>
         </div>
     </nav>
@@ -40,6 +41,7 @@
         <div class="section-header">
             <h2>Our Packages</h2>
             <p class="section-subtitle">Choose the perfect plan for your needs</p>
+            <p class="shipping-notice">🚚 Free shipping fee notification: Shipping is FREE nationwide (₱0) for all packages.</p>
         </div>
         
         <div class="packages-grid">
@@ -191,7 +193,21 @@
             <!-- Step 1: QR Code Payment -->
             <div id="step1" class="payment-step active">
                 <h3>Step 1: Scan QR Code to Pay via GCash</h3>
-                <p class="package-selected">Package <span id="selectedPackageText">1</span> - ₱<span id="selectedPrice">10</span>.00</p>
+                <p class="package-selected">
+                    Package: <span id="selectedPackageText">Starter</span><br>
+                    Unit Price: ₱<span id="selectedUnitPrice">5800</span>.00<br>
+                    Quantity: <span id="selectedQuantityText">1</span> piece(s)<br>
+                    Total Payment: ₱<span id="selectedPrice">5800</span>.00
+                </p>
+                <p class="shipping-free-note">Shipping Fee: FREE (₱0)</p>
+
+                <div class="form-group quantity-group">
+                    <label for="orderQuantity">How many pieces do you want to order? *</label>
+                    <input type="number" id="orderQuantity" min="1" max="100" value="1" oninput="handleQuantityChange()" required>
+                    <p class="quantity-summary">Automatically calculated total: ₱<span id="selectedTotalPrice">5800</span>.00</p>
+                </div>
+
+                <div id="checkoutAccountNotice" class="checkout-account-notice" style="display: none;"></div>
                 
                 <div class="qr-container">
                     <div id="qrcode" class="qr-code"></div>
@@ -302,6 +318,9 @@
                         <p><strong>Order ID:</strong> <span id="confirmOrderId">--</span></p>
                         <p><strong>Tracking Number:</strong> <span id="confirmTrackingNumber">--</span></p>
                         <p><strong>Order Status:</strong> <span id="confirmOrderStatus">PENDING</span></p>
+                        <p><strong>Quantity:</strong> <span id="confirmQuantity">1</span> piece(s)</p>
+                        <p><strong>Total Payment:</strong> ₱<span id="confirmTotalPrice">0</span>.00</p>
+                        <p id="confirmReferralRewardWrap" style="display: none;"><strong>Referral Reward:</strong> <span id="confirmReferralRewardText"></span></p>
                         <p><strong>WiFi Name:</strong> <span id="confirmWifiName"></span></p>
                         <p><strong>Duration:</strong> <span id="confirmDuration"></span></p>
                         <p><strong>Name:</strong> <span id="confirmName"></span></p>
@@ -341,6 +360,9 @@
                 <p><strong>Tracking Number:</strong> <span id="trackResultTracking"></span></p>
                 <p><strong>Status:</strong> <span id="trackResultStatus" class="track-status-badge">PENDING</span></p>
                 <p><strong>Package:</strong> <span id="trackResultPackage"></span></p>
+                <p><strong>Quantity:</strong> <span id="trackResultQuantity"></span></p>
+                <p><strong>Total Paid:</strong> ₱<span id="trackResultTotal"></span>.00</p>
+                <p><strong>Shipping Fee:</strong> <span id="trackResultShipping"></span></p>
                 <p><strong>Date Submitted:</strong> <span id="trackResultDate"></span></p>
                 <p><strong>Last Updated:</strong> <span id="trackResultUpdated"></span></p>
                 <p id="trackResultReasonWrap" style="display: none;"><strong>Notes:</strong> <span id="trackResultReason"></span></p>
@@ -396,6 +418,109 @@
         <p class="footer-bottom">&copy; 2026 CYNETWORK PISOWIFI. All rights reserved.</p>
     </footer>
 
+    <!-- Client Account Modal -->
+    <div id="accountModal" class="modal">
+        <div class="modal-content account-modal">
+            <span class="close" onclick="closeAccountModal()">&times;</span>
+            <h2>Client Account & Referral</h2>
+            <p class="account-modal-subtitle">Create a simple account, share your referral code, and earn ₱100 for every invite who buys.</p>
+
+            <div class="account-tabs" role="tablist" aria-label="Client account tabs">
+                <button type="button" id="accountTabLogin" class="account-tab-btn active" onclick="switchAccountTab('login')">Login</button>
+                <button type="button" id="accountTabRegister" class="account-tab-btn" onclick="switchAccountTab('register')">Register</button>
+                <button type="button" id="accountTabDashboard" class="account-tab-btn" onclick="switchAccountTab('dashboard')">My Account</button>
+            </div>
+
+            <div id="accountAuthMessage" class="account-auth-message" style="display: none;"></div>
+
+            <div id="accountLoginPanel" class="account-panel active">
+                <form id="clientLoginForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientLoginEmail">Email *</label>
+                        <input type="email" id="clientLoginEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientLoginPassword">Password *</label>
+                        <input type="password" id="clientLoginPassword" placeholder="Enter password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="next-btn">Login</button>
+                </form>
+            </div>
+
+            <div id="accountRegisterPanel" class="account-panel">
+                <form id="clientRegisterForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientRegisterName">Full Name *</label>
+                        <input type="text" id="clientRegisterName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterContact">Contact Number</label>
+                        <input type="tel" id="clientRegisterContact" placeholder="+63 9XX XXX XXXX">
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterEmail">Email *</label>
+                        <input type="email" id="clientRegisterEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterPassword">Password *</label>
+                        <input type="password" id="clientRegisterPassword" placeholder="At least 6 characters" minlength="6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerReferralCode">Referral Code (optional)</label>
+                        <input type="text" id="registerReferralCode" placeholder="Example: CYNABC123">
+                    </div>
+                    <button type="submit" class="next-btn">Create Account</button>
+                </form>
+            </div>
+
+            <div id="accountDashboardPanel" class="account-panel">
+                <div id="accountDashboardLoggedOut" class="account-dashboard-logged-out">
+                    <p>Please login or register to access your account and referral dashboard.</p>
+                </div>
+
+                <div id="accountDashboardLoggedIn" class="account-dashboard-logged-in" style="display: none;">
+                    <div class="account-summary-grid">
+                        <div class="account-summary-item">
+                            <span class="summary-label">Name</span>
+                            <span id="clientAccountName" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Email</span>
+                            <span id="clientAccountEmail" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Code</span>
+                            <span id="clientReferralCode" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Balance</span>
+                            <span id="clientReferralBalance" class="summary-value">₱0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Total Invites</span>
+                            <span id="clientInviteCount" class="summary-value">0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Converted Invites</span>
+                            <span id="clientConvertedInviteCount" class="summary-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="referral-link-wrap">
+                        <label for="clientReferralLink">Referral Link</label>
+                        <input type="text" id="clientReferralLink" readonly>
+                        <button type="button" class="back-btn" onclick="copyReferralLink()">Copy Referral Link</button>
+                    </div>
+
+                    <div class="account-dashboard-actions">
+                        <button type="button" class="next-btn" onclick="refreshClientAccountSummary()">Refresh Account</button>
+                        <button type="button" class="back-btn" onclick="logoutClientAccount()">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- AI Customer Support Chat -->
     <button id="supportChatToggle" class="support-chat-toggle" aria-label="Open AI customer support">
         <span class="support-chat-toggle-icon">AI</span>
@@ -436,6 +561,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260419-4"></script>
+    <script src="script.js?v=20260419-5"></script>
 </body>
 </html>

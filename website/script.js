@@ -8,6 +8,12 @@ let uploadedProofImage = null;
 let latestOrderId = null;
 let latestOrderStatus = 'pending';
 let latestTrackingNumber = null;
+let selectedQuantity = 1;
+let selectedUnitPrice = 0;
+let selectedTotalPrice = 0;
+
+let clientAuthToken = null;
+let clientAccount = null;
 
 let supportClientId = null;
 let supportChatSessionId = null;
@@ -17,14 +23,32 @@ let supportLastMessageId = 0;
 const renderedSupportMessageIds = new Set();
 
 const API_URL = '/api';
+const FREE_SHIPPING_FEE = 0;
 
 const packages = {
-    1: { name: 'Starter', price: '5800', duration: '1 Year License | 50 Meters' },
-    2: { name: 'Professional', price: '8500', duration: '3 Years License | 100 Meters' },
-    3: { name: 'Enterprise', price: '11000', duration: 'LIFETIME LICENSE | 250 Meters' }
+    1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
+    2: { name: 'Professional', price: 8500, duration: '3 Years License | 100 Meters' },
+    3: { name: 'Enterprise', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
 };
 
 const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
+const CLIENT_AUTH_STORAGE_KEY = 'cynetworkClientAuth';
+
+function formatMoney(value) {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) {
+        return '0';
+    }
+    return numeric.toLocaleString('en-PH');
+}
+
+function normalizeQuantity(value) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return 1;
+    }
+    return Math.min(100, Math.max(1, parsed));
+}
 
 function loadSavedCustomerDetails() {
     try {
@@ -98,6 +122,381 @@ function clearSavedCustomerDetails() {
     alert('Saved customer details were cleared from this device.');
 }
 
+function setClientAuthMessage(message, type = '') {
+    const messageEl = document.getElementById('accountAuthMessage');
+    if (!messageEl) {
+        return;
+    }
+
+    if (!message) {
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+        messageEl.className = 'account-auth-message';
+        return;
+    }
+
+    messageEl.style.display = 'block';
+    messageEl.textContent = message;
+    messageEl.className = `account-auth-message ${type}`.trim();
+}
+
+function updateCheckoutAccountNotice() {
+    const notice = document.getElementById('checkoutAccountNotice');
+    if (!notice) {
+        return;
+    }
+
+    if (clientAccount) {
+        notice.style.display = 'block';
+        notice.textContent = `Logged in as ${clientAccount.fullName || clientAccount.email}. Referral balance: PHP ${formatMoney(clientAccount.referralBalance || 0)}.`;
+        return;
+    }
+
+    notice.style.display = 'block';
+    notice.textContent = 'Tip: Create or login to a client account to get your own referral code and earn PHP 100 per successful invite purchase.';
+}
+
+function saveClientSession(token, account) {
+    clientAuthToken = token || null;
+    clientAccount = account || null;
+
+    if (!clientAuthToken || !clientAccount) {
+        localStorage.removeItem(CLIENT_AUTH_STORAGE_KEY);
+        return;
+    }
+
+    localStorage.setItem(
+        CLIENT_AUTH_STORAGE_KEY,
+        JSON.stringify({
+            token: clientAuthToken,
+            account: clientAccount
+        })
+    );
+}
+
+function loadClientSession() {
+    try {
+        const raw = localStorage.getItem(CLIENT_AUTH_STORAGE_KEY);
+        if (!raw) {
+            clientAuthToken = null;
+            clientAccount = null;
+            return;
+        }
+
+        const parsed = JSON.parse(raw);
+        clientAuthToken = parsed?.token || null;
+        clientAccount = parsed?.account || null;
+    } catch (error) {
+        console.warn('Unable to load client session:', error.message);
+        clientAuthToken = null;
+        clientAccount = null;
+    }
+}
+
+function clearClientSession() {
+    clientAuthToken = null;
+    clientAccount = null;
+    localStorage.removeItem(CLIENT_AUTH_STORAGE_KEY);
+}
+
+function buildReferralLink(code) {
+    if (!code) {
+        return '';
+    }
+
+    const cleanCode = String(code).trim().toUpperCase();
+    const url = new URL(`${window.location.origin}${window.location.pathname}`);
+    url.searchParams.set('ref', cleanCode);
+    return url.toString();
+}
+
+function getReferralCodeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get('ref') || params.get('referral') || '').trim().toUpperCase();
+}
+
+function applyReferralCodeFromUrl() {
+    const referralCode = getReferralCodeFromUrl();
+    if (!referralCode) {
+        return;
+    }
+
+    const registerReferralInput = document.getElementById('registerReferralCode');
+    if (registerReferralInput && !registerReferralInput.value.trim()) {
+        registerReferralInput.value = referralCode;
+    }
+
+    if (!clientAccount) {
+        setClientAuthMessage(`Referral code detected: ${referralCode}. Register now to link this account.`, 'success');
+    }
+}
+
+function updateClientAccountUi() {
+    const navAccountButton = document.querySelector('.account-nav-btn');
+    const dashboardLoggedOut = document.getElementById('accountDashboardLoggedOut');
+    const dashboardLoggedIn = document.getElementById('accountDashboardLoggedIn');
+
+    if (clientAccount && clientAuthToken) {
+        const displayName = String(clientAccount.fullName || clientAccount.email || 'Client').trim();
+        const firstName = displayName.split(' ')[0] || 'Client';
+
+        if (navAccountButton) {
+            navAccountButton.textContent = `Account: ${firstName}`;
+        }
+
+        if (dashboardLoggedOut) {
+            dashboardLoggedOut.style.display = 'none';
+        }
+
+        if (dashboardLoggedIn) {
+            dashboardLoggedIn.style.display = 'block';
+        }
+
+        document.getElementById('clientAccountName').textContent = clientAccount.fullName || '--';
+        document.getElementById('clientAccountEmail').textContent = clientAccount.email || '--';
+        document.getElementById('clientReferralCode').textContent = clientAccount.referralCode || '--';
+        document.getElementById('clientReferralBalance').textContent = `PHP ${formatMoney(clientAccount.referralBalance || 0)}`;
+        document.getElementById('clientInviteCount').textContent = String(clientAccount.inviteCount || 0);
+        document.getElementById('clientConvertedInviteCount').textContent = String(clientAccount.convertedInviteCount || 0);
+        document.getElementById('clientReferralLink').value = buildReferralLink(clientAccount.referralCode || '');
+
+        const fullNameInput = document.getElementById('fullName');
+        if (fullNameInput && !fullNameInput.value.trim() && clientAccount.fullName) {
+            fullNameInput.value = clientAccount.fullName;
+        }
+
+        const contactNumberInput = document.getElementById('contactNumber');
+        if (contactNumberInput && !contactNumberInput.value.trim() && clientAccount.contactNumber) {
+            contactNumberInput.value = clientAccount.contactNumber;
+        }
+    } else {
+        if (navAccountButton) {
+            navAccountButton.textContent = 'Client Account';
+        }
+
+        if (dashboardLoggedOut) {
+            dashboardLoggedOut.style.display = 'block';
+        }
+
+        if (dashboardLoggedIn) {
+            dashboardLoggedIn.style.display = 'none';
+        }
+    }
+
+    updateCheckoutAccountNotice();
+}
+
+function switchAccountTab(tabName) {
+    const validTabs = ['login', 'register', 'dashboard'];
+    const safeTab = validTabs.includes(tabName) ? tabName : 'login';
+
+    validTabs.forEach((tab) => {
+        const button = document.getElementById(`accountTab${tab.charAt(0).toUpperCase()}${tab.slice(1)}`);
+        const panel = document.getElementById(`account${tab.charAt(0).toUpperCase()}${tab.slice(1)}Panel`);
+
+        if (button) {
+            button.classList.toggle('active', tab === safeTab);
+        }
+
+        if (panel) {
+            panel.classList.toggle('active', tab === safeTab);
+        }
+    });
+}
+
+function openAccountModal(preferredTab = '') {
+    const modal = document.getElementById('accountModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.add('show');
+
+    if (preferredTab) {
+        switchAccountTab(preferredTab);
+        return;
+    }
+
+    if (clientAccount && clientAuthToken) {
+        switchAccountTab('dashboard');
+    } else {
+        switchAccountTab('login');
+    }
+}
+
+function closeAccountModal() {
+    const modal = document.getElementById('accountModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+async function refreshClientAccountSummary(silent = false) {
+    if (!clientAuthToken) {
+        clearClientSession();
+        updateClientAccountUi();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/me`, {
+            headers: {
+                Authorization: `Bearer ${clientAuthToken}`
+            }
+        });
+
+        if (!response.ok) {
+            clearClientSession();
+            updateClientAccountUi();
+            if (!silent) {
+                setClientAuthMessage('Session expired. Please login again.', 'error');
+                switchAccountTab('login');
+            }
+            return;
+        }
+
+        const result = await response.json();
+        saveClientSession(clientAuthToken, result.account || null);
+        updateClientAccountUi();
+
+        if (!silent) {
+            setClientAuthMessage('Account details refreshed.', 'success');
+            switchAccountTab('dashboard');
+        }
+    } catch (error) {
+        if (!silent) {
+            setClientAuthMessage('Unable to refresh account right now. Please try again.', 'error');
+        }
+    }
+}
+
+async function handleClientLogin(event) {
+    event.preventDefault();
+
+    const email = document.getElementById('clientLoginEmail').value.trim().toLowerCase();
+    const password = document.getElementById('clientLoginPassword').value;
+
+    if (!email || !password) {
+        setClientAuthMessage('Email and password are required.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Login failed. Please try again.', 'error');
+            return;
+        }
+
+        saveClientSession(result.token, result.account || null);
+        updateClientAccountUi();
+        switchAccountTab('dashboard');
+        setClientAuthMessage('Login successful. You can now use your referral dashboard.', 'success');
+
+        document.getElementById('clientLoginForm').reset();
+    } catch (error) {
+        setClientAuthMessage('Unable to login right now. Please try again later.', 'error');
+    }
+}
+
+async function handleClientRegister(event) {
+    event.preventDefault();
+
+    const fullName = document.getElementById('clientRegisterName').value.trim();
+    const contactNumber = document.getElementById('clientRegisterContact').value.trim();
+    const email = document.getElementById('clientRegisterEmail').value.trim().toLowerCase();
+    const password = document.getElementById('clientRegisterPassword').value;
+    const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
+
+    if (!fullName || !email || !password) {
+        setClientAuthMessage('Full name, email, and password are required.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fullName,
+                contactNumber,
+                email,
+                password,
+                referralCode: referralCode || null
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Registration failed. Please try again.', 'error');
+            return;
+        }
+
+        saveClientSession(result.token, result.account || null);
+        updateClientAccountUi();
+        switchAccountTab('dashboard');
+        setClientAuthMessage('Account created successfully. Share your referral link to earn PHP 100 per successful invite.', 'success');
+
+        document.getElementById('clientRegisterForm').reset();
+    } catch (error) {
+        setClientAuthMessage('Unable to register right now. Please try again later.', 'error');
+    }
+}
+
+function logoutClientAccount() {
+    clearClientSession();
+    updateClientAccountUi();
+    switchAccountTab('login');
+    setClientAuthMessage('You are logged out from your client account.', 'success');
+}
+
+async function copyReferralLink() {
+    const referralInput = document.getElementById('clientReferralLink');
+    if (!referralInput || !referralInput.value.trim()) {
+        setClientAuthMessage('No referral link found yet.', 'error');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(referralInput.value.trim());
+        setClientAuthMessage('Referral link copied to clipboard.', 'success');
+    } catch (error) {
+        referralInput.select();
+        document.execCommand('copy');
+        setClientAuthMessage('Referral link copied.', 'success');
+    }
+}
+
+function initClientAccountFeatures() {
+    loadClientSession();
+    updateClientAccountUi();
+
+    const loginForm = document.getElementById('clientLoginForm');
+    const registerForm = document.getElementById('clientRegisterForm');
+
+    if (loginForm && loginForm.dataset.bound !== 'true') {
+        loginForm.addEventListener('submit', handleClientLogin);
+        loginForm.dataset.bound = 'true';
+    }
+
+    if (registerForm && registerForm.dataset.bound !== 'true') {
+        registerForm.addEventListener('submit', handleClientRegister);
+        registerForm.dataset.bound = 'true';
+    }
+
+    applyReferralCodeFromUrl();
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+}
+
 // =====================================================
 // PACKAGE SELECTION
 // =====================================================
@@ -105,22 +504,80 @@ function clearSavedCustomerDetails() {
 function selectPackage(packageNum) {
     selectedPackage = packageNum;
     const packageData = packages[packageNum];
+    selectedUnitPrice = Number(packageData?.price || 0);
+    selectedQuantity = 1;
+    selectedTotalPrice = selectedUnitPrice;
     
     // Show modal
     document.getElementById('paymentModal').classList.add('show');
     
     // Set package info in step 1
-    document.getElementById('selectedPackageText').textContent = packageNum;
-    document.getElementById('selectedPrice').textContent = packageData.price;
+    document.getElementById('selectedPackageText').textContent = packageData.name;
+
+    const quantityInput = document.getElementById('orderQuantity');
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+
+    recalculateSelectedTotal({ refreshQr: false });
+    updateCheckoutAccountNotice();
     
     // Generate QR code
-    generateQRCode(packageData);
+    generateQRCode({ ...packageData, price: selectedTotalPrice });
     
     // Reset steps
     currentStep = 1;
     showStep(1);
     resetForm();
     applySavedCustomerDetailsToForm();
+}
+
+function recalculateSelectedTotal({ refreshQr = true } = {}) {
+    if (!selectedPackage || !packages[selectedPackage]) {
+        return;
+    }
+
+    const packageData = packages[selectedPackage];
+    selectedUnitPrice = Number(packageData.price || 0);
+
+    const quantityInput = document.getElementById('orderQuantity');
+    const normalizedQuantity = normalizeQuantity(quantityInput?.value || selectedQuantity);
+    selectedQuantity = normalizedQuantity;
+
+    if (quantityInput) {
+        quantityInput.value = String(normalizedQuantity);
+    }
+
+    selectedTotalPrice = selectedUnitPrice * selectedQuantity + FREE_SHIPPING_FEE;
+
+    const unitPriceEl = document.getElementById('selectedUnitPrice');
+    const quantityTextEl = document.getElementById('selectedQuantityText');
+    const totalPriceEl = document.getElementById('selectedPrice');
+    const totalSummaryEl = document.getElementById('selectedTotalPrice');
+
+    if (unitPriceEl) {
+        unitPriceEl.textContent = formatMoney(selectedUnitPrice);
+    }
+
+    if (quantityTextEl) {
+        quantityTextEl.textContent = String(selectedQuantity);
+    }
+
+    if (totalPriceEl) {
+        totalPriceEl.textContent = formatMoney(selectedTotalPrice);
+    }
+
+    if (totalSummaryEl) {
+        totalSummaryEl.textContent = formatMoney(selectedTotalPrice);
+    }
+
+    if (refreshQr) {
+        generateQRCode({ ...packageData, price: selectedTotalPrice });
+    }
+}
+
+function handleQuantityChange() {
+    recalculateSelectedTotal({ refreshQr: true });
 }
 
 // =====================================================
@@ -230,6 +687,9 @@ async function completeTransaction() {
     const wifiName = document.getElementById('wifiName').value.trim();
     const wifiPassword = document.getElementById('wifiPassword').value.trim();
     const wifiRate = document.getElementById('wifiRate').value;
+
+    recalculateSelectedTotal({ refreshQr: false });
+    const orderQuantity = normalizeQuantity(selectedQuantity);
     
     if (!wifiName || !wifiPassword || !wifiRate) {
         alert('Please fill in all WiFi configuration fields');
@@ -241,6 +701,11 @@ async function completeTransaction() {
     let resolvedOrderId = null;
     let resolvedTrackingNumber = null;
     let resolvedOrderStatus = 'pending';
+    let resolvedTotalPrice = selectedTotalPrice;
+    let resolvedUnitPrice = selectedUnitPrice;
+    let resolvedShippingFee = FREE_SHIPPING_FEE;
+    let referralRewardApplied = false;
+    let referralRewardAmount = 0;
     let submittedToServer = false;
     let backendFailureMessage = '';
 
@@ -248,7 +713,11 @@ async function completeTransaction() {
     const transactionData = {
         packageId: selectedPackage,
         packageName: packages[selectedPackage].name,
-        price: packages[selectedPackage].price,
+        price: selectedTotalPrice,
+        unitPrice: selectedUnitPrice,
+        totalPrice: selectedTotalPrice,
+        shippingFee: FREE_SHIPPING_FEE,
+        quantity: orderQuantity,
         duration: packages[selectedPackage].duration,
         fullName: document.getElementById('fullName').value.trim(),
         contactNumber: document.getElementById('contactNumber').value.trim(),
@@ -267,9 +736,14 @@ async function completeTransaction() {
     
     // Try to submit to backend
     try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
         const response = await fetch(`${API_URL}/submit-order`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: requestHeaders,
             body: JSON.stringify(transactionData)
         });
         
@@ -280,6 +754,11 @@ async function completeTransaction() {
                 resolvedOrderId = String(result.orderId);
                 resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
                 resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                resolvedTotalPrice = Number(result.totalPrice ?? selectedTotalPrice);
+                resolvedUnitPrice = Number(result.unitPrice ?? selectedUnitPrice);
+                resolvedShippingFee = Number(result.shippingFee ?? FREE_SHIPPING_FEE);
+                referralRewardApplied = Boolean(result.referralRewardApplied);
+                referralRewardAmount = Number(result.referralRewardAmount || 0);
                 submittedToServer = true;
             }
         } else {
@@ -315,6 +794,10 @@ async function completeTransaction() {
             orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
             trackingNumber: resolvedTrackingNumber || '',
             status: resolvedOrderStatus,
+            quantity: orderQuantity,
+            unitPrice: resolvedUnitPrice,
+            totalPrice: resolvedTotalPrice,
+            shippingFee: resolvedShippingFee,
             timestamp: new Date().toLocaleString()
         });
         localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
@@ -330,9 +813,27 @@ async function completeTransaction() {
     document.getElementById('confirmOrderId').textContent = resolvedOrderId || '--';
     document.getElementById('confirmTrackingNumber').textContent = resolvedTrackingNumber || '--';
     document.getElementById('confirmOrderStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('confirmQuantity').textContent = String(orderQuantity);
+    document.getElementById('confirmTotalPrice').textContent = formatMoney(resolvedTotalPrice);
     document.getElementById('confirmWifiName').textContent = wifiName;
     document.getElementById('confirmDuration').textContent = packages[selectedPackage].duration;
     document.getElementById('confirmName').textContent = document.getElementById('fullName').value.trim();
+
+    const rewardWrap = document.getElementById('confirmReferralRewardWrap');
+    const rewardText = document.getElementById('confirmReferralRewardText');
+    if (rewardWrap && rewardText) {
+        if (referralRewardApplied && referralRewardAmount > 0) {
+            rewardWrap.style.display = 'block';
+            rewardText.textContent = `A referral reward of PHP ${formatMoney(referralRewardAmount)} has been credited to your inviter account.`;
+        } else {
+            rewardWrap.style.display = 'none';
+            rewardText.textContent = '';
+        }
+    }
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
 
     syncSupportSessionWithLatestOrder();
 
@@ -368,6 +869,19 @@ function resetForm() {
     document.getElementById('wifiRate').value = '';
     document.getElementById('proofImage').value = '';
     document.getElementById('uploadPreview').innerHTML = '';
+
+    const quantityInput = document.getElementById('orderQuantity');
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+
+    selectedQuantity = 1;
+    if (selectedPackage && packages[selectedPackage]) {
+        selectedUnitPrice = Number(packages[selectedPackage].price || 0);
+    }
+    selectedTotalPrice = selectedUnitPrice;
+    recalculateSelectedTotal({ refreshQr: false });
+
     uploadedProofImage = null;
 }
 
@@ -379,6 +893,7 @@ function scrollToPackages() {
 window.addEventListener('click', function(event) {
     const paymentModal = document.getElementById('paymentModal');
     const trackingModal = document.getElementById('trackOrderModal');
+    const accountModal = document.getElementById('accountModal');
 
     if (event.target === paymentModal) {
         closeModal();
@@ -386,6 +901,10 @@ window.addEventListener('click', function(event) {
 
     if (event.target === trackingModal) {
         closeTrackOrderModal();
+    }
+
+    if (event.target === accountModal) {
+        closeAccountModal();
     }
 });
 
@@ -465,6 +984,11 @@ function renderTrackOrderResult(orderData) {
     document.getElementById('trackResultOrderId').textContent = orderData.orderId || '--';
     document.getElementById('trackResultTracking').textContent = orderData.trackingNumber || '--';
     document.getElementById('trackResultPackage').textContent = orderData.packageName || '--';
+    document.getElementById('trackResultQuantity').textContent = String(orderData.quantity || 1);
+    document.getElementById('trackResultTotal').textContent = formatMoney(orderData.totalPrice || orderData.price || 0);
+    document.getElementById('trackResultShipping').textContent = Number(orderData.shippingFee || 0) === 0
+        ? 'FREE (PHP 0)'
+        : `PHP ${formatMoney(orderData.shippingFee)}`;
     document.getElementById('trackResultDate').textContent = formatTrackDate(orderData.createdAt || orderData.timestamp);
     document.getElementById('trackResultUpdated').textContent = formatTrackDate(orderData.updatedAt || orderData.timestamp);
     setTrackStatusBadge(orderData.status || 'pending');
@@ -515,6 +1039,9 @@ async function trackOrder() {
             orderId: localOrder.orderId,
             trackingNumber: localOrder.trackingNumber || localOrder.orderId,
             packageName: localOrder.packageName,
+            quantity: localOrder.quantity || 1,
+            totalPrice: localOrder.totalPrice || localOrder.price || 0,
+            shippingFee: localOrder.shippingFee || 0,
             status: localOrder.status || 'pending',
             createdAt: localOrder.timestamp,
             updatedAt: localOrder.timestamp
@@ -535,6 +1062,9 @@ async function trackOrder() {
                 orderId: localOrder.orderId,
                 trackingNumber: localOrder.trackingNumber || localOrder.orderId,
                 packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
                 status: localOrder.status || 'pending',
                 createdAt: localOrder.timestamp,
                 updatedAt: localOrder.timestamp
@@ -549,6 +1079,9 @@ async function trackOrder() {
                 orderId: localOrder.orderId,
                 trackingNumber: localOrder.trackingNumber || localOrder.orderId,
                 packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
                 status: localOrder.status || 'pending',
                 createdAt: localOrder.timestamp,
                 updatedAt: localOrder.timestamp
@@ -908,6 +1441,9 @@ async function getTrackedOrderFromLookup(lookup) {
             orderId: localOrder.orderId,
             trackingNumber: localOrder.trackingNumber || localOrder.orderId,
             packageName: localOrder.packageName,
+            quantity: localOrder.quantity || 1,
+            totalPrice: localOrder.totalPrice || localOrder.price || 0,
+            shippingFee: localOrder.shippingFee || 0,
             status: localOrder.status || 'pending',
             createdAt: localOrder.timestamp,
             updatedAt: localOrder.timestamp,
@@ -931,6 +1467,9 @@ async function getTrackedOrderFromLookup(lookup) {
                 orderId: localOrder.orderId,
                 trackingNumber: localOrder.trackingNumber || localOrder.orderId,
                 packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
                 status: localOrder.status || 'pending',
                 createdAt: localOrder.timestamp,
                 updatedAt: localOrder.timestamp,
@@ -949,6 +1488,9 @@ async function getTrackedOrderFromLookup(lookup) {
                 orderId: localOrder.orderId,
                 trackingNumber: localOrder.trackingNumber || localOrder.orderId,
                 packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
                 status: localOrder.status || 'pending',
                 createdAt: localOrder.timestamp,
                 updatedAt: localOrder.timestamp,
@@ -986,10 +1528,12 @@ async function generateTrackingSupportReply(lowerText, rawMessage) {
     const trackingNumberText = trackedOrder.trackingNumber || '--';
     const orderIdText = trackedOrder.orderId || '--';
     const statusText = String(trackedOrder.status || 'pending').toUpperCase();
+    const quantityText = String(trackedOrder.quantity || 1);
+    const totalText = formatMoney(trackedOrder.totalPrice || trackedOrder.price || 0);
     const submittedText = formatTrackDate(trackedOrder.createdAt || trackedOrder.timestamp);
     const updatedText = formatTrackDate(trackedOrder.updatedAt || trackedOrder.timestamp);
 
-    return `Order Tracking Update:\nTracking Number: ${trackingNumberText}\nOrder ID: ${orderIdText}\nStatus: ${statusText}\nPackage: ${trackedOrder.packageName || '--'}\nDate Submitted: ${submittedText}\nLast Updated: ${updatedText}\n\n${getStatusNoteForOrder(trackedOrder)}`;
+    return `Order Tracking Update:\nTracking Number: ${trackingNumberText}\nOrder ID: ${orderIdText}\nStatus: ${statusText}\nPackage: ${trackedOrder.packageName || '--'}\nQuantity: ${quantityText}\nTotal Paid: PHP ${totalText}\nDate Submitted: ${submittedText}\nLast Updated: ${updatedText}\n\n${getStatusNoteForOrder(trackedOrder)}`;
 }
 
 function initSupportChat() {
@@ -1194,7 +1738,7 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our current packages:\n\n1) Starter - PHP ${packages[1].price} (${packages[1].duration})\n2) Professional - PHP ${packages[2].price} (${packages[2].duration})\n3) Enterprise - PHP ${packages[3].price} (${packages[3].duration})\n\nTell me your target number of users and I can suggest the best package.`;
+        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and total payment is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
@@ -1232,6 +1776,7 @@ async function generateSupportReply(userMessage) {
 document.addEventListener('DOMContentLoaded', function() {
     initPackageImagesFromServer();
     applySavedCustomerDetailsToForm();
+    initClientAccountFeatures();
 
     const modal = document.getElementById('pictureModal');
     if (modal) {

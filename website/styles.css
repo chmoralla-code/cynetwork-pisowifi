@@ -111,6 +111,22 @@ body {
     width: 100%;
 }
 
+.account-nav-btn {
+    border: 1px solid #D9D9D9;
+    background: #FFFFFF;
+    color: var(--text-dark);
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 0.42rem 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.account-nav-btn:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
 /* =====================================================
    HERO SECTION
    ===================================================== */
@@ -214,6 +230,18 @@ body {
     font-size: 1.1rem;
     color: #666;
     font-weight: 500;
+}
+
+.shipping-notice {
+    display: inline-flex;
+    margin-top: 0.9rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid #F0D7AA;
+    background: #FFF7E8;
+    color: #7A5A1A;
+    font-size: 0.88rem;
+    font-weight: 600;
 }
 
 .packages-grid {
@@ -666,6 +694,42 @@ body {
     border-radius: 8px;
     margin-bottom: 1.5rem;
     font-weight: 600;
+    line-height: 1.55;
+}
+
+.shipping-free-note {
+    margin-bottom: 1rem;
+    color: #7A5A1A;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.quantity-group {
+    background: #FAFAFA;
+    border: 1px solid #E8E8E8;
+    border-radius: 10px;
+    padding: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.quantity-group input {
+    max-width: 180px;
+}
+
+.quantity-summary {
+    margin-top: 0.55rem;
+    font-size: 0.88rem;
+    color: #666;
+}
+
+.checkout-account-notice {
+    border: 1px solid #D9E8FF;
+    background: #EFF6FF;
+    color: #1C4A83;
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.86rem;
+    margin-bottom: 1rem;
 }
 
 .qr-container {
@@ -850,6 +914,137 @@ body {
 
 .track-order-result p {
     margin: 0.55rem 0;
+}
+
+.account-modal {
+    max-width: 700px;
+}
+
+.account-modal-subtitle {
+    color: #666;
+    font-size: 0.92rem;
+    margin-top: -0.8rem;
+    margin-bottom: 1rem;
+}
+
+.account-tabs {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.account-tab-btn {
+    border: 1px solid #E0E0E0;
+    border-radius: 999px;
+    background: #FFF;
+    color: #444;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.account-tab-btn.active,
+.account-tab-btn:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.account-auth-message {
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.88rem;
+    margin-bottom: 0.9rem;
+    border: 1px solid #E2E2E2;
+    background: #FAFAFA;
+}
+
+.account-auth-message.success {
+    border-color: #CBE9D4;
+    background: #EAF8EF;
+    color: #1E6A31;
+}
+
+.account-auth-message.error {
+    border-color: #F3C2C2;
+    background: #FEECEC;
+    color: #9D1D1D;
+}
+
+.account-panel {
+    display: none;
+}
+
+.account-panel.active {
+    display: block;
+}
+
+.account-form {
+    display: grid;
+}
+
+.account-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.account-summary-item {
+    border: 1px solid #EBEBEB;
+    border-radius: 10px;
+    padding: 0.7rem;
+    background: #FFF;
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.78rem;
+    color: #777;
+    margin-bottom: 0.3rem;
+}
+
+.summary-value {
+    display: block;
+    color: #222;
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.referral-link-wrap {
+    border: 1px solid #EAEAEA;
+    border-radius: 10px;
+    padding: 0.9rem;
+    background: #FAFAFA;
+    margin-bottom: 0.95rem;
+}
+
+.referral-link-wrap label {
+    display: block;
+    margin-bottom: 0.45rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.referral-link-wrap input {
+    margin-bottom: 0.7rem;
+}
+
+.account-dashboard-actions {
+    display: flex;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.account-dashboard-logged-out {
+    border: 1px dashed #DDD;
+    border-radius: 10px;
+    padding: 1rem;
+    color: #666;
+    background: #FBFBFB;
 }
 
 .track-status-badge {
@@ -1275,6 +1470,11 @@ body {
         gap: 1rem;
     }
 
+    .account-nav-btn {
+        padding: 0.36rem 0.7rem;
+        font-size: 0.8rem;
+    }
+
     .contact-info {
         gap: 1.5rem;
     }
@@ -1282,6 +1482,15 @@ body {
     .saved-details-helper {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .account-dashboard-actions {
+        flex-direction: column;
+    }
+
+    .account-dashboard-actions .next-btn,
+    .account-dashboard-actions .back-btn {
+        width: 100%;
     }
 
     .support-chat-toggle {

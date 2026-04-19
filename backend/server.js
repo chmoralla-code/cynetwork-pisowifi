@@ -26,6 +26,189 @@ const defaultPackageImages = {
     3: 'assets/images/package3.png'
 };
 const CHAT_SESSION_STATUSES = ['ai', 'live', 'closed'];
+const REFERRAL_REWARD_PHP = 100;
+const PACKAGE_CATALOG = {
+    1: { name: 'Starter', unitPrice: 5800, duration: '1 Year License | 50 Meters' },
+    2: { name: 'Professional', unitPrice: 8500, duration: '3 Years License | 100 Meters' },
+    3: { name: 'Enterprise', unitPrice: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
+};
+
+function createReferralCode() {
+    const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
+    return `CYN${randomPart}`;
+}
+
+function normalizePositiveInt(value, fallback = 1, min = 1, max = 999) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+    return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizePriceInt(value, fallback = 0) {
+    const numeric = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+    if (!Number.isFinite(numeric)) {
+        return fallback;
+    }
+    return Math.max(0, Math.round(numeric));
+}
+
+function toMoneyText(value) {
+    return String(normalizePriceInt(value, 0));
+}
+
+function issueClientToken(accountId, email) {
+    return jwt.sign(
+        {
+            type: 'client',
+            id: Number(accountId),
+            email: String(email || '').toLowerCase()
+        },
+        SECRET_KEY,
+        { expiresIn: '30d' }
+    );
+}
+
+function getOptionalClientAuth(req) {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        return null;
+    }
+
+    try {
+        const decoded = jwt.verify(token, SECRET_KEY);
+        if (decoded?.type === 'client' && decoded?.id) {
+            return decoded;
+        }
+        return null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function generateUniqueReferralCode(callback, attempt = 0) {
+    if (attempt > 10) {
+        callback(new Error('Unable to generate unique referral code'));
+        return;
+    }
+
+    const code = createReferralCode();
+    db.get(
+        'SELECT id FROM client_accounts WHERE referral_code = ?',
+        [code],
+        (err, row) => {
+            if (err) {
+                callback(err);
+                return;
+            }
+
+            if (row) {
+                generateUniqueReferralCode(callback, attempt + 1);
+                return;
+            }
+
+            callback(null, code);
+        }
+    );
+}
+
+function applyReferralRewardForOrder(referredAccountId, orderId, callback) {
+    const safeAccountId = Number(referredAccountId || 0);
+    if (!safeAccountId) {
+        callback(null, { rewardApplied: false, rewardAmount: 0 });
+        return;
+    }
+
+    db.get(
+        `SELECT id, referral_code, referred_by_code
+         FROM client_accounts WHERE id = ?`,
+        [safeAccountId],
+        (accountErr, referredAccount) => {
+            if (accountErr) {
+                callback(accountErr);
+                return;
+            }
+
+            if (!referredAccount?.referred_by_code) {
+                callback(null, { rewardApplied: false, rewardAmount: 0 });
+                return;
+            }
+
+            const referredByCode = String(referredAccount.referred_by_code).trim().toUpperCase();
+            db.get(
+                `SELECT id, referral_code
+                 FROM client_accounts
+                 WHERE referral_code = ?`,
+                [referredByCode],
+                (referrerErr, referrer) => {
+                    if (referrerErr) {
+                        callback(referrerErr);
+                        return;
+                    }
+
+                    if (!referrer || Number(referrer.id) === safeAccountId) {
+                        callback(null, { rewardApplied: false, rewardAmount: 0 });
+                        return;
+                    }
+
+                    db.get(
+                        'SELECT id FROM referral_rewards WHERE referred_account_id = ?',
+                        [safeAccountId],
+                        (existingErr, existingReward) => {
+                            if (existingErr) {
+                                callback(existingErr);
+                                return;
+                            }
+
+                            if (existingReward) {
+                                callback(null, { rewardApplied: false, rewardAmount: 0 });
+                                return;
+                            }
+
+                            db.run(
+                                `INSERT INTO referral_rewards (
+                                    referrer_account_id,
+                                    referred_account_id,
+                                    first_order_id,
+                                    reward_amount
+                                ) VALUES (?, ?, ?, ?)`,
+                                [referrer.id, safeAccountId, orderId, REFERRAL_REWARD_PHP],
+                                (insertRewardErr) => {
+                                    if (insertRewardErr) {
+                                        callback(insertRewardErr);
+                                        return;
+                                    }
+
+                                    db.run(
+                                        `UPDATE client_accounts
+                                         SET referral_balance = COALESCE(referral_balance, 0) + ?,
+                                             referral_reward_count = COALESCE(referral_reward_count, 0) + 1,
+                                             updated_at = CURRENT_TIMESTAMP
+                                         WHERE id = ?`,
+                                        [REFERRAL_REWARD_PHP, referrer.id],
+                                        (creditErr) => {
+                                            if (creditErr) {
+                                                callback(creditErr);
+                                                return;
+                                            }
+
+                                            callback(null, {
+                                                rewardApplied: true,
+                                                rewardAmount: REFERRAL_REWARD_PHP,
+                                                referrerCode: referrer.referral_code
+                                            });
+                                        }
+                                    );
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+}
 
 function ensureUploadedPackageImagesDir() {
     if (!fs.existsSync(uploadedPackageImagesDir)) {
@@ -89,6 +272,27 @@ function toChatMessagePayload(row) {
     };
 }
 
+function toClientAccountPayload(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.id,
+        fullName: row.full_name,
+        contactNumber: row.contact_number,
+        email: row.email,
+        referralCode: row.referral_code,
+        referredByCode: row.referred_by_code,
+        referralBalance: Number(row.referral_balance || 0),
+        referralRewardCount: Number(row.referral_reward_count || 0),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        inviteCount: Number(row.invite_count || 0),
+        convertedInviteCount: Number(row.converted_invite_count || 0)
+    };
+}
+
 function getOptionalAdminAuth(req) {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) {
@@ -138,6 +342,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Create tables
 db.serialize(() => {
+    const addColumnIfMissing = (sql, label) => {
+        db.run(sql, (err) => {
+            if (err && !String(err.message || '').includes('duplicate column name')) {
+                console.error(`Failed adding ${label} column:`, err.message);
+            }
+        });
+    };
+
     // Admin users table
     db.run(`
         CREATE TABLE IF NOT EXISTS admins (
@@ -174,6 +386,36 @@ db.serialize(() => {
     `);
 
     db.run(`
+        CREATE TABLE IF NOT EXISTS client_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            contact_number TEXT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            referral_code TEXT UNIQUE NOT NULL,
+            referred_by_code TEXT,
+            referral_balance INTEGER DEFAULT 0,
+            referral_reward_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS referral_rewards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_account_id INTEGER NOT NULL,
+            referred_account_id INTEGER UNIQUE NOT NULL,
+            first_order_id INTEGER,
+            reward_amount INTEGER NOT NULL DEFAULT ${REFERRAL_REWARD_PHP},
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (referrer_account_id) REFERENCES client_accounts(id),
+            FOREIGN KEY (referred_account_id) REFERENCES client_accounts(id),
+            FOREIGN KEY (first_order_id) REFERENCES orders(id)
+        )
+    `);
+
+    db.run(`
         CREATE TABLE IF NOT EXISTS chat_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id TEXT UNIQUE NOT NULL,
@@ -202,17 +444,48 @@ db.serialize(() => {
         )
     `);
 
-    db.run(`ALTER TABLE orders ADD COLUMN tracking_number TEXT`, (err) => {
-        if (err && !String(err.message || '').includes('duplicate column name')) {
-            console.error('Failed adding tracking_number column:', err.message);
-        }
-    });
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN tracking_number TEXT', 'tracking_number');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN quantity INTEGER DEFAULT 1', 'quantity');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN unit_price TEXT', 'unit_price');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN shipping_fee TEXT DEFAULT \'0\'', 'shipping_fee');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN total_price TEXT', 'total_price');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN client_account_id INTEGER', 'client_account_id');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN referral_code_used TEXT', 'referral_code_used');
+
+    addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN contact_number TEXT', 'contact_number');
+    addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN referral_balance INTEGER DEFAULT 0', 'referral_balance');
+    addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN referral_reward_count INTEGER DEFAULT 0', 'referral_reward_count');
+    addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP', 'updated_at');
 
     // Backfill old orders with deterministic tracking numbers.
     db.run(`
         UPDATE orders
         SET tracking_number = 'CYN-' || strftime('%Y%m%d', COALESCE(created_at, CURRENT_TIMESTAMP)) || '-' || substr('000000' || id, -6)
         WHERE tracking_number IS NULL OR TRIM(tracking_number) = ''
+    `);
+
+    db.run(`
+        UPDATE orders
+        SET quantity = 1
+        WHERE quantity IS NULL OR quantity < 1
+    `);
+
+    db.run(`
+        UPDATE orders
+        SET unit_price = price
+        WHERE unit_price IS NULL OR TRIM(unit_price) = ''
+    `);
+
+    db.run(`
+        UPDATE orders
+        SET shipping_fee = '0'
+        WHERE shipping_fee IS NULL OR TRIM(shipping_fee) = ''
+    `);
+
+    db.run(`
+        UPDATE orders
+        SET total_price = price
+        WHERE total_price IS NULL OR TRIM(total_price) = ''
     `);
 });
 
@@ -257,6 +530,24 @@ const verifyToken = (req, res, next) => {
     });
 };
 
+const verifyClientToken = (req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'No client token provided' });
+    }
+
+    jwt.verify(token, SECRET_KEY, (err, decoded) => {
+        if (err || decoded?.type !== 'client' || !decoded?.id) {
+            return res.status(401).json({ error: 'Invalid client token' });
+        }
+
+        req.clientAccountId = Number(decoded.id);
+        req.clientEmail = decoded.email || null;
+        next();
+    });
+};
+
 // =====================================================
 // AUTHENTICATION ROUTES
 // =====================================================
@@ -288,13 +579,204 @@ app.post('/api/login', (req, res) => {
 });
 
 // =====================================================
+// CLIENT ACCOUNT & REFERRAL ROUTES
+// =====================================================
+
+app.post('/api/client/register', (req, res) => {
+    const fullName = String(req.body.fullName || '').trim();
+    const contactNumber = String(req.body.contactNumber || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const rawReferralCode = String(req.body.referralCode || '').trim().toUpperCase();
+
+    if (!fullName || !email || !password) {
+        return res.status(400).json({ error: 'Full name, email, and password are required' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+        return res.status(400).json({ error: 'Please provide a valid email address' });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const createAccount = (referralCodeToStore = null) => {
+        generateUniqueReferralCode((codeErr, ownReferralCode) => {
+            if (codeErr) {
+                return res.status(500).json({ error: 'Failed to generate referral code' });
+            }
+
+            bcrypt.hash(password, 10, (hashErr, hash) => {
+                if (hashErr) {
+                    return res.status(500).json({ error: 'Failed to secure password' });
+                }
+
+                db.run(
+                    `INSERT INTO client_accounts (
+                        full_name,
+                        contact_number,
+                        email,
+                        password,
+                        referral_code,
+                        referred_by_code,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                    [fullName, contactNumber || null, email, hash, ownReferralCode, referralCodeToStore],
+                    function(insertErr) {
+                        if (insertErr) {
+                            if (String(insertErr.message || '').includes('UNIQUE constraint failed: client_accounts.email')) {
+                                return res.status(409).json({ error: 'Email is already registered' });
+                            }
+
+                            if (String(insertErr.message || '').includes('UNIQUE constraint failed: client_accounts.referral_code')) {
+                                return res.status(500).json({ error: 'Referral code collision. Please try again.' });
+                            }
+
+                            return res.status(500).json({ error: 'Failed to create account' });
+                        }
+
+                        db.get(
+                            `SELECT
+                                c.*,
+                                (SELECT COUNT(*) FROM client_accounts r WHERE r.referred_by_code = c.referral_code) AS invite_count,
+                                (SELECT COUNT(*) FROM referral_rewards rr WHERE rr.referrer_account_id = c.id) AS converted_invite_count
+                             FROM client_accounts c
+                             WHERE c.id = ?`,
+                            [this.lastID],
+                            (loadErr, accountRow) => {
+                                if (loadErr || !accountRow) {
+                                    return res.status(500).json({ error: 'Account created but could not be loaded' });
+                                }
+
+                                const token = issueClientToken(accountRow.id, accountRow.email);
+                                res.json({
+                                    success: true,
+                                    token,
+                                    account: toClientAccountPayload(accountRow)
+                                });
+                            }
+                        );
+                    }
+                );
+            });
+        });
+    };
+
+    if (rawReferralCode) {
+        db.get(
+            'SELECT id FROM client_accounts WHERE referral_code = ?',
+            [rawReferralCode],
+            (refErr, refRow) => {
+                if (refErr) {
+                    return res.status(500).json({ error: 'Failed to validate referral code' });
+                }
+
+                if (!refRow) {
+                    return res.status(400).json({ error: 'Referral code is invalid' });
+                }
+
+                createAccount(rawReferralCode);
+            }
+        );
+        return;
+    }
+
+    createAccount(null);
+});
+
+app.post('/api/client/login', (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    db.get(
+        `SELECT
+            c.*,
+            (SELECT COUNT(*) FROM client_accounts r WHERE r.referred_by_code = c.referral_code) AS invite_count,
+            (SELECT COUNT(*) FROM referral_rewards rr WHERE rr.referrer_account_id = c.id) AS converted_invite_count
+         FROM client_accounts c
+         WHERE c.email = ?`,
+        [email],
+        (err, accountRow) => {
+            if (err || !accountRow) {
+                return res.status(401).json({ error: 'Invalid email or password' });
+            }
+
+            bcrypt.compare(password, accountRow.password, (compareErr, matched) => {
+                if (compareErr || !matched) {
+                    return res.status(401).json({ error: 'Invalid email or password' });
+                }
+
+                const token = issueClientToken(accountRow.id, accountRow.email);
+                res.json({
+                    success: true,
+                    token,
+                    account: toClientAccountPayload(accountRow)
+                });
+            });
+        }
+    );
+});
+
+app.get('/api/client/me', verifyClientToken, (req, res) => {
+    db.get(
+        `SELECT
+            c.*,
+            (SELECT COUNT(*) FROM client_accounts r WHERE r.referred_by_code = c.referral_code) AS invite_count,
+            (SELECT COUNT(*) FROM referral_rewards rr WHERE rr.referrer_account_id = c.id) AS converted_invite_count
+         FROM client_accounts c
+         WHERE c.id = ?`,
+        [req.clientAccountId],
+        (err, row) => {
+            if (err || !row) {
+                return res.status(404).json({ error: 'Client account not found' });
+            }
+
+            res.json({ success: true, account: toClientAccountPayload(row) });
+        }
+    );
+});
+
+app.get('/api/client/referral/:code', (req, res) => {
+    const code = String(req.params.code || '').trim().toUpperCase();
+    if (!code) {
+        return res.status(400).json({ error: 'Referral code is required' });
+    }
+
+    db.get(
+        'SELECT full_name, referral_code FROM client_accounts WHERE referral_code = ?',
+        [code],
+        (err, row) => {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to validate referral code' });
+            }
+
+            if (!row) {
+                return res.status(404).json({ error: 'Referral code not found' });
+            }
+
+            res.json({
+                success: true,
+                code: row.referral_code,
+                inviterName: row.full_name
+            });
+        }
+    );
+});
+
+// =====================================================
 // ORDER ROUTES
 // =====================================================
 
 // Get all orders
 app.get('/api/orders', verifyToken, (req, res) => {
     db.all(
-        `SELECT id, tracking_number, package_name, price, full_name, contact_number, status, created_at 
+        `SELECT id, tracking_number, package_name, price, unit_price, quantity, total_price, full_name, contact_number, status, created_at 
          FROM orders ORDER BY created_at DESC`,
         (err, rows) => {
             if (err) {
@@ -393,12 +875,37 @@ app.post('/api/orders/:id/status', verifyToken, (req, res) => {
 // =====================================================
 
 app.post('/api/submit-order', (req, res) => {
-    const { packageId, packageName, price, duration, fullName, contactNumber, address, wifiName, wifiPassword, wifiRate, proofImage } = req.body;
+    const {
+        packageId,
+        packageName,
+        price,
+        duration,
+        quantity,
+        fullName,
+        contactNumber,
+        address,
+        wifiName,
+        wifiPassword,
+        wifiRate,
+        proofImage
+    } = req.body;
     
     // Validate required fields
     if (!packageId || !fullName || !contactNumber || !address || !wifiName || !wifiPassword) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    const normalizedPackageId = normalizePositiveInt(packageId, 1, 1, 3);
+    const catalog = PACKAGE_CATALOG[normalizedPackageId];
+    const resolvedPackageName = catalog?.name || String(packageName || `Package ${normalizedPackageId}`);
+    const resolvedDuration = catalog?.duration || String(duration || 'Custom Duration');
+    const resolvedUnitPrice = catalog?.unitPrice || normalizePriceInt(price, 0);
+    const resolvedQuantity = normalizePositiveInt(quantity, 1, 1, 100);
+    const shippingFee = 0;
+    const totalPrice = resolvedUnitPrice * resolvedQuantity + shippingFee;
+
+    const optionalClientAuth = getOptionalClientAuth(req);
+    const clientAccountId = optionalClientAuth?.id ? Number(optionalClientAuth.id) : null;
     
     let proofBuffer = null;
     
@@ -412,38 +919,108 @@ app.post('/api/submit-order', (req, res) => {
         }
     }
     
-    db.run(
-        `INSERT INTO orders (package_id, package_name, price, duration, full_name, contact_number, 
-                           address, wifi_name, wifi_password, wifi_rate, proof_image, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [packageId, packageName, price, duration, fullName, contactNumber, address, wifiName, wifiPassword, wifiRate, proofBuffer],
-        function(err) {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Failed to save order' });
+    const insertOrderRow = (accountRow = null) => {
+        db.run(
+            `INSERT INTO orders (
+                package_id,
+                package_name,
+                price,
+                duration,
+                full_name,
+                contact_number,
+                address,
+                wifi_name,
+                wifi_password,
+                wifi_rate,
+                proof_image,
+                status,
+                quantity,
+                unit_price,
+                shipping_fee,
+                total_price,
+                client_account_id,
+                referral_code_used
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+            [
+                normalizedPackageId,
+                resolvedPackageName,
+                toMoneyText(totalPrice),
+                resolvedDuration,
+                fullName,
+                contactNumber,
+                address,
+                wifiName,
+                wifiPassword,
+                wifiRate,
+                proofBuffer,
+                resolvedQuantity,
+                toMoneyText(resolvedUnitPrice),
+                toMoneyText(shippingFee),
+                toMoneyText(totalPrice),
+                accountRow?.id || null,
+                accountRow?.referred_by_code || null
+            ],
+            function(err) {
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Failed to save order' });
+                }
+
+                const orderId = this.lastID;
+                const trackingNumber = buildTrackingNumber(orderId, new Date());
+
+                db.run(
+                    `UPDATE orders SET tracking_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                    [trackingNumber, orderId],
+                    (updateErr) => {
+                        if (updateErr) {
+                            console.error('Tracking update error:', updateErr);
+                            return res.status(500).json({ error: 'Failed to generate tracking number' });
+                        }
+
+                        applyReferralRewardForOrder(accountRow?.id, orderId, (rewardErr, rewardMeta) => {
+                            if (rewardErr) {
+                                console.error('Referral reward processing error:', rewardErr.message);
+                            }
+
+                            res.json({
+                                success: true,
+                                orderId,
+                                trackingNumber,
+                                status: 'pending',
+                                quantity: resolvedQuantity,
+                                unitPrice: toMoneyText(resolvedUnitPrice),
+                                shippingFee: toMoneyText(shippingFee),
+                                totalPrice: toMoneyText(totalPrice),
+                                referralRewardApplied: Boolean(rewardMeta?.rewardApplied),
+                                referralRewardAmount: rewardMeta?.rewardAmount || 0,
+                                message: 'Order submitted successfully'
+                            });
+                        });
+                    }
+                );
+            }
+        );
+    };
+
+    if (!clientAccountId) {
+        insertOrderRow(null);
+        return;
+    }
+
+    db.get(
+        `SELECT id, referred_by_code
+         FROM client_accounts
+         WHERE id = ?`,
+        [clientAccountId],
+        (accountErr, accountRow) => {
+            if (accountErr) {
+                console.error('Client account lookup error:', accountErr.message);
+                insertOrderRow(null);
+                return;
             }
 
-            const orderId = this.lastID;
-            const trackingNumber = buildTrackingNumber(orderId, new Date());
-
-            db.run(
-                `UPDATE orders SET tracking_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-                [trackingNumber, orderId],
-                (updateErr) => {
-                    if (updateErr) {
-                        console.error('Tracking update error:', updateErr);
-                        return res.status(500).json({ error: 'Failed to generate tracking number' });
-                    }
-
-                    res.json({
-                        success: true,
-                        orderId,
-                        trackingNumber,
-                        status: 'pending',
-                        message: 'Order submitted successfully'
-                    });
-                }
-            );
+            insertOrderRow(accountRow || null);
         }
     );
 });
@@ -459,9 +1036,9 @@ app.get('/api/track-order/:id', (req, res) => {
     const normalizedLookup = rawLookup.toUpperCase();
     const isNumericOrderId = /^\d+$/.test(normalizedLookup);
     const query = isNumericOrderId
-        ? `SELECT id, tracking_number, package_name, status, rejection_reason, created_at, updated_at
+          ? `SELECT id, tracking_number, package_name, quantity, total_price, shipping_fee, status, rejection_reason, created_at, updated_at
            FROM orders WHERE id = ? OR tracking_number = ? ORDER BY id DESC LIMIT 1`
-        : `SELECT id, tracking_number, package_name, status, rejection_reason, created_at, updated_at
+          : `SELECT id, tracking_number, package_name, quantity, total_price, shipping_fee, status, rejection_reason, created_at, updated_at
            FROM orders WHERE tracking_number = ? LIMIT 1`;
     const params = isNumericOrderId ? [normalizedLookup, normalizedLookup] : [normalizedLookup];
 
@@ -486,6 +1063,9 @@ app.get('/api/track-order/:id', (req, res) => {
             orderId: row.id,
             trackingNumber,
             packageName: row.package_name,
+            quantity: Number(row.quantity || 1),
+            totalPrice: row.total_price || row.price || '0',
+            shippingFee: row.shipping_fee || '0',
             status: row.status,
             rejectionReason: row.rejection_reason,
             createdAt: row.created_at,
@@ -1016,6 +1596,10 @@ app.listen(PORT, () => {
     
     API Endpoints:
     POST   /api/login
+    POST   /api/client/register
+    POST   /api/client/login
+    GET    /api/client/me
+    GET    /api/client/referral/:code
     GET    /api/orders
     GET    /api/orders/:id
     POST   /api/orders/:id/approve

@@ -12,6 +12,14 @@ let currentChatStatus = 'ai';
 let currentChatLastMessageId = 0;
 let chatPollTimer = null;
 
+function formatAdminMoney(value) {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) {
+        return '0';
+    }
+    return numeric.toLocaleString('en-PH');
+}
+
 // =====================================================
 // INITIALIZATION
 // =====================================================
@@ -270,12 +278,20 @@ function displayOrders(orders) {
     }
     
     orders.forEach(order => {
+        const quantity = Number(order.quantity || 1);
+        const unitPrice = Number(order.unit_price || order.price || 0);
+        const totalPrice = Number(order.total_price || order.price || 0);
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>#${order.id}<br><small>${order.tracking_number || '--'}</small></td>
             <td>${order.full_name}</td>
             <td>${order.package_name}</td>
-            <td>₱${order.price}</td>
+            <td>
+                ₱${formatAdminMoney(totalPrice)}
+                <br>
+                <small>${quantity} pc(s) × ₱${formatAdminMoney(unitPrice)}</small>
+            </td>
             <td>${order.contact_number}</td>
             <td><span class="status-badge status-${order.status}">${order.status.toUpperCase()}</span></td>
             <td>${new Date(order.created_at).toLocaleDateString()}</td>
@@ -318,6 +334,9 @@ function displayPendingOrders(orders) {
     }
     
     orders.forEach(order => {
+        const quantity = Number(order.quantity || 1);
+        const totalPrice = Number(order.total_price || order.price || 0);
+
         const card = document.createElement('div');
         card.style.cssText = `
             background: white;
@@ -340,7 +359,7 @@ function displayPendingOrders(orders) {
                 </div>
                 <div>
                     <p style="color: #999; font-size: 0.9rem; margin-bottom: 0.25rem;">Package</p>
-                    <p style="font-weight: 600; font-size: 1.1rem;">${order.package_name} - ₱${order.price}</p>
+                    <p style="font-weight: 600; font-size: 1.1rem;">${order.package_name} - ${quantity} pc(s) - ₱${formatAdminMoney(totalPrice)}</p>
                 </div>
                 <div>
                     <p style="color: #999; font-size: 0.9rem; margin-bottom: 0.25rem;">Phone</p>
@@ -409,7 +428,27 @@ async function viewOrder(orderId) {
                 
                 <div class="detail-group">
                     <label>Price</label>
-                    <p>₱${order.price}</p>
+                    <p>₱${formatAdminMoney(order.total_price || order.price || 0)}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Quantity</label>
+                    <p>${Number(order.quantity || 1)} piece(s)</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Unit Price</label>
+                    <p>₱${formatAdminMoney(order.unit_price || order.price || 0)}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Shipping Fee</label>
+                    <p>${Number(order.shipping_fee || 0) === 0 ? 'FREE (₱0)' : `₱${formatAdminMoney(order.shipping_fee)}`}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Total Payment</label>
+                    <p>₱${formatAdminMoney(order.total_price || order.price || 0)}</p>
                 </div>
                 
                 <div class="detail-group">
@@ -445,6 +484,16 @@ async function viewOrder(orderId) {
                 <div class="detail-group">
                     <label>Duration</label>
                     <p>${order.duration}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Client Account ID</label>
+                    <p>${order.client_account_id || '--'}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>Referral Code Used</label>
+                    <p>${order.referral_code_used || '--'}</p>
                 </div>
                 
                 <div class="detail-group">
