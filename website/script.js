@@ -25,7 +25,7 @@ const renderedSupportMessageIds = new Set();
 const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_VAT_PHP = 15;
-const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-1';
+const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
 
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
