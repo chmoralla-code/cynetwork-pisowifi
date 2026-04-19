@@ -213,20 +213,20 @@
         <p>We provide premium WiFi solutions for affordable, high-speed internet access. Trust CYNETWORK for reliable connectivity.</p>
     </section>
 
-    <!-- Preorder Modal -->
+    <!-- Payment Modal -->
     <div id="paymentModal" class="modal">
         <div class="modal-content payment-modal">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Complete Your Preorder</h2>
-
-            <!-- Step 1: Shipping Details -->
+            <h2>Complete Your Payment</h2>
+            
+            <!-- Step 1: QR Code Payment -->
             <div id="step1" class="payment-step active">
-                <h3>Step 1: Fill Up Shipping Details</h3>
+                <h3>Step 1: Scan QR Code to Pay via GCash</h3>
                 <p class="package-selected">
                     Package: <span id="selectedPackageText">Starter</span><br>
                     Unit Price: ₱<span id="selectedUnitPrice">5800</span>.00<br>
                     Quantity: <span id="selectedQuantityText">1</span> piece(s)<br>
-                    Preorder Total: ₱<span id="selectedPrice">5800</span>.00
+                    Total Payment: ₱<span id="selectedPrice">5800</span>.00
                 </p>
                 <p class="shipping-free-note">Shipping Fee: FREE (₱0)</p>
 
@@ -237,8 +237,43 @@
                 </div>
 
                 <div id="checkoutAccountNotice" class="checkout-account-notice" style="display: none;"></div>
+                
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay</p>
+                </div>
+                
+                <button class="next-btn" onclick="nextStep()">I've Completed Payment</button>
+            </div>
 
-                <form id="shippingForm">
+            <!-- Step 2: Upload Proof of Payment -->
+            <div id="step2" class="payment-step">
+                <h3>Step 2: Upload Proof of Payment</h3>
+                <p>Upload a screenshot showing your successful GCash transaction</p>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="proofImage" accept="image/*" onchange="handleFileUpload(event)">
+                    <label for="proofImage">
+                        <span class="upload-icon">📸</span>
+                        <span class="upload-text">Click to upload or drag and drop</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+                
+                <div id="uploadPreview" class="upload-preview"></div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validateProof()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Personal Information -->
+            <div id="step3" class="payment-step">
+                <h3>Step 3: Personal Information</h3>
+                <p>Please provide your details for WiFi access</p>
+                
+                <form id="personalForm">
                     <div class="form-group">
                         <label for="fullName">Full Name *</label>
                         <input type="text" id="fullName" placeholder="Juan Dela Cruz" required>
@@ -253,21 +288,59 @@
                         <label for="address">Full Address *</label>
                         <textarea id="address" placeholder="Street Address, Barangay, City, Province, Postal Code" rows="3" required></textarea>
                     </div>
-                </form>
+                </form>                
 
                 <div class="saved-details-helper">
                     <p class="saved-details-note">Your customer details are saved on this device to make your next order faster.</p>
                     <button type="button" class="saved-details-clear" onclick="clearSavedCustomerDetails()">Clear Saved Details</button>
                 </div>
 
-                <button class="submit-btn" onclick="completeTransaction()">Submit Preorder</button>
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validatePersonalInfo()">Next</button>
+                </div>
             </div>
 
-            <!-- Step 2: Success -->
-            <div id="step2" class="payment-step">
+            <!-- Step 4: WiFi Configuration -->
+            <div id="step4" class="payment-step">
+                <h3>Step 4: WiFi Configuration</h3>
+                <p>Set up your WiFi network details</p>
+                
+                <form id="wifiForm">
+                    <div class="form-group">
+                        <label for="wifiName">WiFi Name (SSID) *</label>
+                        <input type="text" id="wifiName" placeholder="e.g., MyWiFi_Home" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiPassword">WiFi Password *</label>
+                        <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiRate">Data Rate Limit (Mbps) *</label>
+                        <select id="wifiRate" required>
+                            <option value="">Select rate limit</option>
+                            <option value="5">5 Mbps - Basic</option>
+                            <option value="10">10 Mbps - Standard</option>
+                            <option value="25">25 Mbps - Fast</option>
+                            <option value="50">50 Mbps - Ultra Fast</option>
+                            <option value="100">100 Mbps - Premium</option>
+                        </select>
+                    </div>
+                </form>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="submit-btn" onclick="completeTransaction()">Complete & Activate</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Success -->
+            <div id="step5" class="payment-step">
                 <div class="success-container">
                     <div class="success-icon">✓</div>
-                    <h3>Preorder Submitted!</h3>
+                    <h3>Payment Successful!</h3>
                     <p>Your order has been received and is now pending review.</p>
                     
                     <div class="success-details">
@@ -275,8 +348,9 @@
                         <p><strong>Tracking Number:</strong> <span id="confirmTrackingNumber">--</span></p>
                         <p><strong>Order Status:</strong> <span id="confirmOrderStatus">PENDING</span></p>
                         <p><strong>Quantity:</strong> <span id="confirmQuantity">1</span> piece(s)</p>
-                        <p><strong>Preorder Total:</strong> ₱<span id="confirmTotalPrice">0</span>.00</p>
+                        <p><strong>Total Payment:</strong> ₱<span id="confirmTotalPrice">0</span>.00</p>
                         <p id="confirmReferralRewardWrap" style="display: none;"><strong>Referral Reward:</strong> <span id="confirmReferralRewardText"></span></p>
+                        <p><strong>WiFi Name:</strong> <span id="confirmWifiName"></span></p>
                         <p><strong>Duration:</strong> <span id="confirmDuration"></span></p>
                         <p><strong>Name:</strong> <span id="confirmName"></span></p>
                     </div>
@@ -285,7 +359,7 @@
 
                     <div class="success-actions">
                         <button id="trackPendingOrderBtn" class="next-btn track-order-btn" onclick="trackPendingOrder()">Track Pending Order</button>
-                        <button class="cta-button" onclick="location.reload()">Start New Preorder</button>
+                        <button class="cta-button" onclick="location.reload()">Start New Transaction</button>
                     </div>
                 </div>
             </div>
