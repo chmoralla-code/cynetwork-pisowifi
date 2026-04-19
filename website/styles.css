@@ -401,6 +401,88 @@ body {
 }
 
 /* =====================================================
+   OTHER OFFERS SECTION
+   ===================================================== */
+
+.other-offers-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem 90px;
+}
+
+.other-offer-card {
+    background: #FFFFFF;
+    border: 1px solid #E6E6E6;
+    border-radius: 14px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+}
+
+.other-offer-media {
+    min-height: 260px;
+    background: linear-gradient(135deg, #1B1B1B 0%, #444 100%);
+}
+
+.other-offer-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.other-offer-content {
+    padding: 1.6rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.8rem;
+}
+
+.other-offer-tag {
+    display: inline-flex;
+    width: fit-content;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    background: #FDECEC;
+    color: #B72D36;
+}
+
+.other-offer-content h3 {
+    font-size: 1.7rem;
+    color: var(--text-dark);
+}
+
+.other-offer-content p {
+    color: #5A5A5A;
+    line-height: 1.6;
+}
+
+.other-offer-btn {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.78rem 1rem;
+    border-radius: 8px;
+    background: var(--gradient-main);
+    color: #FFFFFF;
+    font-weight: 700;
+    width: fit-content;
+    transition: var(--transition);
+}
+
+.other-offer-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(230, 57, 70, 0.25);
+}
+
+/* =====================================================
    INSTALLATION TUTORIALS
    ===================================================== */
 
@@ -860,6 +942,11 @@ body {
 .next-btn:hover, .submit-btn:hover {
     background: var(--accent-red-dark);
     transform: translateY(-2px);
+}
+
+.payment-step > .submit-btn {
+    width: 100%;
+    margin-top: 1.2rem;
 }
 
 .success-container {
@@ -1520,6 +1607,18 @@ body {
 
     .packages-grid {
         grid-template-columns: 1fr;
+    }
+
+    .other-offers-section {
+        padding: 0 1rem 60px;
+    }
+
+    .other-offer-card {
+        grid-template-columns: 1fr;
+    }
+
+    .other-offer-media {
+        min-height: 200px;
     }
 
     .tutorials-grid {

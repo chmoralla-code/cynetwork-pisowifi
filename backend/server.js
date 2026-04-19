@@ -344,6 +344,221 @@ function getOptionalAdminAuth(req) {
     }
 }
 
+function parseBooleanFlag(value, fallback = false) {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+            return true;
+        }
+        if (['0', 'false', 'no', 'off', ''].includes(normalized)) {
+            return false;
+        }
+    }
+
+    return fallback;
+}
+
+function toNotificationSettingsPayload(row) {
+    return {
+        telegramEnabled: Boolean(Number(row?.telegram_enabled || 0)),
+        telegramBotToken: String(row?.telegram_bot_token || ''),
+        telegramChatId: String(row?.telegram_chat_id || ''),
+        intergramEnabled: Boolean(Number(row?.intergram_enabled || 0)),
+        intergramWebhookUrl: String(row?.intergram_webhook_url || ''),
+        notifyPendingOrders: Boolean(Number(row?.notify_pending_orders ?? 1)),
+        notifyAiChats: Boolean(Number(row?.notify_ai_chats ?? 1)),
+        updatedAt: row?.updated_at || null
+    };
+}
+
+function loadNotificationSettings(callback) {
+    db.get(
+        'SELECT * FROM notification_settings WHERE id = 1',
+        (err, row) => {
+            if (err) {
+                callback(err);
+                return;
+            }
+
+            if (row) {
+                callback(null, row);
+                return;
+            }
+
+            callback(null, {
+                id: 1,
+                telegram_enabled: 0,
+                telegram_bot_token: '',
+                telegram_chat_id: '',
+                intergram_enabled: 0,
+                intergram_webhook_url: '',
+                notify_pending_orders: 1,
+                notify_ai_chats: 1,
+                updated_at: null
+            });
+        }
+    );
+}
+
+function buildNotificationMessage(eventType, payload = {}) {
+    const timestamp = new Date().toLocaleString('en-PH');
+
+    if (eventType === 'pending_order') {
+        return [
+            '[CYNETWORK] New Pending Preorder',
+            `Time: ${timestamp}`,
+            `Order ID: ${payload.orderId || '--'}`,
+            `Tracking: ${payload.trackingNumber || '--'}`,
+            `Customer: ${payload.fullName || '--'}`,
+            `Contact: ${payload.contactNumber || '--'}`,
+            `Package: ${payload.packageName || '--'}`,
+            `Quantity: ${payload.quantity || 1}`,
+            `Total: PHP ${Number(payload.totalPrice || 0).toLocaleString('en-PH')}`,
+            `Status: ${String(payload.status || 'pending').toUpperCase()}`
+        ].join('\n');
+    }
+
+    if (eventType === 'ai_chat') {
+        return [
+            '[CYNETWORK] New AI Chat Activity',
+            `Time: ${timestamp}`,
+            `Session ID: ${payload.sessionId || '--'}`,
+            `Client: ${payload.clientId || '--'}`,
+            `Customer: ${payload.customerName || '--'}`,
+            `Tracking: ${payload.trackingNumber || '--'}`,
+            `Status: ${String(payload.status || 'ai').toUpperCase()}`,
+            `Message: ${String(payload.message || '').slice(0, 200) || '--'}`
+        ].join('\n');
+    }
+
+    return [
+        '[CYNETWORK] Admin Notification',
+        `Time: ${timestamp}`,
+        `Type: ${eventType}`,
+        `Message: ${String(payload.message || 'System event')}`
+    ].join('\n');
+}
+
+async function sendTelegramNotification(botToken, chatId, text) {
+    if (typeof fetch !== 'function') {
+        throw new Error('Global fetch is unavailable in this Node runtime');
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            disable_web_page_preview: true
+        })
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Telegram API error (${response.status}): ${errorBody.slice(0, 220)}`);
+    }
+
+    return response.json();
+}
+
+async function sendIntergramNotification(webhookUrl, payload) {
+    if (typeof fetch !== 'function') {
+        throw new Error('Global fetch is unavailable in this Node runtime');
+    }
+
+    const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Intergram webhook error (${response.status}): ${errorBody.slice(0, 220)}`);
+    }
+
+    return response.text();
+}
+
+function dispatchAdminNotification(eventType, payload = {}, options = {}) {
+    const force = Boolean(options.force);
+
+    return new Promise((resolve) => {
+        loadNotificationSettings(async (settingsErr, settingsRow) => {
+            if (settingsErr) {
+                console.error('Notification settings load error:', settingsErr.message || settingsErr);
+                resolve({ success: false, error: 'settings_load_failed' });
+                return;
+            }
+
+            const settings = toNotificationSettingsPayload(settingsRow);
+
+            if (!force) {
+                if (eventType === 'pending_order' && !settings.notifyPendingOrders) {
+                    resolve({ success: true, skipped: 'pending_order_notifications_disabled' });
+                    return;
+                }
+
+                if (eventType === 'ai_chat' && !settings.notifyAiChats) {
+                    resolve({ success: true, skipped: 'ai_chat_notifications_disabled' });
+                    return;
+                }
+            }
+
+            const messageText = buildNotificationMessage(eventType, payload);
+            const requests = [];
+
+            if (settings.telegramEnabled && settings.telegramBotToken && settings.telegramChatId) {
+                requests.push(
+                    sendTelegramNotification(settings.telegramBotToken, settings.telegramChatId, messageText)
+                        .then(() => ({ channel: 'telegram', ok: true }))
+                        .catch((error) => ({ channel: 'telegram', ok: false, error: error.message }))
+                );
+            }
+
+            if (settings.intergramEnabled && settings.intergramWebhookUrl) {
+                requests.push(
+                    sendIntergramNotification(settings.intergramWebhookUrl, {
+                        source: 'cynetwork-pisowifi',
+                        eventType,
+                        message: messageText,
+                        payload,
+                        sentAt: new Date().toISOString()
+                    })
+                        .then(() => ({ channel: 'intergram', ok: true }))
+                        .catch((error) => ({ channel: 'intergram', ok: false, error: error.message }))
+                );
+            }
+
+            if (!requests.length) {
+                resolve({ success: true, skipped: 'no_enabled_channels' });
+                return;
+            }
+
+            const results = await Promise.all(requests);
+            results
+                .filter((item) => !item.ok)
+                .forEach((failed) => {
+                    console.warn(`Notification channel failure (${failed.channel}):`, failed.error);
+                });
+
+            resolve({
+                success: results.some((item) => item.ok),
+                results
+            });
+        });
+    });
+}
+
 // =====================================================
 // MIDDLEWARE
 // =====================================================
@@ -499,6 +714,21 @@ db.serialize(() => {
         )
     `);
 
+    db.run(`
+        CREATE TABLE IF NOT EXISTS notification_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            telegram_enabled INTEGER DEFAULT 0,
+            telegram_bot_token TEXT,
+            telegram_chat_id TEXT,
+            intergram_enabled INTEGER DEFAULT 0,
+            intergram_webhook_url TEXT,
+            notify_pending_orders INTEGER DEFAULT 1,
+            notify_ai_chats INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN tracking_number TEXT', 'tracking_number');
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN quantity INTEGER DEFAULT 1', 'quantity');
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN unit_price TEXT', 'unit_price');
@@ -511,6 +741,29 @@ db.serialize(() => {
     addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN referral_balance INTEGER DEFAULT 0', 'referral_balance');
     addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN referral_reward_count INTEGER DEFAULT 0', 'referral_reward_count');
     addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP', 'updated_at');
+
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN telegram_enabled INTEGER DEFAULT 0', 'notification_settings.telegram_enabled');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN telegram_bot_token TEXT', 'notification_settings.telegram_bot_token');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN telegram_chat_id TEXT', 'notification_settings.telegram_chat_id');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN intergram_enabled INTEGER DEFAULT 0', 'notification_settings.intergram_enabled');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN intergram_webhook_url TEXT', 'notification_settings.intergram_webhook_url');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN notify_pending_orders INTEGER DEFAULT 1', 'notification_settings.notify_pending_orders');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN notify_ai_chats INTEGER DEFAULT 1', 'notification_settings.notify_ai_chats');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP', 'notification_settings.created_at');
+    addColumnIfMissing('ALTER TABLE notification_settings ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP', 'notification_settings.updated_at');
+
+    db.run(`
+        INSERT OR IGNORE INTO notification_settings (
+            id,
+            telegram_enabled,
+            telegram_bot_token,
+            telegram_chat_id,
+            intergram_enabled,
+            intergram_webhook_url,
+            notify_pending_orders,
+            notify_ai_chats
+        ) VALUES (1, 0, '', '', 0, '', 1, 1)
+    `);
 
     // Backfill old orders with deterministic tracking numbers.
     db.run(`
@@ -1103,9 +1356,16 @@ app.post('/api/submit-order', (req, res) => {
         wifiRate,
         proofImage
     } = req.body;
+
+    const normalizedFullName = String(fullName || '').trim();
+    const normalizedContactNumber = String(contactNumber || '').trim();
+    const normalizedAddress = String(address || '').trim();
+    const normalizedWifiName = String(wifiName || 'PREORDER').trim() || 'PREORDER';
+    const normalizedWifiPassword = String(wifiPassword || 'PREORDER').trim() || 'PREORDER';
+    const normalizedWifiRate = String(wifiRate || 'N/A').trim() || 'N/A';
     
     // Validate required fields
-    if (!packageId || !fullName || !contactNumber || !address || !wifiName || !wifiPassword) {
+    if (!packageId || !normalizedFullName || !normalizedContactNumber || !normalizedAddress) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -1160,12 +1420,12 @@ app.post('/api/submit-order', (req, res) => {
                 resolvedPackageName,
                 toMoneyText(totalPrice),
                 resolvedDuration,
-                fullName,
-                contactNumber,
-                address,
-                wifiName,
-                wifiPassword,
-                wifiRate,
+                normalizedFullName,
+                normalizedContactNumber,
+                normalizedAddress,
+                normalizedWifiName,
+                normalizedWifiPassword,
+                normalizedWifiRate,
                 proofBuffer,
                 resolvedQuantity,
                 toMoneyText(resolvedUnitPrice),
@@ -1196,6 +1456,17 @@ app.post('/api/submit-order', (req, res) => {
                             if (rewardErr) {
                                 console.error('Referral reward processing error:', rewardErr.message);
                             }
+
+                            void dispatchAdminNotification('pending_order', {
+                                orderId,
+                                trackingNumber,
+                                fullName: normalizedFullName,
+                                contactNumber: normalizedContactNumber,
+                                packageName: resolvedPackageName,
+                                quantity: resolvedQuantity,
+                                totalPrice,
+                                status: 'pending'
+                            });
 
                             res.json({
                                 success: true,
@@ -1409,6 +1680,15 @@ app.post('/api/chat/live-support-request', (req, res) => {
                                 return res.status(500).json({ error: 'Failed to add live support request message' });
                             }
 
+                            void dispatchAdminNotification('ai_chat', {
+                                sessionId,
+                                clientId,
+                                customerName: session.customer_name || null,
+                                trackingNumber: session.tracking_number || null,
+                                status: 'live',
+                                message: 'Client requested live customer support.'
+                            });
+
                             res.json({ success: true, status: 'live' });
                         }
                     );
@@ -1471,6 +1751,17 @@ app.post('/api/chat/messages', (req, res) => {
                         (getErr, createdMessage) => {
                             if (getErr || !createdMessage) {
                                 return res.status(500).json({ error: 'Failed to load chat message' });
+                            }
+
+                            if (senderType === 'client') {
+                                void dispatchAdminNotification('ai_chat', {
+                                    sessionId,
+                                    clientId,
+                                    customerName: session.customer_name || null,
+                                    trackingNumber: session.tracking_number || null,
+                                    status: session.status || 'ai',
+                                    message: trimmedMessage
+                                });
                             }
 
                             res.json({ success: true, message: toChatMessagePayload(createdMessage) });
@@ -1668,6 +1959,211 @@ app.post('/api/chat/sessions/:id/status', verifyToken, (req, res) => {
 });
 
 // =====================================================
+// ADMIN NOTIFICATION SETTINGS
+// =====================================================
+
+app.get('/api/notifications/settings', verifyToken, (req, res) => {
+    loadNotificationSettings((err, row) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to load notification settings' });
+        }
+
+        res.json({ success: true, settings: toNotificationSettingsPayload(row) });
+    });
+});
+
+app.post('/api/notifications/settings', verifyToken, (req, res) => {
+    const telegramEnabled = parseBooleanFlag(req.body.telegramEnabled, false);
+    const telegramBotToken = String(req.body.telegramBotToken || '').trim();
+    const telegramChatId = String(req.body.telegramChatId || '').trim();
+    const intergramEnabled = parseBooleanFlag(req.body.intergramEnabled, false);
+    const intergramWebhookUrl = String(req.body.intergramWebhookUrl || '').trim();
+    const notifyPendingOrders = parseBooleanFlag(req.body.notifyPendingOrders, true);
+    const notifyAiChats = parseBooleanFlag(req.body.notifyAiChats, true);
+
+    if (telegramEnabled && (!telegramBotToken || !telegramChatId)) {
+        return res.status(400).json({
+            error: 'Telegram Bot Token and Chat ID are required when Telegram notifications are enabled.'
+        });
+    }
+
+    if (intergramEnabled) {
+        const validWebhook = /^https?:\/\//i.test(intergramWebhookUrl);
+        if (!validWebhook) {
+            return res.status(400).json({
+                error: 'Please enter a valid Intergram webhook URL (http or https).'
+            });
+        }
+    }
+
+    db.run(
+        `INSERT INTO notification_settings (
+            id,
+            telegram_enabled,
+            telegram_bot_token,
+            telegram_chat_id,
+            intergram_enabled,
+            intergram_webhook_url,
+            notify_pending_orders,
+            notify_ai_chats,
+            updated_at
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+            telegram_enabled = excluded.telegram_enabled,
+            telegram_bot_token = excluded.telegram_bot_token,
+            telegram_chat_id = excluded.telegram_chat_id,
+            intergram_enabled = excluded.intergram_enabled,
+            intergram_webhook_url = excluded.intergram_webhook_url,
+            notify_pending_orders = excluded.notify_pending_orders,
+            notify_ai_chats = excluded.notify_ai_chats,
+            updated_at = CURRENT_TIMESTAMP`,
+        [
+            telegramEnabled ? 1 : 0,
+            telegramBotToken,
+            telegramChatId,
+            intergramEnabled ? 1 : 0,
+            intergramWebhookUrl,
+            notifyPendingOrders ? 1 : 0,
+            notifyAiChats ? 1 : 0
+        ],
+        (err) => {
+            if (err) {
+                console.error('Failed to save notification settings:', err.message);
+                return res.status(500).json({ error: 'Failed to save notification settings' });
+            }
+
+            loadNotificationSettings((loadErr, settingsRow) => {
+                if (loadErr) {
+                    return res.status(500).json({ error: 'Settings were saved but could not be reloaded' });
+                }
+
+                res.json({
+                    success: true,
+                    message: 'Notification settings saved successfully',
+                    settings: toNotificationSettingsPayload(settingsRow)
+                });
+            });
+        }
+    );
+});
+
+app.post('/api/notifications/test', verifyToken, async (req, res) => {
+    const type = String(req.body.type || 'pending_order').toLowerCase();
+
+    if (!['pending_order', 'ai_chat'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid test notification type' });
+    }
+
+    const payload = type === 'pending_order'
+        ? {
+            orderId: 'TEST-ORDER',
+            trackingNumber: 'TEST-TRACKING',
+            fullName: 'Test Customer',
+            contactNumber: '+639000000000',
+            packageName: 'Starter',
+            quantity: 1,
+            totalPrice: 5800,
+            status: 'pending'
+        }
+        : {
+            sessionId: 'TEST-SESSION',
+            clientId: 'TEST-CLIENT',
+            customerName: 'Test Chat User',
+            trackingNumber: 'TEST-TRACKING',
+            status: 'ai',
+            message: 'This is a sample AI chat notification from CYNETWORK dashboard test.'
+        };
+
+    const result = await dispatchAdminNotification(type, payload, { force: true });
+    res.json({ success: true, result });
+});
+
+// =====================================================
+// SALES ANALYTICS REPORT
+// =====================================================
+
+app.get('/api/reports/sales', verifyToken, (req, res) => {
+    db.get(
+        `SELECT
+            COUNT(*) AS total_orders,
+            COALESCE(SUM(CAST(total_price AS INTEGER)), 0) AS gross_sales,
+            COALESCE(SUM(CAST(quantity AS INTEGER)), 0) AS total_units,
+            COALESCE(SUM(CASE WHEN date(created_at, 'localtime') = date('now', 'localtime') THEN CAST(total_price AS INTEGER) ELSE 0 END), 0) AS today_sales,
+            COALESCE(SUM(CASE WHEN date(created_at, 'localtime') = date('now', 'localtime') THEN 1 ELSE 0 END), 0) AS today_orders,
+            COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime') THEN CAST(total_price AS INTEGER) ELSE 0 END), 0) AS month_sales,
+            COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime') THEN 1 ELSE 0 END), 0) AS month_orders
+        FROM orders`,
+        (summaryErr, summaryRow) => {
+            if (summaryErr) {
+                return res.status(500).json({ error: 'Failed to load sales summary' });
+            }
+
+            db.all(
+                `SELECT
+                    package_name,
+                    COUNT(*) AS order_count,
+                    COALESCE(SUM(CAST(quantity AS INTEGER)), 0) AS units_sold,
+                    COALESCE(SUM(CAST(total_price AS INTEGER)), 0) AS sales_amount
+                 FROM orders
+                 GROUP BY package_name
+                 ORDER BY sales_amount DESC`,
+                (packageErr, packageRows) => {
+                    if (packageErr) {
+                        return res.status(500).json({ error: 'Failed to load package analytics' });
+                    }
+
+                    db.all(
+                        `SELECT
+                            date(created_at, 'localtime') AS report_date,
+                            COUNT(*) AS order_count,
+                            COALESCE(SUM(CAST(quantity AS INTEGER)), 0) AS units_sold,
+                            COALESCE(SUM(CAST(total_price AS INTEGER)), 0) AS sales_amount
+                         FROM orders
+                         WHERE date(created_at, 'localtime') >= date('now', '-6 day', 'localtime')
+                         GROUP BY date(created_at, 'localtime')
+                         ORDER BY report_date ASC`,
+                        (trendErr, trendRows) => {
+                            if (trendErr) {
+                                return res.status(500).json({ error: 'Failed to load sales trend report' });
+                            }
+
+                            const totalOrders = Number(summaryRow?.total_orders || 0);
+                            const grossSales = Number(summaryRow?.gross_sales || 0);
+
+                            res.json({
+                                success: true,
+                                summary: {
+                                    totalOrders,
+                                    grossSales,
+                                    totalUnits: Number(summaryRow?.total_units || 0),
+                                    todaySales: Number(summaryRow?.today_sales || 0),
+                                    todayOrders: Number(summaryRow?.today_orders || 0),
+                                    monthSales: Number(summaryRow?.month_sales || 0),
+                                    monthOrders: Number(summaryRow?.month_orders || 0),
+                                    averageOrderValue: totalOrders > 0 ? Math.round(grossSales / totalOrders) : 0
+                                },
+                                packageBreakdown: (packageRows || []).map((row) => ({
+                                    packageName: row.package_name,
+                                    orderCount: Number(row.order_count || 0),
+                                    unitsSold: Number(row.units_sold || 0),
+                                    salesAmount: Number(row.sales_amount || 0)
+                                })),
+                                dailyTrend: (trendRows || []).map((row) => ({
+                                    reportDate: row.report_date,
+                                    orderCount: Number(row.order_count || 0),
+                                    unitsSold: Number(row.units_sold || 0),
+                                    salesAmount: Number(row.sales_amount || 0)
+                                }))
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
+// =====================================================
 // ADMIN DASHBOARD STATS
 // =====================================================
 
@@ -1831,7 +2327,11 @@ app.listen(PORT, () => {
     GET    /api/chat/unread-count
     POST   /api/chat/sessions/:id/reply
     POST   /api/chat/sessions/:id/status
+    GET    /api/notifications/settings
+    POST   /api/notifications/settings
+    POST   /api/notifications/test
     GET    /api/stats
+    GET    /api/reports/sales
     GET    /api/images/package/:packageId
     POST   /api/images/upload
     ========================================

@@ -11,6 +11,7 @@ let currentChatSessionId = null;
 let currentChatStatus = 'ai';
 let currentChatLastMessageId = 0;
 let chatPollTimer = null;
+let notificationSettings = null;
 
 function formatAdminMoney(value) {
     const numeric = Number(value || 0);
@@ -29,12 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
         showDashboard();
         loadStats();
         loadOrders();
+        loadSalesReport();
+        loadNotificationSettings();
         setupImageUploadListeners();
         initializeChatSupport();
     } else {
         showLoginPage();
     }
-    
+
     setupEventListeners();
 });
 
@@ -45,10 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     // Login form
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    
+
     // Logout button
     document.getElementById('logoutBtn').addEventListener('click', logout);
-    
+
     // Sidebar navigation
     document.querySelectorAll('.menu-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -58,13 +61,14 @@ function setupEventListeners() {
             switchView(view);
         });
     });
-    
+
     // Search and filter
     document.getElementById('searchInput')?.addEventListener('input', filterOrders);
     document.getElementById('filterStatus')?.addEventListener('change', filterOrders);
 
     // Dashboard actions
     document.getElementById('refreshDashboardBtn')?.addEventListener('click', refreshDashboardData);
+    document.getElementById('refreshSalesReportBtn')?.addEventListener('click', loadSalesReport);
 
     // Chat actions
     document.getElementById('refreshChatsBtn')?.addEventListener('click', () => {
@@ -84,6 +88,13 @@ function setupEventListeners() {
         updateChatSessionStatus(event.target.value);
     });
 
+    // Notification settings
+    document.getElementById('notificationSettingsForm')?.addEventListener('submit', saveNotificationSettings);
+    document.getElementById('testPendingNotifBtn')?.addEventListener('click', () => sendNotificationTest('pending_order'));
+    document.getElementById('testAiNotifBtn')?.addEventListener('click', () => sendNotificationTest('ai_chat'));
+    document.getElementById('telegramEnabled')?.addEventListener('change', syncNotificationInputState);
+    document.getElementById('intergramEnabled')?.addEventListener('change', syncNotificationInputState);
+
     // Close modals by clicking outside
     window.addEventListener('click', (event) => {
         if (event.target.id === 'orderModal') {
@@ -101,37 +112,39 @@ function setupEventListeners() {
 
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
-    
+
     try {
         const response = await fetch(`${API_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             errorDiv.textContent = data.error || 'Login failed';
             errorDiv.classList.add('show');
             return;
         }
-        
+
         authToken = data.token;
         localStorage.setItem('adminToken', authToken);
         localStorage.setItem('adminUsername', data.username);
-        
+
         document.getElementById('username').value = '';
         document.getElementById('password').value = '';
         errorDiv.classList.remove('show');
-        
+
         showDashboard();
         loadStats();
         loadOrders();
+        loadSalesReport();
+        loadNotificationSettings();
         setupImageUploadListeners();
         initializeChatSupport();
     } catch (error) {
@@ -154,6 +167,7 @@ function logout() {
     chatSessions = [];
     currentChatSessionId = null;
     currentChatLastMessageId = 0;
+    notificationSettings = null;
 
     showLoginPage();
 }
@@ -179,18 +193,18 @@ function switchView(viewName) {
     document.querySelectorAll('.view').forEach(view => {
         view.classList.remove('active');
     });
-    
+
     // Remove active from all menu items
     document.querySelectorAll('.menu-item').forEach(item => {
         item.classList.remove('active');
     });
-    
+
     // Add active to selected view and menu item
     const viewId = `${viewName}View`;
     document.getElementById(viewId)?.classList.add('active');
-    
+
     document.querySelector(`[data-view="${viewName}"]`)?.classList.add('active');
-    
+
     // Load view-specific data
     if (viewName === 'pending') {
         loadPendingOrders();
@@ -200,12 +214,18 @@ function switchView(viewName) {
         loadChatSessions(true);
     } else if (viewName === 'images') {
         loadCurrentImages();
+    } else if (viewName === 'settings') {
+        loadNotificationSettings();
+    } else if (viewName === 'dashboard') {
+        loadSalesReport();
     }
 }
 
 async function refreshDashboardData() {
     await loadStats();
     await loadOrders();
+    await loadSalesReport();
+    await loadNotificationSettings();
     await loadChatUnreadCount();
     loadCurrentImages();
 }
@@ -229,6 +249,11 @@ async function loadStats() {
         document.getElementById('rejectedOrders').textContent = stats.rejected_orders || 0;
         document.getElementById('completedOrders').textContent = stats.completed_orders || 0;
         document.getElementById('cancelledOrders').textContent = stats.cancelled_orders || 0;
+
+        const monitorPending = document.getElementById('monitorPendingOrders');
+        if (monitorPending) {
+            monitorPending.textContent = String(stats.pending_orders || 0);
+        }
     } catch (error) {
         console.error('Error loading stats:', error);
     }
@@ -262,6 +287,252 @@ async function loadPendingOrders() {
     }
     const pendingOrders = allOrders.filter(order => order.status === 'pending');
     displayPendingOrders(pendingOrders);
+}
+
+async function loadSalesReport() {
+    try {
+        const response = await fetch(`${API_URL}/reports/sales`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                logout();
+            }
+            return;
+        }
+
+        const result = await response.json();
+        renderSalesReport(result);
+    } catch (error) {
+        console.error('Error loading sales report:', error);
+    }
+}
+
+function renderSalesReport(reportData) {
+    const summary = reportData?.summary || {};
+
+    const grossEl = document.getElementById('salesGrossValue');
+    const todayEl = document.getElementById('salesTodayValue');
+    const monthEl = document.getElementById('salesMonthValue');
+    const unitsEl = document.getElementById('salesUnitsValue');
+    const averageEl = document.getElementById('salesAverageValue');
+
+    if (grossEl) grossEl.textContent = `₱${formatAdminMoney(summary.grossSales || 0)}`;
+    if (todayEl) todayEl.textContent = `₱${formatAdminMoney(summary.todaySales || 0)}`;
+    if (monthEl) monthEl.textContent = `₱${formatAdminMoney(summary.monthSales || 0)}`;
+    if (unitsEl) unitsEl.textContent = formatAdminMoney(summary.totalUnits || 0);
+    if (averageEl) averageEl.textContent = `₱${formatAdminMoney(summary.averageOrderValue || 0)}`;
+
+    const packageBody = document.getElementById('salesPackageBody');
+    if (packageBody) {
+        packageBody.innerHTML = '';
+        const rows = reportData?.packageBreakdown || [];
+
+        if (!rows.length) {
+            packageBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem;">No sales data yet</td></tr>';
+        } else {
+            rows.forEach((item) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.packageName || '--'}</td>
+                    <td>${formatAdminMoney(item.orderCount || 0)}</td>
+                    <td>${formatAdminMoney(item.unitsSold || 0)}</td>
+                    <td>₱${formatAdminMoney(item.salesAmount || 0)}</td>
+                `;
+                packageBody.appendChild(row);
+            });
+        }
+    }
+
+    const trendBody = document.getElementById('salesTrendBody');
+    if (trendBody) {
+        trendBody.innerHTML = '';
+        const rows = reportData?.dailyTrend || [];
+
+        if (!rows.length) {
+            trendBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 1rem;">No trend data yet</td></tr>';
+        } else {
+            rows.forEach((item) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.reportDate || '--'}</td>
+                    <td>${formatAdminMoney(item.orderCount || 0)}</td>
+                    <td>${formatAdminMoney(item.unitsSold || 0)}</td>
+                    <td>₱${formatAdminMoney(item.salesAmount || 0)}</td>
+                `;
+                trendBody.appendChild(row);
+            });
+        }
+    }
+}
+
+function setNotificationSettingsStatus(message, type = '') {
+    const statusEl = document.getElementById('notificationSettingsStatus');
+    if (!statusEl) {
+        return;
+    }
+
+    if (!message) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+        statusEl.className = 'settings-status';
+        return;
+    }
+
+    statusEl.style.display = 'block';
+    statusEl.textContent = message;
+    statusEl.className = `settings-status ${type}`.trim();
+}
+
+function updateNotificationMonitorStateLabel() {
+    const monitorEl = document.getElementById('monitorNotificationState');
+    if (!monitorEl) {
+        return;
+    }
+
+    if (!notificationSettings) {
+        monitorEl.textContent = 'Not configured';
+        return;
+    }
+
+    const channels = [];
+    if (notificationSettings.telegramEnabled) {
+        channels.push('Telegram');
+    }
+    if (notificationSettings.intergramEnabled) {
+        channels.push('Intergram');
+    }
+
+    monitorEl.textContent = channels.length
+        ? `${channels.join(' + ')} active`
+        : 'Disabled';
+}
+
+function syncNotificationInputState() {
+    const telegramEnabled = document.getElementById('telegramEnabled')?.checked;
+    const intergramEnabled = document.getElementById('intergramEnabled')?.checked;
+
+    const telegramTokenInput = document.getElementById('telegramBotToken');
+    const telegramChatInput = document.getElementById('telegramChatId');
+    const intergramWebhookInput = document.getElementById('intergramWebhookUrl');
+
+    if (telegramTokenInput) telegramTokenInput.disabled = !telegramEnabled;
+    if (telegramChatInput) telegramChatInput.disabled = !telegramEnabled;
+    if (intergramWebhookInput) intergramWebhookInput.disabled = !intergramEnabled;
+}
+
+function applyNotificationSettingsToForm(settings) {
+    if (!settings) {
+        return;
+    }
+
+    const telegramEnabled = document.getElementById('telegramEnabled');
+    const telegramBotToken = document.getElementById('telegramBotToken');
+    const telegramChatId = document.getElementById('telegramChatId');
+    const intergramEnabled = document.getElementById('intergramEnabled');
+    const intergramWebhookUrl = document.getElementById('intergramWebhookUrl');
+    const notifyPendingOrders = document.getElementById('notifyPendingOrders');
+    const notifyAiChats = document.getElementById('notifyAiChats');
+
+    if (telegramEnabled) telegramEnabled.checked = Boolean(settings.telegramEnabled);
+    if (telegramBotToken) telegramBotToken.value = settings.telegramBotToken || '';
+    if (telegramChatId) telegramChatId.value = settings.telegramChatId || '';
+    if (intergramEnabled) intergramEnabled.checked = Boolean(settings.intergramEnabled);
+    if (intergramWebhookUrl) intergramWebhookUrl.value = settings.intergramWebhookUrl || '';
+    if (notifyPendingOrders) notifyPendingOrders.checked = settings.notifyPendingOrders !== false;
+    if (notifyAiChats) notifyAiChats.checked = settings.notifyAiChats !== false;
+
+    syncNotificationInputState();
+}
+
+async function loadNotificationSettings() {
+    try {
+        const response = await fetch(`${API_URL}/notifications/settings`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                logout();
+            }
+            return;
+        }
+
+        const result = await response.json();
+        notificationSettings = result?.settings || null;
+        applyNotificationSettingsToForm(notificationSettings);
+        updateNotificationMonitorStateLabel();
+    } catch (error) {
+        console.error('Error loading notification settings:', error);
+    }
+}
+
+async function saveNotificationSettings(event) {
+    event.preventDefault();
+
+    const payload = {
+        telegramEnabled: document.getElementById('telegramEnabled')?.checked || false,
+        telegramBotToken: document.getElementById('telegramBotToken')?.value?.trim() || '',
+        telegramChatId: document.getElementById('telegramChatId')?.value?.trim() || '',
+        intergramEnabled: document.getElementById('intergramEnabled')?.checked || false,
+        intergramWebhookUrl: document.getElementById('intergramWebhookUrl')?.value?.trim() || '',
+        notifyPendingOrders: document.getElementById('notifyPendingOrders')?.checked !== false,
+        notifyAiChats: document.getElementById('notifyAiChats')?.checked !== false
+    };
+
+    setNotificationSettingsStatus('Saving notification settings...');
+
+    try {
+        const response = await fetch(`${API_URL}/notifications/settings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setNotificationSettingsStatus(result.error || 'Failed to save notification settings', 'error');
+            return;
+        }
+
+        notificationSettings = result?.settings || payload;
+        applyNotificationSettingsToForm(notificationSettings);
+        updateNotificationMonitorStateLabel();
+        setNotificationSettingsStatus('Notification settings saved successfully.', 'success');
+    } catch (error) {
+        console.error('Error saving notification settings:', error);
+        setNotificationSettingsStatus('Network error while saving settings.', 'error');
+    }
+}
+
+async function sendNotificationTest(type) {
+    setNotificationSettingsStatus('Sending test notification...');
+
+    try {
+        const response = await fetch(`${API_URL}/notifications/test`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ type })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setNotificationSettingsStatus(result.error || 'Failed to send test notification', 'error');
+            return;
+        }
+
+        setNotificationSettingsStatus('Test notification sent. Check your configured channels.', 'success');
+    } catch (error) {
+        console.error('Error sending test notification:', error);
+        setNotificationSettingsStatus('Network error while sending test notification.', 'error');
+    }
 }
 
 // =====================================================
@@ -403,6 +674,34 @@ async function viewOrder(orderId) {
                 </div>
             `;
         }
+
+        const isPreorderOnly =
+            String(order.wifi_name || '').trim().toUpperCase() === 'PREORDER'
+            && String(order.wifi_password || '').trim().toUpperCase() === 'PREORDER';
+
+        const networkDetailsHtml = isPreorderOnly
+            ? `
+                <div class="detail-group">
+                    <label>Order Type</label>
+                    <p>Preorder (shipping details only)</p>
+                </div>
+            `
+            : `
+                <div class="detail-group">
+                    <label>WiFi Name (SSID)</label>
+                    <p>${order.wifi_name}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>WiFi Password</label>
+                    <p>${order.wifi_password}</p>
+                </div>
+
+                <div class="detail-group">
+                    <label>WiFi Rate</label>
+                    <p>${order.wifi_rate}</p>
+                </div>
+            `;
         
         modalBody.innerHTML = `
             <div class="order-details">
@@ -427,7 +726,7 @@ async function viewOrder(orderId) {
                 </div>
                 
                 <div class="detail-group">
-                    <label>Price</label>
+                    <label>Preorder Total</label>
                     <p>₱${formatAdminMoney(order.total_price || order.price || 0)}</p>
                 </div>
 
@@ -465,21 +764,8 @@ async function viewOrder(orderId) {
                     <label>Address</label>
                     <p>${order.address}</p>
                 </div>
-                
-                <div class="detail-group">
-                    <label>WiFi Name (SSID)</label>
-                    <p>${order.wifi_name}</p>
-                </div>
-                
-                <div class="detail-group">
-                    <label>WiFi Password</label>
-                    <p>${order.wifi_password}</p>
-                </div>
-                
-                <div class="detail-group">
-                    <label>WiFi Rate</label>
-                    <p>${order.wifi_rate}</p>
-                </div>
+
+                ${networkDetailsHtml}
                 
                 <div class="detail-group">
                     <label>Duration</label>
@@ -735,7 +1021,13 @@ async function loadChatUnreadCount() {
         }
 
         const result = await response.json();
-        setChatUnreadBadge(result?.unreadCount || 0);
+        const unreadCount = Number(result?.unreadCount || 0);
+        setChatUnreadBadge(unreadCount);
+
+        const monitorUnread = document.getElementById('monitorUnreadChats');
+        if (monitorUnread) {
+            monitorUnread.textContent = String(unreadCount);
+        }
     } catch (error) {
         console.error('Error loading chat unread count:', error);
     }
