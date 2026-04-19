@@ -30,7 +30,7 @@ const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', price: 8500, duration: '3 Years License | 100 Meters' },
-    3: { name: 'AMAZON LEO', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
+    3: { name: 'Enterprise', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
 };
 
 const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
@@ -1267,13 +1267,13 @@ async function trackOrder() {
 const packageImages = {
     1: ['assets/images/package1.png'],
     2: ['assets/images/package2.png'],
-    3: ['assets/images/amazon-leo.webp']
+    3: ['assets/images/package3.png']
 };
 
 const packageImageFallbacks = {
     1: 'assets/images/package1.png',
     2: 'assets/images/package2.png',
-    3: 'assets/images/amazon-leo.webp'
+    3: 'assets/images/package3.png'
 };
 
 function initPackageImagesFromServer() {
@@ -1906,7 +1906,7 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) AMAZON LEO - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
+        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
     if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {

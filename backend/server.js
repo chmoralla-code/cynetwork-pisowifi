@@ -23,7 +23,7 @@ const uploadedPackageImagesDir = process.env.UPLOADS_DIR
 const defaultPackageImages = {
     1: 'assets/images/package1.png',
     2: 'assets/images/package2.png',
-    3: 'assets/images/amazon-leo.webp'
+    3: 'assets/images/package3.png'
 };
 const CHAT_SESSION_STATUSES = ['ai', 'live', 'closed'];
 const REFERRAL_REWARD_PHP = 100;
@@ -31,7 +31,7 @@ const REFERRAL_REDEEM_VAT_PHP = 15;
 const PACKAGE_CATALOG = {
     1: { name: 'Starter', unitPrice: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', unitPrice: 8500, duration: '3 Years License | 100 Meters' },
-    3: { name: 'AMAZON LEO', unitPrice: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
+    3: { name: 'Enterprise', unitPrice: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
 };
 
 function createReferralCode() {
