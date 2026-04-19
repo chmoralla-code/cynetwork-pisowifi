@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
@@ -20,6 +21,10 @@ const adminPublicDir = path.join(__dirname, 'public');
 const clientPublicDir = path.join(__dirname, '..', 'website');
 const configuredDatabasePath = String(process.env.DATABASE_PATH || '').trim();
 const configuredUploadsDir = String(process.env.UPLOADS_DIR || '').trim();
+const accountBackupDatabaseUrl = String(process.env.ACCOUNT_BACKUP_DATABASE_URL || '').trim();
+const accountBackupUseSsl = ['1', 'true', 'yes', 'on'].includes(
+    String(process.env.ACCOUNT_BACKUP_USE_SSL || '').trim().toLowerCase()
+);
 const dbPath = configuredDatabasePath
     ? path.resolve(configuredDatabasePath)
     : (isProduction
@@ -37,6 +42,19 @@ if (isProduction && !configuredDatabasePath) {
 if (isProduction && !configuredUploadsDir) {
     console.warn(`UPLOADS_DIR not set; using production default: ${uploadedPackageImagesDir}`);
 }
+
+let accountBackupPool = null;
+let accountBackupSyncInProgress = false;
+let accountBackupSyncQueued = false;
+let accountBackupSyncTimer = null;
+let accountBackupHydratedFromRemote = false;
+let accountBackupLastSyncedAt = null;
+let accountBackupLastSyncError = '';
+let accountBackupLastSyncReason = '';
+let resolveStartupReady = null;
+const startupReady = new Promise((resolve) => {
+    resolveStartupReady = resolve;
+});
 
 const defaultPackageImages = {
     1: 'assets/images/package1.png',
@@ -239,6 +257,7 @@ function applyReferralRewardForOrder(referredAccountId, orderId, callback) {
                                                 return;
                                             }
 
+                                            queueClientAccountBackup('referral-reward');
                                             callback(null, {
                                                 rewardApplied: true,
                                                 rewardAmount: REFERRAL_REWARD_PHP,
@@ -831,6 +850,282 @@ const db = new sqlite3.Database(dbPath, (err) => {
     else console.log(`Connected to SQLite database at: ${dbPath}`);
 });
 
+function sqliteGetAsync(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(sql, params, (err, row) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(row || null);
+        });
+    });
+}
+
+function sqliteAllAsync(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, (err, rows) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(rows || []);
+        });
+    });
+}
+
+function sqliteRunAsync(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function(err) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve({
+                lastID: this.lastID,
+                changes: this.changes
+            });
+        });
+    });
+}
+
+function normalizeAccountBackupPayload(rawPayload) {
+    if (!rawPayload) {
+        return null;
+    }
+    if (typeof rawPayload === 'string') {
+        try {
+            return JSON.parse(rawPayload);
+        } catch (error) {
+            return null;
+        }
+    }
+    if (typeof rawPayload === 'object') {
+        return rawPayload;
+    }
+    return null;
+}
+
+async function buildClientAccountSnapshot() {
+    const [accounts, rewards, redemptions] = await Promise.all([
+        sqliteAllAsync(`
+            SELECT id, full_name, contact_number, email, password, referral_code, referred_by_code,
+                   referral_balance, referral_reward_count, created_at, updated_at
+            FROM client_accounts
+            ORDER BY id ASC
+        `),
+        sqliteAllAsync(`
+            SELECT id, referrer_account_id, referred_account_id, first_order_id, reward_amount, created_at
+            FROM referral_rewards
+            ORDER BY id ASC
+        `),
+        sqliteAllAsync(`
+            SELECT id, client_account_id, gross_amount, vat_amount, net_amount, gcash_name, gcash_number,
+                   status, note, created_at, updated_at
+            FROM referral_redemptions
+            ORDER BY id ASC
+        `)
+    ]);
+
+    return {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        accounts,
+        rewards,
+        redemptions
+    };
+}
+
+async function restoreClientAccountSnapshotIfNeeded() {
+    if (!accountBackupPool) {
+        return false;
+    }
+
+    const localAccountCountRow = await sqliteGetAsync('SELECT COUNT(*) AS total FROM client_accounts');
+    const localAccountCount = Number(localAccountCountRow?.total || 0);
+    if (localAccountCount > 0) {
+        return false;
+    }
+
+    const remoteResult = await accountBackupPool.query(
+        'SELECT payload FROM client_account_backups WHERE id = 1 LIMIT 1'
+    );
+    const payload = normalizeAccountBackupPayload(remoteResult?.rows?.[0]?.payload);
+    if (!payload) {
+        return false;
+    }
+
+    const accounts = Array.isArray(payload.accounts) ? payload.accounts : [];
+    const rewards = Array.isArray(payload.rewards) ? payload.rewards : [];
+    const redemptions = Array.isArray(payload.redemptions) ? payload.redemptions : [];
+    if (!accounts.length && !rewards.length && !redemptions.length) {
+        return false;
+    }
+
+    await sqliteRunAsync('BEGIN IMMEDIATE TRANSACTION');
+    try {
+        for (const account of accounts) {
+            await sqliteRunAsync(
+                `INSERT OR REPLACE INTO client_accounts (
+                    id, full_name, contact_number, email, password, referral_code, referred_by_code,
+                    referral_balance, referral_reward_count, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    account.id,
+                    account.full_name,
+                    account.contact_number || null,
+                    String(account.email || '').toLowerCase(),
+                    account.password,
+                    String(account.referral_code || '').toUpperCase(),
+                    account.referred_by_code ? String(account.referred_by_code).toUpperCase() : null,
+                    Number(account.referral_balance || 0),
+                    Number(account.referral_reward_count || 0),
+                    account.created_at || new Date().toISOString(),
+                    account.updated_at || new Date().toISOString()
+                ]
+            );
+        }
+
+        for (const reward of rewards) {
+            await sqliteRunAsync(
+                `INSERT OR REPLACE INTO referral_rewards (
+                    id, referrer_account_id, referred_account_id, first_order_id, reward_amount, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    reward.id,
+                    reward.referrer_account_id,
+                    reward.referred_account_id,
+                    reward.first_order_id || null,
+                    Number(reward.reward_amount || REFERRAL_REWARD_PHP),
+                    reward.created_at || new Date().toISOString()
+                ]
+            );
+        }
+
+        for (const redemption of redemptions) {
+            await sqliteRunAsync(
+                `INSERT OR REPLACE INTO referral_redemptions (
+                    id, client_account_id, gross_amount, vat_amount, net_amount, gcash_name, gcash_number,
+                    status, note, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    redemption.id,
+                    redemption.client_account_id,
+                    Number(redemption.gross_amount || 0),
+                    Number(redemption.vat_amount || REFERRAL_REDEEM_VAT_PHP),
+                    Number(redemption.net_amount || 0),
+                    redemption.gcash_name || '',
+                    redemption.gcash_number || '',
+                    redemption.status || 'pending',
+                    redemption.note || '',
+                    redemption.created_at || new Date().toISOString(),
+                    redemption.updated_at || new Date().toISOString()
+                ]
+            );
+        }
+
+        await sqliteRunAsync('COMMIT');
+        accountBackupHydratedFromRemote = true;
+        console.log(`Restored client account snapshot from managed backup (${accounts.length} accounts).`);
+        return true;
+    } catch (error) {
+        await sqliteRunAsync('ROLLBACK');
+        throw error;
+    }
+}
+
+async function pushClientAccountSnapshot(reason = 'manual') {
+    if (!accountBackupPool) {
+        return;
+    }
+    if (accountBackupSyncInProgress) {
+        accountBackupSyncQueued = true;
+        accountBackupLastSyncReason = reason;
+        return;
+    }
+
+    accountBackupSyncInProgress = true;
+    try {
+        const snapshot = await buildClientAccountSnapshot();
+        await accountBackupPool.query(
+            `INSERT INTO client_account_backups (id, payload, updated_at)
+             VALUES (1, $1::jsonb, NOW())
+             ON CONFLICT (id) DO UPDATE SET
+                payload = EXCLUDED.payload,
+                updated_at = NOW()`,
+            [JSON.stringify(snapshot)]
+        );
+        accountBackupLastSyncedAt = new Date().toISOString();
+        accountBackupLastSyncReason = reason;
+        accountBackupLastSyncError = '';
+    } catch (error) {
+        accountBackupLastSyncError = String(error.message || error);
+        console.error('Managed account backup sync failed:', accountBackupLastSyncError);
+    } finally {
+        accountBackupSyncInProgress = false;
+        if (accountBackupSyncQueued) {
+            accountBackupSyncQueued = false;
+            const queuedReason = accountBackupLastSyncReason || 'queued';
+            setTimeout(() => {
+                void pushClientAccountSnapshot(queuedReason);
+            }, 250);
+        }
+    }
+}
+
+function queueClientAccountBackup(reason = 'update') {
+    if (!accountBackupPool) {
+        return;
+    }
+    accountBackupLastSyncReason = reason;
+    if (accountBackupSyncTimer) {
+        clearTimeout(accountBackupSyncTimer);
+    }
+    accountBackupSyncTimer = setTimeout(() => {
+        accountBackupSyncTimer = null;
+        void pushClientAccountSnapshot(reason);
+    }, 1200);
+}
+
+async function initializeManagedAccountBackup() {
+    if (!accountBackupDatabaseUrl) {
+        console.log('Managed account backup is disabled (ACCOUNT_BACKUP_DATABASE_URL is not set).');
+        return;
+    }
+
+    try {
+        accountBackupPool = new Pool({
+            connectionString: accountBackupDatabaseUrl,
+            ssl: accountBackupUseSsl ? { rejectUnauthorized: false } : undefined,
+            max: 2
+        });
+
+        await accountBackupPool.query('SELECT 1');
+        await accountBackupPool.query(`
+            CREATE TABLE IF NOT EXISTS client_account_backups (
+                id SMALLINT PRIMARY KEY,
+                payload JSONB NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await restoreClientAccountSnapshotIfNeeded();
+        await pushClientAccountSnapshot('startup');
+        console.log('Managed account backup is enabled.');
+    } catch (error) {
+        accountBackupLastSyncError = String(error.message || error);
+        console.error('Failed to initialize managed account backup:', accountBackupLastSyncError);
+        if (accountBackupPool) {
+            try {
+                await accountBackupPool.end();
+            } catch (closeError) {
+                console.error('Failed to close managed backup connection:', closeError.message || closeError);
+            }
+        }
+        accountBackupPool = null;
+    }
+}
+
 // Create tables
 db.serialize(() => {
     const addColumnIfMissing = (sql, label) => {
@@ -1045,6 +1340,19 @@ db.serialize(() => {
         SET amazon_leo_sms_sent = 0
         WHERE amazon_leo_sms_sent IS NULL
     `);
+
+    db.get('SELECT 1 AS ready', async () => {
+        try {
+            await initializeManagedAccountBackup();
+        } catch (error) {
+            console.error('Managed account backup startup error:', error.message || error);
+        } finally {
+            if (typeof resolveStartupReady === 'function') {
+                resolveStartupReady();
+                resolveStartupReady = null;
+            }
+        }
+    });
 });
 
 // Create default admin if not exists
@@ -1209,6 +1517,7 @@ app.post('/api/client/register', (req, res) => {
                                 }
 
                                 const token = issueClientToken(accountRow.id, accountRow.email);
+                                queueClientAccountBackup('client-register');
                                 res.json({
                                     success: true,
                                     token,
@@ -1465,6 +1774,7 @@ app.post('/api/client/redeem-referral', verifyClientToken, (req, res) => {
                                                             return rollbackWithError('Failed to finalize redemption request', commitErr);
                                                         }
 
+                                                        queueClientAccountBackup('referral-redemption');
                                                         res.json({
                                                             success: true,
                                                             message: 'Redemption request submitted. Redemption of rewards will be given within 2 business days.',
@@ -2639,6 +2949,14 @@ app.get('/health', (req, res) => {
             databaseStatError,
             uploadsDir: uploadedPackageImagesDir,
             uploadsDirExists
+        },
+        accountBackup: {
+            enabled: Boolean(accountBackupPool),
+            configured: Boolean(accountBackupDatabaseUrl),
+            hydratedFromRemote: accountBackupHydratedFromRemote,
+            lastSyncedAt: accountBackupLastSyncedAt,
+            lastSyncReason: accountBackupLastSyncReason || null,
+            lastSyncError: accountBackupLastSyncError || null
         }
     });
 });
@@ -2647,8 +2965,9 @@ app.get('/health', (req, res) => {
 // START SERVER
 // =====================================================
 
-app.listen(PORT, () => {
-    console.log(`
+startupReady.finally(() => {
+    app.listen(PORT, () => {
+        console.log(`
     ========================================
     CYNETWORK PISOWIFI Admin Backend
     ========================================
@@ -2694,4 +3013,5 @@ app.listen(PORT, () => {
     POST   /api/images/upload
     ========================================
     `);
+    });
 });
