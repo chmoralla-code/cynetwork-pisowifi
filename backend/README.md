@@ -180,7 +180,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 
 ### 3. Production environment values
 - `NODE_ENV=production`
-- `JWT_SECRET` is auto-generated in the blueprint.
+- `JWT_SECRET` is auto-generated in the blueprint and kept stable across redeploys (`sync: false`).
 - `DATABASE_PATH=/var/data/pisowifi-admin.db`
 - `UPLOADS_DIR=/var/data/package-images`
 - `SEMAPHORE_API_KEY=<your-semaphore-api-key>` (required for PH SMS sending)
@@ -191,6 +191,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 ### 4. Persistent storage
 - Render mounts a persistent disk at `/var/data`.
 - Orders database and uploaded package images stay available across restarts/redeploys.
+- Keep using the **same Render service + disk** (do not delete/recreate them) to retain accounts and sessions.
 
 ### 5. Verify deployment
 - Open `<your-render-url>/health` and confirm `ok: true`.

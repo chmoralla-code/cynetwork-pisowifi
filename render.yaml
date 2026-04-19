@@ -13,6 +13,7 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
+        sync: false
       - key: DATABASE_PATH
         value: /var/data/pisowifi-admin.db
       - key: UPLOADS_DIR
