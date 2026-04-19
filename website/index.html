@@ -6,7 +6,8 @@
     <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
     <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
     <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
-    <link rel="stylesheet" href="styles.css?v=20260419-9">
+    <link rel="stylesheet" href="styles.css?v=20260419-7">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -20,7 +21,6 @@
             <ul class="nav-menu">
                 <li><a href="#home" class="nav-link">Home</a></li>
                 <li><a href="#packages" class="nav-link">Packages</a></li>
-                <li><a href="#other-offers" class="nav-link">Other Offers</a></li>
                 <li><a href="#tutorials" class="nav-link">Tutorials</a></li>
                 <li><a href="#about" class="nav-link">About</a></li>
                 <li><a href="#contact" class="nav-link">Contact</a></li>
@@ -67,7 +67,7 @@
                         <li>✓ Customized Portal</li>
                         <li>✓ Perfect for 20-30 Clients</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(1)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(1)">Get Started</button>
                 </div>
             </div>
 
@@ -92,7 +92,7 @@
                         <li>✓ Customized Portal</li>
                         <li>✓ Perfect for 40-60 Clients</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(2)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(2)">Get Started</button>
                 </div>
             </div>
 
@@ -116,35 +116,8 @@
                         <li>✓ Perfect for 80-100 Clients</li>
                         <li>✓ Advanced Anti Lag Feature</li>
                     </ul>
-                    <button class="select-package-btn" onclick="selectPackage(3)">PREORDER</button>
+                    <button class="select-package-btn" onclick="selectPackage(3)">Get Started</button>
                 </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Other Offer Packages -->
-    <section id="other-offers" class="other-offers-section">
-        <div class="section-header">
-            <h2>Other Offer Packages</h2>
-            <p class="section-subtitle">Need Amazon LEO internet equipment? Visit our partner offer page.</p>
-        </div>
-
-        <div class="other-offer-card">
-            <div class="other-offer-media">
-                <img src="assets/images/package2-machine.jpg" alt="Amazon LEO internet hardware offer" class="other-offer-image">
-            </div>
-            <div class="other-offer-content">
-                <span class="other-offer-tag">External Offer</span>
-                <h3>Amazon LEO Internet Package</h3>
-                <p>Open the dedicated offer page to view available Amazon LEO internet hardware, inclusions, and pricing.</p>
-                <a
-                    class="other-offer-btn"
-                    href="https://www.amazon.com/s?k=amazon+leo+internet"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Open Amazon LEO Offer
-                </a>
             </div>
         </div>
     </section>
@@ -213,20 +186,20 @@
         <p>We provide premium WiFi solutions for affordable, high-speed internet access. Trust CYNETWORK for reliable connectivity.</p>
     </section>
 
-    <!-- Preorder Modal -->
+    <!-- Payment Modal -->
     <div id="paymentModal" class="modal">
         <div class="modal-content payment-modal">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2>Complete Your Preorder</h2>
-
-            <!-- Step 1: Shipping Details -->
+            <h2>Complete Your Payment</h2>
+            
+            <!-- Step 1: QR Code Payment -->
             <div id="step1" class="payment-step active">
-                <h3>Step 1: Fill Up Shipping Details</h3>
+                <h3>Step 1: Scan QR Code to Pay via GCash</h3>
                 <p class="package-selected">
                     Package: <span id="selectedPackageText">Starter</span><br>
                     Unit Price: ₱<span id="selectedUnitPrice">5800</span>.00<br>
                     Quantity: <span id="selectedQuantityText">1</span> piece(s)<br>
-                    Preorder Total: ₱<span id="selectedPrice">5800</span>.00
+                    Total Payment: ₱<span id="selectedPrice">5800</span>.00
                 </p>
                 <p class="shipping-free-note">Shipping Fee: FREE (₱0)</p>
 
@@ -237,8 +210,43 @@
                 </div>
 
                 <div id="checkoutAccountNotice" class="checkout-account-notice" style="display: none;"></div>
+                
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay</p>
+                </div>
+                
+                <button class="next-btn" onclick="nextStep()">I've Completed Payment</button>
+            </div>
 
-                <form id="shippingForm">
+            <!-- Step 2: Upload Proof of Payment -->
+            <div id="step2" class="payment-step">
+                <h3>Step 2: Upload Proof of Payment</h3>
+                <p>Upload a screenshot showing your successful GCash transaction</p>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="proofImage" accept="image/*" onchange="handleFileUpload(event)">
+                    <label for="proofImage">
+                        <span class="upload-icon">📸</span>
+                        <span class="upload-text">Click to upload or drag and drop</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+                
+                <div id="uploadPreview" class="upload-preview"></div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validateProof()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Personal Information -->
+            <div id="step3" class="payment-step">
+                <h3>Step 3: Personal Information</h3>
+                <p>Please provide your details for WiFi access</p>
+                
+                <form id="personalForm">
                     <div class="form-group">
                         <label for="fullName">Full Name *</label>
                         <input type="text" id="fullName" placeholder="Juan Dela Cruz" required>
@@ -259,15 +267,53 @@
                     <p class="saved-details-note">Your customer details are saved on this device to make your next order faster.</p>
                     <button type="button" class="saved-details-clear" onclick="clearSavedCustomerDetails()">Clear Saved Details</button>
                 </div>
-
-                <button class="submit-btn" onclick="completeTransaction()">Submit Preorder</button>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validatePersonalInfo()">Next</button>
+                </div>
             </div>
 
-            <!-- Step 2: Success -->
-            <div id="step2" class="payment-step">
+            <!-- Step 4: WiFi Configuration -->
+            <div id="step4" class="payment-step">
+                <h3>Step 4: WiFi Configuration</h3>
+                <p>Set up your WiFi network details</p>
+                
+                <form id="wifiForm">
+                    <div class="form-group">
+                        <label for="wifiName">WiFi Name (SSID) *</label>
+                        <input type="text" id="wifiName" placeholder="e.g., MyWiFi_Home" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiPassword">WiFi Password *</label>
+                        <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiRate">Data Rate Limit (Mbps) *</label>
+                        <select id="wifiRate" required>
+                            <option value="">Select rate limit</option>
+                            <option value="5">5 Mbps - Basic</option>
+                            <option value="10">10 Mbps - Standard</option>
+                            <option value="25">25 Mbps - Fast</option>
+                            <option value="50">50 Mbps - Ultra Fast</option>
+                            <option value="100">100 Mbps - Premium</option>
+                        </select>
+                    </div>
+                </form>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="submit-btn" onclick="completeTransaction()">Complete & Activate</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Success -->
+            <div id="step5" class="payment-step">
                 <div class="success-container">
                     <div class="success-icon">✓</div>
-                    <h3>Preorder Submitted!</h3>
+                    <h3>Payment Successful!</h3>
                     <p>Your order has been received and is now pending review.</p>
                     
                     <div class="success-details">
@@ -275,8 +321,9 @@
                         <p><strong>Tracking Number:</strong> <span id="confirmTrackingNumber">--</span></p>
                         <p><strong>Order Status:</strong> <span id="confirmOrderStatus">PENDING</span></p>
                         <p><strong>Quantity:</strong> <span id="confirmQuantity">1</span> piece(s)</p>
-                        <p><strong>Preorder Total:</strong> ₱<span id="confirmTotalPrice">0</span>.00</p>
+                        <p><strong>Total Payment:</strong> ₱<span id="confirmTotalPrice">0</span>.00</p>
                         <p id="confirmReferralRewardWrap" style="display: none;"><strong>Referral Reward:</strong> <span id="confirmReferralRewardText"></span></p>
+                        <p><strong>WiFi Name:</strong> <span id="confirmWifiName"></span></p>
                         <p><strong>Duration:</strong> <span id="confirmDuration"></span></p>
                         <p><strong>Name:</strong> <span id="confirmName"></span></p>
                     </div>
@@ -285,7 +332,7 @@
 
                     <div class="success-actions">
                         <button id="trackPendingOrderBtn" class="next-btn track-order-btn" onclick="trackPendingOrder()">Track Pending Order</button>
-                        <button class="cta-button" onclick="location.reload()">Start New Preorder</button>
+                        <button class="cta-button" onclick="location.reload()">Start New Transaction</button>
                     </div>
                 </div>
             </div>
@@ -316,7 +363,7 @@
                 <p><strong>Status:</strong> <span id="trackResultStatus" class="track-status-badge">PENDING</span></p>
                 <p><strong>Package:</strong> <span id="trackResultPackage"></span></p>
                 <p><strong>Quantity:</strong> <span id="trackResultQuantity"></span></p>
-                <p><strong>Preorder Total:</strong> ₱<span id="trackResultTotal"></span>.00</p>
+                <p><strong>Total Paid:</strong> ₱<span id="trackResultTotal"></span>.00</p>
                 <p><strong>Shipping Fee:</strong> <span id="trackResultShipping"></span></p>
                 <p><strong>Date Submitted:</strong> <span id="trackResultDate"></span></p>
                 <p><strong>Last Updated:</strong> <span id="trackResultUpdated"></span></p>
@@ -378,7 +425,7 @@
         <div class="modal-content account-modal">
             <span class="close" onclick="closeAccountModal()">&times;</span>
             <h2>Client Account & Referral</h2>
-            <p class="account-modal-subtitle">Create a simple account, share your referral code, and earn ₱100 for every invite who preorders.</p>
+            <p class="account-modal-subtitle">Create a simple account, share your referral code, and earn ₱100 for every invite who buys.</p>
 
             <div class="account-tabs" role="tablist" aria-label="Client account tabs">
                 <button type="button" id="accountTabLogin" class="account-tab-btn active" onclick="switchAccountTab('login')">Login</button>
@@ -522,7 +569,7 @@
 
         <div class="support-quick-actions">
             <button type="button" class="support-quick-btn" data-query="What are your package prices?">Package Prices</button>
-            <button type="button" class="support-quick-btn" data-query="How do I submit a preorder?">Preorder Steps</button>
+            <button type="button" class="support-quick-btn" data-query="How do I pay using GCash?">GCash Payment</button>
             <button type="button" class="support-quick-btn" data-query="Track my pending order status">Track Order</button>
             <button type="button" class="support-quick-btn" data-query="My internet is slow, what should I do?">Speed Help</button>
             <button type="button" class="support-quick-btn" data-query="How long is installation and activation?">Activation Time</button>
@@ -543,6 +590,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260419-9"></script>
+    <script src="script.js?v=20260419-8"></script>
 </body>
 </html>
