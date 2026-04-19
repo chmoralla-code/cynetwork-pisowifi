@@ -25,6 +25,7 @@ const renderedSupportMessageIds = new Set();
 const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_VAT_PHP = 15;
+const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-1';
 
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
@@ -732,20 +733,19 @@ function handleQuantityChange() {
 // QR CODE GENERATION
 // =====================================================
 
-function generateQRCode(packageData) {
-    document.getElementById('qrcode').innerHTML = '';
-    
-    const gcashNumber = '09XX XXX XXXX';
-    const qrData = `https://gcash.com/pay?number=${gcashNumber}&amount=${packageData.price}&ref=${packageData.name}`;
-    
-    new QRCode(document.getElementById('qrcode'), {
-        text: qrData,
-        width: 200,
-        height: 200,
-        colorDark: '#2A2A2A',
-        colorLight: '#FFFFFF',
-        correctLevel: QRCode.CorrectLevel.H
-    });
+function generateQRCode() {
+    const qrWrap = document.getElementById('qrcode');
+    if (!qrWrap) {
+        return;
+    }
+
+    qrWrap.innerHTML = '';
+
+    const qrImage = document.createElement('img');
+    qrImage.src = STATIC_GCASH_QR_IMAGE;
+    qrImage.alt = 'Official GCash payment QR code';
+    qrImage.className = 'static-gcash-qr-image';
+    qrWrap.appendChild(qrImage);
 }
 
 // =====================================================

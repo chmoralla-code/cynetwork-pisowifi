@@ -748,6 +748,15 @@ body {
     margin-bottom: 1rem;
 }
 
+.static-gcash-qr-image {
+    display: block;
+    width: min(100%, 260px);
+    height: 320px;
+    object-fit: cover;
+    object-position: center 24%;
+    border-radius: 10px;
+}
+
 .qr-instruction {
     color: #666;
     font-size: 0.95rem;
