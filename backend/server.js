@@ -27,6 +27,7 @@ const defaultPackageImages = {
 };
 const CHAT_SESSION_STATUSES = ['ai', 'live', 'closed'];
 const REFERRAL_REWARD_PHP = 100;
+const REFERRAL_REDEEM_VAT_PHP = 15;
 const PACKAGE_CATALOG = {
     1: { name: 'Starter', unitPrice: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', unitPrice: 8500, duration: '3 Years License | 100 Meters' },
@@ -56,6 +57,23 @@ function normalizePriceInt(value, fallback = 0) {
 
 function toMoneyText(value) {
     return String(normalizePriceInt(value, 0));
+}
+
+function normalizeGcashNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return `+63${digits.slice(1)}`;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `+${digits}`;
+    }
+
+    return '';
 }
 
 function issueClientToken(accountId, email) {
@@ -293,6 +311,26 @@ function toClientAccountPayload(row) {
     };
 }
 
+function toReferralRedemptionPayload(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.id,
+        clientAccountId: row.client_account_id,
+        grossAmount: Number(row.gross_amount || 0),
+        vatAmount: Number(row.vat_amount || 0),
+        netAmount: Number(row.net_amount || 0),
+        gcashName: row.gcash_name,
+        gcashNumber: row.gcash_number,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        note: row.note || ''
+    };
+}
+
 function getOptionalAdminAuth(req) {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) {
@@ -412,6 +450,23 @@ db.serialize(() => {
             FOREIGN KEY (referrer_account_id) REFERENCES client_accounts(id),
             FOREIGN KEY (referred_account_id) REFERENCES client_accounts(id),
             FOREIGN KEY (first_order_id) REFERENCES orders(id)
+        )
+    `);
+
+    db.run(`
+        CREATE TABLE IF NOT EXISTS referral_redemptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_account_id INTEGER NOT NULL,
+            gross_amount INTEGER NOT NULL,
+            vat_amount INTEGER NOT NULL DEFAULT ${REFERRAL_REDEEM_VAT_PHP},
+            net_amount INTEGER NOT NULL,
+            gcash_name TEXT NOT NULL,
+            gcash_number TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            note TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_account_id) REFERENCES client_accounts(id)
         )
     `);
 
@@ -764,6 +819,165 @@ app.get('/api/client/referral/:code', (req, res) => {
                 success: true,
                 code: row.referral_code,
                 inviterName: row.full_name
+            });
+        }
+    );
+});
+
+app.get('/api/client/redemptions', verifyClientToken, (req, res) => {
+    db.all(
+        `SELECT *
+         FROM referral_redemptions
+         WHERE client_account_id = ?
+         ORDER BY created_at DESC
+         LIMIT 20`,
+        [req.clientAccountId],
+        (err, rows) => {
+            if (err) {
+                return res.status(500).json({ error: 'Failed to load redemption history' });
+            }
+
+            res.json({
+                success: true,
+                redemptions: (rows || []).map(toReferralRedemptionPayload)
+            });
+        }
+    );
+});
+
+app.post('/api/client/redeem-referral', verifyClientToken, (req, res) => {
+    const gcashName = String(req.body.gcashName || '').trim();
+    const gcashNumber = normalizeGcashNumber(req.body.gcashNumber || '');
+
+    if (!gcashName) {
+        return res.status(400).json({ error: 'GCash name is required' });
+    }
+
+    if (!gcashNumber) {
+        return res.status(400).json({ error: 'Please enter a valid GCash number' });
+    }
+
+    db.get(
+        `SELECT id, email, referral_balance
+         FROM client_accounts
+         WHERE id = ?`,
+        [req.clientAccountId],
+        (accountErr, accountRow) => {
+            if (accountErr || !accountRow) {
+                return res.status(404).json({ error: 'Client account not found' });
+            }
+
+            const grossAmount = Number(accountRow.referral_balance || 0);
+            const vatAmount = REFERRAL_REDEEM_VAT_PHP;
+            const netAmount = grossAmount - vatAmount;
+
+            if (grossAmount <= vatAmount) {
+                return res.status(400).json({
+                    error: `Referral balance must be more than PHP ${vatAmount} to redeem.`
+                });
+            }
+
+            db.serialize(() => {
+                const rollbackWithError = (message, err = null, status = 500) => {
+                    db.run('ROLLBACK', () => {
+                        if (err) {
+                            console.error(message, err.message || err);
+                        }
+                        res.status(status).json({ error: message });
+                    });
+                };
+
+                db.run('BEGIN IMMEDIATE TRANSACTION', (beginErr) => {
+                    if (beginErr) {
+                        return res.status(500).json({ error: 'Unable to start redemption transaction' });
+                    }
+
+                    db.run(
+                        `UPDATE client_accounts
+                         SET referral_balance = referral_balance - ?,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ? AND referral_balance >= ?`,
+                        [grossAmount, req.clientAccountId, grossAmount],
+                        function(updateErr) {
+                            if (updateErr) {
+                                return rollbackWithError('Failed to reserve referral rewards for redemption', updateErr);
+                            }
+
+                            if (this.changes === 0) {
+                                return rollbackWithError('Referral balance changed. Please refresh and try again.', null, 409);
+                            }
+
+                            db.run(
+                                `INSERT INTO referral_redemptions (
+                                    client_account_id,
+                                    gross_amount,
+                                    vat_amount,
+                                    net_amount,
+                                    gcash_name,
+                                    gcash_number,
+                                    status,
+                                    note,
+                                    created_at,
+                                    updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                                [
+                                    req.clientAccountId,
+                                    grossAmount,
+                                    vatAmount,
+                                    netAmount,
+                                    gcashName,
+                                    gcashNumber,
+                                    'Redemption of rewards will be given within 2 business days.'
+                                ],
+                                function(insertErr) {
+                                    if (insertErr) {
+                                        return rollbackWithError('Failed to create redemption request', insertErr);
+                                    }
+
+                                    const redemptionId = this.lastID;
+
+                                    db.get(
+                                        `SELECT
+                                            c.*,
+                                            (SELECT COUNT(*) FROM client_accounts r WHERE r.referred_by_code = c.referral_code) AS invite_count,
+                                            (SELECT COUNT(*) FROM referral_rewards rr WHERE rr.referrer_account_id = c.id) AS converted_invite_count
+                                         FROM client_accounts c
+                                         WHERE c.id = ?`,
+                                        [req.clientAccountId],
+                                        (accountLoadErr, latestAccountRow) => {
+                                            if (accountLoadErr || !latestAccountRow) {
+                                                return rollbackWithError('Redemption was created but account refresh failed', accountLoadErr);
+                                            }
+
+                                            db.get(
+                                                'SELECT * FROM referral_redemptions WHERE id = ?',
+                                                [redemptionId],
+                                                (redemptionErr, redemptionRow) => {
+                                                    if (redemptionErr || !redemptionRow) {
+                                                        return rollbackWithError('Redemption was created but details could not be loaded', redemptionErr);
+                                                    }
+
+                                                    db.run('COMMIT', (commitErr) => {
+                                                        if (commitErr) {
+                                                            return rollbackWithError('Failed to finalize redemption request', commitErr);
+                                                        }
+
+                                                        res.json({
+                                                            success: true,
+                                                            message: 'Redemption request submitted. Redemption of rewards will be given within 2 business days.',
+                                                            account: toClientAccountPayload(latestAccountRow),
+                                                            redemption: toReferralRedemptionPayload(redemptionRow)
+                                                        });
+                                                    });
+                                                }
+                                            );
+                                        }
+                                    );
+                                }
+                            );
+                        }
+                    );
+                });
             });
         }
     );
@@ -1600,6 +1814,8 @@ app.listen(PORT, () => {
     POST   /api/client/login
     GET    /api/client/me
     GET    /api/client/referral/:code
+    GET    /api/client/redemptions
+    POST   /api/client/redeem-referral
     GET    /api/orders
     GET    /api/orders/:id
     POST   /api/orders/:id/approve

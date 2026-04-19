@@ -1039,6 +1039,65 @@ body {
     flex-wrap: wrap;
 }
 
+.redeem-reward-wrap {
+    border: 1px solid #E9E9E9;
+    border-radius: 10px;
+    background: #FBFBFB;
+    padding: 0.95rem;
+    margin-bottom: 0.95rem;
+}
+
+.redeem-reward-wrap h4 {
+    margin-bottom: 0.45rem;
+    color: var(--text-dark);
+}
+
+.redeem-note {
+    color: #6A6A6A;
+    font-size: 0.82rem;
+    margin-bottom: 0.7rem;
+}
+
+.redeem-breakdown {
+    border: 1px dashed #D8D8D8;
+    border-radius: 8px;
+    background: #FFF;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.redeem-breakdown p {
+    font-size: 0.86rem;
+    color: #444;
+    margin: 0.22rem 0;
+}
+
+.redeem-form {
+    margin-bottom: 0.45rem;
+}
+
+.redeem-referral-notice {
+    border: 1px solid #D8E7FF;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    background: #EDF5FF;
+    color: #1D4B85;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.redeem-referral-notice.error {
+    border-color: #F3C2C2;
+    background: #FEECEC;
+    color: #9D1D1D;
+}
+
+.redeem-referral-notice.success {
+    border-color: #CBE9D4;
+    background: #EAF8EF;
+    color: #1E6A31;
+}
+
 .account-dashboard-logged-out {
     border: 1px dashed #DDD;
     border-radius: 10px;

@@ -24,6 +24,7 @@ const renderedSupportMessageIds = new Set();
 
 const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
+const REFERRAL_REDEEM_VAT_PHP = 15;
 
 const packages = {
     1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
@@ -138,6 +139,70 @@ function setClientAuthMessage(message, type = '') {
     messageEl.style.display = 'block';
     messageEl.textContent = message;
     messageEl.className = `account-auth-message ${type}`.trim();
+}
+
+function setRedeemNotice(message, type = '') {
+    const noticeEl = document.getElementById('redeemReferralNotice');
+    if (!noticeEl) {
+        return;
+    }
+
+    if (!message) {
+        noticeEl.style.display = 'none';
+        noticeEl.textContent = '';
+        noticeEl.className = 'redeem-referral-notice';
+        return;
+    }
+
+    noticeEl.style.display = 'block';
+    noticeEl.textContent = message;
+    noticeEl.className = `redeem-referral-notice ${type}`.trim();
+}
+
+function normalizeGcashNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return `+63${digits.slice(1)}`;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `+${digits}`;
+    }
+
+    return '';
+}
+
+function getRedeemComputation() {
+    const gross = Number(clientAccount?.referralBalance || 0);
+    const vat = REFERRAL_REDEEM_VAT_PHP;
+    const net = Math.max(0, gross - vat);
+    const canRedeem = Boolean(clientAccount && clientAuthToken && net > 0);
+
+    return { gross, vat, net, canRedeem };
+}
+
+function updateRedeemSummaryUi() {
+    const grossEl = document.getElementById('redeemGrossAmount');
+    const vatEl = document.getElementById('redeemVatAmount');
+    const netEl = document.getElementById('redeemNetAmount');
+    const redeemBtn = document.getElementById('redeemReferralBtn');
+
+    if (!grossEl || !vatEl || !netEl || !redeemBtn) {
+        return;
+    }
+
+    const { gross, vat, net, canRedeem } = getRedeemComputation();
+    grossEl.textContent = formatMoney(gross);
+    vatEl.textContent = formatMoney(vat);
+    netEl.textContent = formatMoney(net);
+
+    redeemBtn.disabled = !canRedeem;
+    redeemBtn.style.opacity = canRedeem ? '1' : '0.65';
+    redeemBtn.style.cursor = canRedeem ? 'pointer' : 'not-allowed';
 }
 
 function updateCheckoutAccountNotice() {
@@ -269,6 +334,8 @@ function updateClientAccountUi() {
         if (contactNumberInput && !contactNumberInput.value.trim() && clientAccount.contactNumber) {
             contactNumberInput.value = clientAccount.contactNumber;
         }
+
+        setRedeemNotice('');
     } else {
         if (navAccountButton) {
             navAccountButton.textContent = 'Client Account';
@@ -281,8 +348,16 @@ function updateClientAccountUi() {
         if (dashboardLoggedIn) {
             dashboardLoggedIn.style.display = 'none';
         }
+
+        const redeemForm = document.getElementById('referralRedeemForm');
+        if (redeemForm) {
+            redeemForm.reset();
+        }
+
+        setRedeemNotice('');
     }
 
+    updateRedeemSummaryUi();
     updateCheckoutAccountNotice();
 }
 
@@ -449,6 +524,73 @@ async function handleClientRegister(event) {
     }
 }
 
+async function handleReferralRedeem(event) {
+    event.preventDefault();
+
+    if (!clientAuthToken || !clientAccount) {
+        setRedeemNotice('Please login to redeem your referral rewards.', 'error');
+        switchAccountTab('login');
+        return;
+    }
+
+    const { canRedeem } = getRedeemComputation();
+    if (!canRedeem) {
+        setRedeemNotice('Your current referral balance is not enough to redeem after the PHP 15 VAT deduction.', 'error');
+        return;
+    }
+
+    const gcashName = document.getElementById('redeemGcashName')?.value?.trim() || '';
+    const gcashNumberRaw = document.getElementById('redeemGcashNumber')?.value?.trim() || '';
+    const gcashNumber = normalizeGcashNumber(gcashNumberRaw);
+
+    if (!gcashName) {
+        setRedeemNotice('GCash name is required.', 'error');
+        return;
+    }
+
+    if (!gcashNumber) {
+        setRedeemNotice('Please enter a valid GCash number (09XXXXXXXXX or +639XXXXXXXXX).', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/redeem-referral`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${clientAuthToken}`
+            },
+            body: JSON.stringify({
+                gcashName,
+                gcashNumber
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setRedeemNotice(result.error || 'Redeem request failed. Please try again.', 'error');
+            return;
+        }
+
+        if (result.account) {
+            saveClientSession(clientAuthToken, result.account);
+        }
+
+        updateClientAccountUi();
+        const redeemForm = document.getElementById('referralRedeemForm');
+        if (redeemForm) {
+            redeemForm.reset();
+        }
+
+        const successMessage = result.message || 'Redemption request submitted. Redemption of rewards will be given within 2 business days.';
+        setRedeemNotice(successMessage, 'success');
+        setClientAuthMessage(successMessage, 'success');
+        refreshClientAccountSummary(true);
+    } catch (error) {
+        setRedeemNotice('Unable to submit redeem request right now. Please try again later.', 'error');
+    }
+}
+
 function logoutClientAccount() {
     clearClientSession();
     updateClientAccountUi();
@@ -479,6 +621,7 @@ function initClientAccountFeatures() {
 
     const loginForm = document.getElementById('clientLoginForm');
     const registerForm = document.getElementById('clientRegisterForm');
+    const redeemForm = document.getElementById('referralRedeemForm');
 
     if (loginForm && loginForm.dataset.bound !== 'true') {
         loginForm.addEventListener('submit', handleClientLogin);
@@ -488,6 +631,11 @@ function initClientAccountFeatures() {
     if (registerForm && registerForm.dataset.bound !== 'true') {
         registerForm.addEventListener('submit', handleClientRegister);
         registerForm.dataset.bound = 'true';
+    }
+
+    if (redeemForm && redeemForm.dataset.bound !== 'true') {
+        redeemForm.addEventListener('submit', handleReferralRedeem);
+        redeemForm.dataset.bound = 'true';
     }
 
     applyReferralCodeFromUrl();

@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
-    <link rel="stylesheet" href="styles.css?v=20260419-5">
+    <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="stylesheet" href="styles.css?v=20260419-6">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -512,6 +514,33 @@
                         <button type="button" class="back-btn" onclick="copyReferralLink()">Copy Referral Link</button>
                     </div>
 
+                    <div class="redeem-reward-wrap">
+                        <h4>Redeem Referral Award</h4>
+                        <p class="redeem-note">VAT deduction per redemption: ₱15.00</p>
+
+                        <div class="redeem-breakdown">
+                            <p><strong>Available Rewards:</strong> ₱<span id="redeemGrossAmount">0</span>.00</p>
+                            <p><strong>Less VAT:</strong> ₱<span id="redeemVatAmount">15</span>.00</p>
+                            <p><strong>Estimated Payout:</strong> ₱<span id="redeemNetAmount">0</span>.00</p>
+                        </div>
+
+                        <form id="referralRedeemForm" class="account-form redeem-form">
+                            <div class="form-group">
+                                <label for="redeemGcashName">GCash Name *</label>
+                                <input type="text" id="redeemGcashName" placeholder="Enter your GCash account name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="redeemGcashNumber">GCash Number *</label>
+                                <input type="tel" id="redeemGcashNumber" placeholder="09XXXXXXXXX or +639XXXXXXXXX" required>
+                            </div>
+
+                            <button type="submit" id="redeemReferralBtn" class="next-btn">Redeem Referral Award</button>
+                        </form>
+
+                        <p id="redeemReferralNotice" class="redeem-referral-notice" style="display: none;"></p>
+                    </div>
+
                     <div class="account-dashboard-actions">
                         <button type="button" class="next-btn" onclick="refreshClientAccountSummary()">Refresh Account</button>
                         <button type="button" class="back-btn" onclick="logoutClientAccount()">Logout</button>
@@ -561,6 +590,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260419-5"></script>
+    <script src="script.js?v=20260419-6"></script>
 </body>
 </html>
