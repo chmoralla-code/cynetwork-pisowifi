@@ -109,6 +109,7 @@ http://localhost:3000/
 - Verify proof of payment
 - Approve order
 - Automatically notifies (can be added)
+- Automatically sends Philippine SMS for Amazon LEO preorders when status becomes approved/confirmed (when SMS env vars are configured)
 
 #### Reject Order
 - Provide rejection reason
@@ -182,6 +183,10 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `JWT_SECRET` is auto-generated in the blueprint.
 - `DATABASE_PATH=/var/data/pisowifi-admin.db`
 - `UPLOADS_DIR=/var/data/package-images`
+- `SEMAPHORE_API_KEY=<your-semaphore-api-key>` (required for PH SMS sending)
+- `SEMAPHORE_SENDER_NAME=CYNETWORK` (optional sender name)
+- `AMAZON_LEO_SMS_ENABLED=true`
+- `AMAZON_LEO_SMS_PROVIDER=semaphore`
 
 ### 4. Persistent storage
 - Render mounts a persistent disk at `/var/data`.

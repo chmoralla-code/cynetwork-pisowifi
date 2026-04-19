@@ -34,6 +34,14 @@ const PACKAGE_CATALOG = {
     3: { name: 'Enterprise', unitPrice: 11000, duration: 'LIFETIME LICENSE | 250 Meters' },
     4: { name: 'AMAZON LEO', unitPrice: 0, duration: 'OFFICIAL PRICE TO BE ANNOUNCED' }
 };
+const AMAZON_LEO_PACKAGE_ID = 4;
+const AMAZON_LEO_SMS_PROVIDER = String(process.env.AMAZON_LEO_SMS_PROVIDER || 'semaphore').trim().toLowerCase();
+const SEMAPHORE_SMS_API_KEY = String(process.env.SEMAPHORE_API_KEY || '').trim();
+const SEMAPHORE_SMS_SENDER_NAME = String(process.env.SEMAPHORE_SENDER_NAME || 'CYNETWORK').trim();
+const AMAZON_LEO_SMS_TEMPLATE = String(
+    process.env.AMAZON_LEO_SMS_TEMPLATE
+    || 'CYNETWORK: Hi {name}, confirmed na ang Amazon LEO preorder mo. Order ID: {orderId}, Tracking: {trackingNumber}. Official price will be declared once Amazon officially releases the product. Reservation mo ay naka-line na.'
+).trim();
 
 function createReferralCode() {
     const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -367,6 +375,205 @@ function parseBooleanFlag(value, fallback = false) {
     return fallback;
 }
 
+function normalizePhilippineMobileNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return digits;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `0${digits.slice(2)}`;
+    }
+
+    if (digits.length === 10 && digits.startsWith('9')) {
+        return `0${digits}`;
+    }
+
+    return '';
+}
+
+function isAmazonLeoOrder(orderRow) {
+    const packageId = Number(orderRow?.package_id || 0);
+    const packageName = String(orderRow?.package_name || '').trim().toUpperCase();
+    return packageId === AMAZON_LEO_PACKAGE_ID || packageName.includes('AMAZON LEO');
+}
+
+function shouldTriggerAmazonLeoSms(status) {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    return ['approved', 'delivery', 'completed'].includes(normalizedStatus);
+}
+
+function buildAmazonLeoApprovalSms(orderRow) {
+    const fallbackTracking = `CYN-${String(orderRow?.id || '--')}`;
+    const replacements = {
+        '{name}': String(orderRow?.full_name || 'Client').trim() || 'Client',
+        '{orderId}': String(orderRow?.id || '--'),
+        '{trackingNumber}': String(orderRow?.tracking_number || fallbackTracking),
+        '{status}': String(orderRow?.status || 'delivery').toUpperCase()
+    };
+
+    let text = AMAZON_LEO_SMS_TEMPLATE;
+    Object.entries(replacements).forEach(([token, replacement]) => {
+        text = text.split(token).join(replacement);
+    });
+
+    return text;
+}
+
+async function sendSemaphoreSms(number, message) {
+    if (!SEMAPHORE_SMS_API_KEY) {
+        throw new Error('SEMAPHORE_API_KEY is not configured');
+    }
+
+    if (typeof fetch !== 'function') {
+        throw new Error('Global fetch is unavailable in this Node runtime');
+    }
+
+    const payload = new URLSearchParams();
+    payload.set('apikey', SEMAPHORE_SMS_API_KEY);
+    payload.set('number', number);
+    payload.set('message', message);
+
+    if (SEMAPHORE_SMS_SENDER_NAME) {
+        payload.set('sendername', SEMAPHORE_SMS_SENDER_NAME);
+    }
+
+    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+    });
+
+    const responseText = await response.text();
+    if (!response.ok) {
+        throw new Error(`Semaphore SMS API error (${response.status}): ${responseText.slice(0, 220)}`);
+    }
+
+    let parsedBody = null;
+    try {
+        parsedBody = JSON.parse(responseText);
+    } catch (parseErr) {
+        parsedBody = null;
+    }
+
+    const primaryResult = Array.isArray(parsedBody) ? parsedBody[0] : parsedBody;
+    return {
+        providerMessageId: primaryResult?.message_id || primaryResult?.id || null,
+        providerStatus: primaryResult?.status || null
+    };
+}
+
+async function sendPhilippineSms(number, message) {
+    if (AMAZON_LEO_SMS_PROVIDER !== 'semaphore') {
+        throw new Error(`Unsupported AMAZON_LEO_SMS_PROVIDER "${AMAZON_LEO_SMS_PROVIDER}"`);
+    }
+
+    return sendSemaphoreSms(number, message);
+}
+
+function maybeSendAmazonLeoApprovalSms(orderId, targetStatus, callback) {
+    const normalizedOrderId = normalizePositiveInt(orderId, 0, 1, Number.MAX_SAFE_INTEGER);
+    if (!normalizedOrderId) {
+        callback(new Error('Invalid order ID for Amazon LEO SMS'));
+        return;
+    }
+
+    if (!shouldTriggerAmazonLeoSms(targetStatus)) {
+        callback(null, { sent: false, skipped: 'status_not_eligible' });
+        return;
+    }
+
+    if (!parseBooleanFlag(process.env.AMAZON_LEO_SMS_ENABLED, true)) {
+        callback(null, { sent: false, skipped: 'sms_disabled' });
+        return;
+    }
+
+    db.get(
+        `SELECT id, package_id, package_name, full_name, contact_number, tracking_number, status, amazon_leo_sms_sent
+         FROM orders WHERE id = ?`,
+        [normalizedOrderId],
+        (loadErr, orderRow) => {
+            if (loadErr) {
+                callback(loadErr);
+                return;
+            }
+
+            if (!orderRow) {
+                callback(new Error('Order not found for Amazon LEO SMS'));
+                return;
+            }
+
+            if (!isAmazonLeoOrder(orderRow)) {
+                callback(null, { sent: false, skipped: 'not_amazon_leo' });
+                return;
+            }
+
+            if (Number(orderRow.amazon_leo_sms_sent || 0) === 1) {
+                callback(null, { sent: false, skipped: 'already_sent' });
+                return;
+            }
+
+            const recipient = normalizePhilippineMobileNumber(orderRow.contact_number);
+            if (!recipient) {
+                const errorMessage = `Invalid Philippine contact number: ${String(orderRow.contact_number || '')}`;
+                db.run(
+                    `UPDATE orders
+                     SET amazon_leo_sms_error = ?, updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ?`,
+                    [errorMessage.slice(0, 350), orderRow.id],
+                    () => callback(null, { sent: false, skipped: 'invalid_contact_number', error: errorMessage })
+                );
+                return;
+            }
+
+            const smsText = buildAmazonLeoApprovalSms({
+                ...orderRow,
+                status: targetStatus
+            });
+
+            sendPhilippineSms(recipient, smsText)
+                .then((providerResult) => {
+                    db.run(
+                        `UPDATE orders
+                         SET amazon_leo_sms_sent = 1,
+                             amazon_leo_sms_sent_at = CURRENT_TIMESTAMP,
+                             amazon_leo_sms_error = NULL,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ?`,
+                        [orderRow.id],
+                        (updateErr) => {
+                            if (updateErr) {
+                                callback(updateErr);
+                                return;
+                            }
+
+                            callback(null, {
+                                sent: true,
+                                provider: AMAZON_LEO_SMS_PROVIDER,
+                                recipient,
+                                ...providerResult
+                            });
+                        }
+                    );
+                })
+                .catch((sendErr) => {
+                    const errorMessage = String(sendErr?.message || sendErr || 'SMS send failed').slice(0, 350);
+                    db.run(
+                        `UPDATE orders
+                         SET amazon_leo_sms_error = ?, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ?`,
+                        [errorMessage, orderRow.id],
+                        () => callback(null, { sent: false, skipped: 'sms_send_failed', error: errorMessage })
+                    );
+                });
+        }
+    );
+}
+
 function toNotificationSettingsPayload(row) {
     return {
         telegramEnabled: Boolean(Number(row?.telegram_enabled || 0)),
@@ -649,6 +856,9 @@ db.serialize(() => {
             status TEXT DEFAULT 'pending',
             approved_by TEXT,
             rejection_reason TEXT,
+            amazon_leo_sms_sent INTEGER DEFAULT 0,
+            amazon_leo_sms_sent_at DATETIME,
+            amazon_leo_sms_error TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -752,6 +962,9 @@ db.serialize(() => {
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN total_price TEXT', 'total_price');
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN client_account_id INTEGER', 'client_account_id');
     addColumnIfMissing('ALTER TABLE orders ADD COLUMN referral_code_used TEXT', 'referral_code_used');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN amazon_leo_sms_sent INTEGER DEFAULT 0', 'amazon_leo_sms_sent');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN amazon_leo_sms_sent_at DATETIME', 'amazon_leo_sms_sent_at');
+    addColumnIfMissing('ALTER TABLE orders ADD COLUMN amazon_leo_sms_error TEXT', 'amazon_leo_sms_error');
 
     addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN contact_number TEXT', 'contact_number');
     addColumnIfMissing('ALTER TABLE client_accounts ADD COLUMN referral_balance INTEGER DEFAULT 0', 'referral_balance');
@@ -810,6 +1023,12 @@ db.serialize(() => {
         UPDATE orders
         SET total_price = price
         WHERE total_price IS NULL OR TRIM(total_price) = ''
+    `);
+
+    db.run(`
+        UPDATE orders
+        SET amazon_leo_sms_sent = 0
+        WHERE amazon_leo_sms_sent IS NULL
     `);
 });
 
@@ -1304,7 +1523,30 @@ app.post('/api/orders/:id/approve', verifyToken, (req, res) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
-            res.json({ success: true, message: 'Order approved and set for delivery' });
+
+            maybeSendAmazonLeoApprovalSms(id, 'delivery', (smsErr, smsMeta) => {
+                if (smsErr) {
+                    console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
+                    return res.json({
+                        success: true,
+                        message: 'Order approved and set for delivery. Amazon LEO SMS check failed.',
+                        sms: {
+                            sent: false,
+                            error: smsErr.message || String(smsErr)
+                        }
+                    });
+                }
+
+                const smsMessage = smsMeta?.sent
+                    ? 'Order approved and set for delivery. Amazon LEO SMS sent to client.'
+                    : 'Order approved and set for delivery.';
+
+                res.json({
+                    success: true,
+                    message: smsMessage,
+                    sms: smsMeta || null
+                });
+            });
         }
     );
 });
@@ -1348,7 +1590,30 @@ app.post('/api/orders/:id/status', verifyToken, (req, res) => {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
             }
-            res.json({ success: true, message: 'Order status updated' });
+
+            maybeSendAmazonLeoApprovalSms(id, status, (smsErr, smsMeta) => {
+                if (smsErr) {
+                    console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
+                    return res.json({
+                        success: true,
+                        message: 'Order status updated. Amazon LEO SMS check failed.',
+                        sms: {
+                            sent: false,
+                            error: smsErr.message || String(smsErr)
+                        }
+                    });
+                }
+
+                const smsMessage = smsMeta?.sent
+                    ? 'Order status updated. Amazon LEO SMS sent to client.'
+                    : 'Order status updated';
+
+                res.json({
+                    success: true,
+                    message: smsMessage,
+                    sms: smsMeta || null
+                });
+            });
         }
     );
 });
