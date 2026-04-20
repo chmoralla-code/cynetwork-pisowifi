@@ -2493,53 +2493,15 @@ app.post('/api/admin/change-password', verifyToken, (req, res) => {
 // =====================================================
 
 const handleClientSendOtpRequest = async (req, res) => {
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const fullName = String(req.body.fullName || '').trim();
     const purpose = normalizeEmailVerificationPurpose(req.body.purpose);
 
     if (!purpose) {
         return res.status(400).json({ error: 'Valid OTP purpose is required.' });
     }
 
-    if (!EMAIL_VERIFICATION_ENABLED) {
-        return res.status(400).json({ error: 'Email OTP is currently disabled by server settings.' });
-    }
-
-    try {
-        const codeResult = await requestClientEmailVerificationCode({
-            email,
-            purpose,
-            fullName
-        });
-
-        const actionText = purpose === EMAIL_CODE_PURPOSE_REGISTER
-            ? 'account registration'
-            : 'password reset';
-
-        const isDevFallback = codeResult.deliveryMethod === 'development-fallback';
-        const message = isDevFallback
-            ? `SMTP is not configured. Development fallback is active for ${actionText}. Use OTP: ${codeResult.previewCode}`
-            : `OTP sent to ${codeResult.maskedEmail} for ${actionText}.`;
-
-        res.json({
-            success: true,
-            message,
-            purpose,
-            email: codeResult.maskedEmail,
-            expiresInMinutes: codeResult.expiresInMinutes,
-            cooldownSeconds: codeResult.cooldownSeconds,
-            deliveryMethod: codeResult.deliveryMethod,
-            previewCode: codeResult.previewCode || null
-        });
-    } catch (error) {
-        const statusCode = Number(error?.statusCode || 500);
-        if (statusCode >= 500 && statusCode !== 503) {
-            console.error('Failed sending client email code:', error.message || error);
-            return res.status(500).json({ error: 'Failed to send OTP right now. Please try again.' });
-        }
-
-        return res.status(statusCode).json({ error: error.message || 'Unable to send OTP.' });
-    }
+    return res.status(410).json({
+        error: 'OTP verification has been removed. Use your registered contact number for account verification.'
+    });
 };
 
 app.post('/api/client/send-otp', handleClientSendOtpRequest);
@@ -2549,18 +2511,18 @@ app.post('/api/client/send-email-code', handleClientSendOtpRequest);
 app.post('/api/client/register', (req, res) => {
     const fullName = String(req.body.fullName || '').trim();
     const contactNumber = String(req.body.contactNumber || '').trim();
+    const normalizedContactNumber = normalizePhilippineMobileNumber(contactNumber);
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
     const confirmPassword = String(req.body.confirmPassword || '');
     const rawReferralCode = String(req.body.referralCode || '').trim().toUpperCase();
-    const verificationCode = String(req.body.verificationCode || '').trim();
 
-    if (!fullName || !email || !password) {
-        return res.status(400).json({ error: 'Full name, email, and password are required' });
+    if (!fullName || !contactNumber || !email || !password) {
+        return res.status(400).json({ error: 'Full name, contact number, email, and password are required' });
     }
 
-    if (EMAIL_VERIFICATION_ENABLED && !verificationCode) {
-        return res.status(400).json({ error: 'Email OTP is required' });
+    if (!normalizedContactNumber) {
+        return res.status(400).json({ error: 'Please provide a valid Philippine contact number' });
     }
 
     if (password !== confirmPassword) {
@@ -2597,7 +2559,7 @@ app.post('/api/client/register', (req, res) => {
                         created_at,
                         updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                    [fullName, contactNumber || null, email, hash, ownReferralCode, referralCodeToStore],
+                    [fullName, normalizedContactNumber, email, hash, ownReferralCode, referralCodeToStore],
                     function(insertErr) {
                         if (insertErr) {
                             if (String(insertErr.message || '').includes('UNIQUE constraint failed: client_accounts.email')) {
@@ -2639,28 +2601,6 @@ app.post('/api/client/register', (req, res) => {
         });
     };
 
-    const finalizeRegistration = (referralCodeToStore = null) => {
-        if (!EMAIL_VERIFICATION_ENABLED) {
-            createAccount(referralCodeToStore);
-            return;
-        }
-
-        verifyClientEmailVerificationCode({
-            email,
-            purpose: EMAIL_CODE_PURPOSE_REGISTER,
-            code: verificationCode
-        })
-            .then(() => {
-                createAccount(referralCodeToStore);
-            })
-            .catch((verifyError) => {
-                const statusCode = Number(verifyError?.statusCode || 400);
-                return res.status(statusCode).json({
-                    error: verifyError?.message || 'Invalid OTP'
-                });
-            });
-    };
-
     if (rawReferralCode) {
         db.get(
             'SELECT id FROM client_accounts WHERE referral_code = ?',
@@ -2674,13 +2614,13 @@ app.post('/api/client/register', (req, res) => {
                     return res.status(400).json({ error: 'Referral code is invalid' });
                 }
 
-                finalizeRegistration(rawReferralCode);
+                createAccount(rawReferralCode);
             }
         );
         return;
     }
 
-    finalizeRegistration(null);
+    createAccount(null);
 });
 
 app.post('/api/client/login', (req, res) => {
@@ -2723,16 +2663,19 @@ app.post('/api/client/login', (req, res) => {
 app.post('/api/client/forgot-password', (req, res) => {
     const fullName = String(req.body.fullName || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
+    const contactNumber = String(req.body.contactNumber || '').trim();
+    const normalizedContactNumber = normalizePhilippineMobileNumber(contactNumber);
     const newPassword = String(req.body.newPassword || '');
     const confirmPassword = String(req.body.confirmPassword || '');
-    const verificationCode = String(req.body.verificationCode || '').trim();
 
-    if (!fullName || !email || !newPassword || !confirmPassword || (EMAIL_VERIFICATION_ENABLED && !verificationCode)) {
+    if (!fullName || !email || !contactNumber || !newPassword || !confirmPassword) {
         return res.status(400).json({
-            error: EMAIL_VERIFICATION_ENABLED
-                ? 'Full name, email, OTP, new password, and confirm password are required'
-                : 'Full name, email, new password, and confirm password are required'
+            error: 'Full name, email, contact number, new password, and confirm password are required'
         });
+    }
+
+    if (!normalizedContactNumber) {
+        return res.status(400).json({ error: 'Please provide a valid Philippine contact number' });
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -2748,7 +2691,7 @@ app.post('/api/client/forgot-password', (req, res) => {
     }
 
     db.get(
-        'SELECT id, full_name FROM client_accounts WHERE email = ?',
+        'SELECT id, full_name, contact_number FROM client_accounts WHERE email = ?',
         [email],
         (lookupErr, accountRow) => {
             if (lookupErr) {
@@ -2761,6 +2704,17 @@ app.post('/api/client/forgot-password', (req, res) => {
 
             const isNameMatch = String(accountRow.full_name || '').trim().toLowerCase() === fullName.toLowerCase();
             if (!isNameMatch) {
+                return res.status(404).json({ error: 'Account details not found' });
+            }
+
+            const storedNormalizedContact = normalizePhilippineMobileNumber(accountRow.contact_number);
+            if (!storedNormalizedContact) {
+                return res.status(409).json({
+                    error: 'This account does not have a registered contact number yet. Please contact support.'
+                });
+            }
+
+            if (storedNormalizedContact !== normalizedContactNumber) {
                 return res.status(404).json({ error: 'Account details not found' });
             }
 
@@ -2795,25 +2749,7 @@ app.post('/api/client/forgot-password', (req, res) => {
                 });
             };
 
-            if (!EMAIL_VERIFICATION_ENABLED) {
-                updatePassword();
-                return;
-            }
-
-            verifyClientEmailVerificationCode({
-                email,
-                purpose: EMAIL_CODE_PURPOSE_FORGOT_PASSWORD,
-                code: verificationCode
-            })
-                .then(() => {
-                    updatePassword();
-                })
-                .catch((verifyError) => {
-                    const statusCode = Number(verifyError?.statusCode || 400);
-                    return res.status(statusCode).json({
-                        error: verifyError?.message || 'Invalid OTP'
-                    });
-                });
+            updatePassword();
         }
     );
 });

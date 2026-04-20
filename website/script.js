@@ -72,6 +72,27 @@ function normalizeQuantity(value) {
     return Math.min(100, Math.max(1, parsed));
 }
 
+function normalizeClientContactNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return digits;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `0${digits.slice(2)}`;
+    }
+
+    if (digits.length === 10 && digits.startsWith('9')) {
+        return `0${digits}`;
+    }
+
+    return '';
+}
+
 function normalizeWifiRateMbps(value) {
     const numeric = Number(String(value || '').trim());
     if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -863,24 +884,19 @@ async function handleClientRegister(event) {
 
     const fullName = document.getElementById('clientRegisterName').value.trim();
     const contactNumber = document.getElementById('clientRegisterContact').value.trim();
+    const normalizedContactNumber = normalizeClientContactNumber(contactNumber);
     const email = document.getElementById('clientRegisterEmail').value.trim().toLowerCase();
-    const verificationCode = document.getElementById('clientRegisterVerificationCode').value.trim();
     const password = document.getElementById('clientRegisterPassword').value;
     const confirmPassword = document.getElementById('clientRegisterConfirmPassword').value;
     const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
 
-    if (!fullName || !email || !password || (isEmailOtpRequired && !verificationCode)) {
-        setClientAuthMessage(
-            isEmailOtpRequired
-                ? 'Full name, email, OTP, and password are required.'
-                : 'Full name, email, and password are required.',
-            'error'
-        );
+    if (!fullName || !contactNumber || !email || !password) {
+        setClientAuthMessage('Full name, contact number, email, and password are required.', 'error');
         return;
     }
 
-    if (isEmailOtpRequired && !EMAIL_CODE_REGEX.test(verificationCode)) {
-        setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
+    if (!normalizedContactNumber) {
+        setClientAuthMessage('Please enter a valid Philippine contact number.', 'error');
         return;
     }
 
@@ -895,9 +911,8 @@ async function handleClientRegister(event) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fullName,
-                contactNumber,
+                contactNumber: normalizedContactNumber,
                 email,
-                verificationCode: isEmailOtpRequired ? verificationCode : '',
                 password,
                 confirmPassword,
                 referralCode: referralCode || null
@@ -917,7 +932,6 @@ async function handleClientRegister(event) {
 
         document.getElementById('clientRegisterForm').reset();
         resetRegisterPasswordToggles();
-        resetEmailCodeButton('sendRegisterCodeBtn');
     } catch (error) {
         setClientAuthMessage('Unable to register right now. Please try again later.', 'error');
     }
@@ -928,22 +942,18 @@ async function handleClientRecoverPassword(event) {
 
     const fullName = document.getElementById('clientRecoverName').value.trim();
     const email = document.getElementById('clientRecoverEmail').value.trim().toLowerCase();
-    const verificationCode = document.getElementById('clientRecoverVerificationCode').value.trim();
+    const contactNumber = document.getElementById('clientRecoverContact').value.trim();
+    const normalizedContactNumber = normalizeClientContactNumber(contactNumber);
     const newPassword = document.getElementById('clientRecoverPassword').value;
     const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
 
-    if (!fullName || !email || !newPassword || !confirmNewPassword || (isEmailOtpRequired && !verificationCode)) {
-        setClientAuthMessage(
-            isEmailOtpRequired
-                ? 'Please complete all reset password fields including OTP.'
-                : 'Please complete all reset password fields.',
-            'error'
-        );
+    if (!fullName || !email || !contactNumber || !newPassword || !confirmNewPassword) {
+        setClientAuthMessage('Please complete all reset password fields.', 'error');
         return;
     }
 
-    if (isEmailOtpRequired && !EMAIL_CODE_REGEX.test(verificationCode)) {
-        setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
+    if (!normalizedContactNumber) {
+        setClientAuthMessage('Please enter the same valid Philippine contact number used during registration.', 'error');
         return;
     }
 
@@ -964,7 +974,7 @@ async function handleClientRecoverPassword(event) {
             body: JSON.stringify({
                 fullName,
                 email,
-                verificationCode: isEmailOtpRequired ? verificationCode : '',
+                contactNumber: normalizedContactNumber,
                 newPassword,
                 confirmPassword: confirmNewPassword
             })
@@ -977,7 +987,6 @@ async function handleClientRecoverPassword(event) {
         }
 
         document.getElementById('clientRecoverForm').reset();
-        resetEmailCodeButton('sendRecoverCodeBtn');
         setClientAuthMessage(result.message || 'Password reset successful. You can now login.', 'success');
         switchAccountTab('login');
     } catch (error) {
@@ -1086,10 +1095,6 @@ function initClientAccountFeatures() {
     const redeemForm = document.getElementById('referralRedeemForm');
 
     resetRegisterPasswordToggles();
-    resetEmailCodeButton('sendRegisterCodeBtn');
-    resetEmailCodeButton('sendRecoverCodeBtn');
-    setEmailOtpRequirement(true);
-    syncEmailOtpRequirementFromHealth();
 
     if (loginForm && loginForm.dataset.bound !== 'true') {
         loginForm.addEventListener('submit', handleClientLogin);

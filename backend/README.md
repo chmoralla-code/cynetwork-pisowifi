@@ -128,12 +128,12 @@ http://localhost:3000/
 ### Authentication
 - `POST /api/login` - Admin login
 
-### Client Account & Verification
-- `POST /api/client/send-otp` - Send 6-digit OTP for register/forgot password
-- `POST /api/client/send-email-code` - Legacy alias for send OTP
-- `POST /api/client/register` - Register client account (requires email OTP)
+### Client Account & Recovery
+- `POST /api/client/send-otp` - Deprecated (returns guidance to use contact-number verification)
+- `POST /api/client/send-email-code` - Deprecated alias (returns guidance to use contact-number verification)
+- `POST /api/client/register` - Register client account (requires valid Philippine contact number)
 - `POST /api/client/login` - Login client account
-- `POST /api/client/forgot-password` - Reset password (requires email OTP)
+- `POST /api/client/forgot-password` - Reset password (requires full name + email + registered contact number)
 - `GET /api/client/me` - Get current client profile
 - `GET /api/client/referral/:code` - Validate referral code
 - `GET /api/client/redemptions` - Get referral redemption history
@@ -208,19 +208,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SEMAPHORE_SENDER_NAME=CYNETWORK` (optional sender name)
 - `AMAZON_LEO_SMS_ENABLED=true`
 - `AMAZON_LEO_SMS_PROVIDER=semaphore`
-- `EMAIL_VERIFICATION_ENABLED=true` (set `false` to allow register/forgot-password without OTP while SMTP is unavailable)
-- `SMTP_HOST=<smtp-host>`
-- `SMTP_PORT=587`
-- `SMTP_SECURE=false` (set `true` for SSL ports such as 465)
-- `SMTP_USER=<smtp-username>`
-- `SMTP_PASS=<smtp-password>`
-- `SMTP_ALLOW_UNAUTH=false` (set `true` only for trusted relay without auth)
-- `SMTP_FROM_EMAIL=<no-reply@your-domain.com>`
-- `SMTP_FROM_NAME=CYNETWORK PISOWIFI`
-- `ALLOW_DEV_EMAIL_CODE_FALLBACK=true` (local/dev only; allows testing with preview OTP when SMTP is not configured)
-- `EMAIL_CODE_TTL_MINUTES=10`
-- `EMAIL_CODE_RESEND_COOLDOWN_SECONDS=60`
-- `EMAIL_CODE_MAX_ATTEMPTS=5`
+- OTP-related SMTP variables are now optional/deprecated for client auth because recovery uses registered contact number verification instead.
 
 ### 3.1 Initialize Supabase schema before first deploy
 - Open Supabase Dashboard -> SQL Editor.
