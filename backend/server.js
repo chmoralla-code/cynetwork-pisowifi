@@ -568,6 +568,11 @@ function shouldTriggerAmazonLeoSms(status) {
     return ['approved', 'delivery', 'completed'].includes(normalizedStatus);
 }
 
+function shouldTriggerReferralReward(status) {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    return ['approved', 'delivery', 'completed'].includes(normalizedStatus);
+}
+
 function buildAmazonLeoApprovalSms(orderRow) {
     const fallbackTracking = `CYN-${String(orderRow?.id || '--')}`;
     const replacements = {
@@ -731,6 +736,50 @@ function maybeSendAmazonLeoApprovalSms(orderId, targetStatus, callback) {
                         () => callback(null, { sent: false, skipped: 'sms_send_failed', error: errorMessage })
                     );
                 });
+        }
+    );
+}
+
+function maybeApplyReferralRewardOnOrderConfirmation(orderId, targetStatus, callback) {
+    const normalizedOrderId = normalizePositiveInt(orderId, 0, 1, Number.MAX_SAFE_INTEGER);
+    if (!normalizedOrderId) {
+        callback(new Error('Invalid order ID for referral reward'));
+        return;
+    }
+
+    if (!shouldTriggerReferralReward(targetStatus)) {
+        callback(null, { rewardApplied: false, rewardAmount: 0, skipped: 'status_not_eligible' });
+        return;
+    }
+
+    db.get(
+        'SELECT id, client_account_id FROM orders WHERE id = ?',
+        [normalizedOrderId],
+        (loadErr, orderRow) => {
+            if (loadErr) {
+                callback(loadErr);
+                return;
+            }
+
+            if (!orderRow) {
+                callback(new Error('Order not found for referral reward'));
+                return;
+            }
+
+            const accountId = Number(orderRow.client_account_id || 0);
+            if (!accountId) {
+                callback(null, { rewardApplied: false, rewardAmount: 0, skipped: 'no_client_account' });
+                return;
+            }
+
+            applyReferralRewardForOrder(accountId, orderRow.id, (rewardErr, rewardMeta) => {
+                if (rewardErr) {
+                    callback(rewardErr);
+                    return;
+                }
+
+                callback(null, rewardMeta || { rewardApplied: false, rewardAmount: 0 });
+            });
         }
     );
 }
@@ -2377,27 +2426,35 @@ app.post('/api/orders/:id/approve', verifyToken, (req, res) => {
                 return res.status(500).json({ error: 'Database error' });
             }
 
-            maybeSendAmazonLeoApprovalSms(id, 'delivery', (smsErr, smsMeta) => {
-                if (smsErr) {
-                    console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
-                    return res.json({
-                        success: true,
-                        message: 'Order approved and set for delivery. Amazon LEO SMS check failed.',
-                        sms: {
-                            sent: false,
-                            error: smsErr.message || String(smsErr)
-                        }
-                    });
+            maybeApplyReferralRewardOnOrderConfirmation(id, 'delivery', (rewardErr, rewardMeta) => {
+                if (rewardErr) {
+                    console.error('Referral reward processing error:', rewardErr.message || rewardErr);
                 }
 
-                const smsMessage = smsMeta?.sent
-                    ? 'Order approved and set for delivery. Amazon LEO SMS sent to client.'
-                    : 'Order approved and set for delivery.';
+                maybeSendAmazonLeoApprovalSms(id, 'delivery', (smsErr, smsMeta) => {
+                    if (smsErr) {
+                        console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
+                        return res.json({
+                            success: true,
+                            message: 'Order approved and set for delivery. Amazon LEO SMS check failed.',
+                            sms: {
+                                sent: false,
+                                error: smsErr.message || String(smsErr)
+                            },
+                            referralReward: rewardMeta || { rewardApplied: false, rewardAmount: 0 }
+                        });
+                    }
 
-                res.json({
-                    success: true,
-                    message: smsMessage,
-                    sms: smsMeta || null
+                    const smsMessage = smsMeta?.sent
+                        ? 'Order approved and set for delivery. Amazon LEO SMS sent to client.'
+                        : 'Order approved and set for delivery.';
+
+                    res.json({
+                        success: true,
+                        message: smsMessage,
+                        sms: smsMeta || null,
+                        referralReward: rewardMeta || { rewardApplied: false, rewardAmount: 0 }
+                    });
                 });
             });
         }
@@ -2444,27 +2501,35 @@ app.post('/api/orders/:id/status', verifyToken, (req, res) => {
                 return res.status(500).json({ error: 'Database error' });
             }
 
-            maybeSendAmazonLeoApprovalSms(id, status, (smsErr, smsMeta) => {
-                if (smsErr) {
-                    console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
-                    return res.json({
-                        success: true,
-                        message: 'Order status updated. Amazon LEO SMS check failed.',
-                        sms: {
-                            sent: false,
-                            error: smsErr.message || String(smsErr)
-                        }
-                    });
+            maybeApplyReferralRewardOnOrderConfirmation(id, status, (rewardErr, rewardMeta) => {
+                if (rewardErr) {
+                    console.error('Referral reward processing error:', rewardErr.message || rewardErr);
                 }
 
-                const smsMessage = smsMeta?.sent
-                    ? 'Order status updated. Amazon LEO SMS sent to client.'
-                    : 'Order status updated';
+                maybeSendAmazonLeoApprovalSms(id, status, (smsErr, smsMeta) => {
+                    if (smsErr) {
+                        console.error('Amazon LEO SMS automation error:', smsErr.message || smsErr);
+                        return res.json({
+                            success: true,
+                            message: 'Order status updated. Amazon LEO SMS check failed.',
+                            sms: {
+                                sent: false,
+                                error: smsErr.message || String(smsErr)
+                            },
+                            referralReward: rewardMeta || { rewardApplied: false, rewardAmount: 0 }
+                        });
+                    }
 
-                res.json({
-                    success: true,
-                    message: smsMessage,
-                    sms: smsMeta || null
+                    const smsMessage = smsMeta?.sent
+                        ? 'Order status updated. Amazon LEO SMS sent to client.'
+                        : 'Order status updated';
+
+                    res.json({
+                        success: true,
+                        message: smsMessage,
+                        sms: smsMeta || null,
+                        referralReward: rewardMeta || { rewardApplied: false, rewardAmount: 0 }
+                    });
                 });
             });
         }
@@ -2586,35 +2651,30 @@ app.post('/api/submit-order', (req, res) => {
                             return res.status(500).json({ error: 'Failed to generate tracking number' });
                         }
 
-                        applyReferralRewardForOrder(accountRow?.id, orderId, (rewardErr, rewardMeta) => {
-                            if (rewardErr) {
-                                console.error('Referral reward processing error:', rewardErr.message);
-                            }
+                        void dispatchAdminNotification('pending_order', {
+                            orderId,
+                            trackingNumber,
+                            fullName: normalizedFullName,
+                            contactNumber: normalizedContactNumber,
+                            packageName: resolvedPackageName,
+                            quantity: resolvedQuantity,
+                            totalPrice,
+                            status: 'pending'
+                        });
 
-                            void dispatchAdminNotification('pending_order', {
-                                orderId,
-                                trackingNumber,
-                                fullName: normalizedFullName,
-                                contactNumber: normalizedContactNumber,
-                                packageName: resolvedPackageName,
-                                quantity: resolvedQuantity,
-                                totalPrice,
-                                status: 'pending'
-                            });
-
-                            res.json({
-                                success: true,
-                                orderId,
-                                trackingNumber,
-                                status: 'pending',
-                                quantity: resolvedQuantity,
-                                unitPrice: toMoneyText(resolvedUnitPrice),
-                                shippingFee: toMoneyText(shippingFee),
-                                totalPrice: toMoneyText(totalPrice),
-                                referralRewardApplied: Boolean(rewardMeta?.rewardApplied),
-                                referralRewardAmount: rewardMeta?.rewardAmount || 0,
-                                message: 'Order submitted successfully'
-                            });
+                        res.json({
+                            success: true,
+                            orderId,
+                            trackingNumber,
+                            status: 'pending',
+                            quantity: resolvedQuantity,
+                            unitPrice: toMoneyText(resolvedUnitPrice),
+                            shippingFee: toMoneyText(shippingFee),
+                            totalPrice: toMoneyText(totalPrice),
+                            referralRewardApplied: false,
+                            referralRewardAmount: 0,
+                            referralRewardPendingApproval: Boolean(accountRow?.id && accountRow?.referred_by_code),
+                            message: 'Order submitted successfully'
                         });
                     }
                 );
