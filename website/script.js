@@ -54,6 +54,7 @@ const CLIENT_AUTH_STORAGE_KEY = 'cynetworkClientAuth';
 const EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS = 60;
 const EMAIL_CODE_REGEX = /^\d{6}$/;
 const emailCodeCooldownIntervals = {};
+let isEmailOtpRequired = true;
 
 function formatMoney(value) {
     const numeric = Number(value || 0);
@@ -655,7 +656,89 @@ function startEmailCodeCooldown(buttonId, cooldownSeconds) {
     }, 1000);
 }
 
+function setEmailOtpFieldState({ inputId, buttonId, required, disabledHint }) {
+    const codeInput = document.getElementById(inputId);
+    const button = document.getElementById(buttonId);
+    if (!codeInput || !button) {
+        return;
+    }
+
+    const formGroup = codeInput.closest('.form-group');
+    const hint = formGroup?.querySelector('.form-hint') || null;
+
+    if (hint && !hint.dataset.defaultText) {
+        hint.dataset.defaultText = hint.textContent || '';
+    }
+
+    if (required) {
+        codeInput.disabled = false;
+        codeInput.required = true;
+        if (!emailCodeCooldownIntervals[buttonId]) {
+            button.disabled = false;
+            button.textContent = 'Send OTP';
+        }
+
+        if (hint && hint.dataset.defaultText) {
+            hint.textContent = hint.dataset.defaultText;
+        }
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    codeInput.value = '';
+    codeInput.required = false;
+    codeInput.disabled = true;
+    button.disabled = true;
+    button.textContent = 'OTP Disabled';
+
+    if (hint) {
+        hint.textContent = disabledHint;
+    }
+}
+
+function setEmailOtpRequirement(required) {
+    isEmailOtpRequired = Boolean(required);
+    const disabledHint = 'OTP is currently disabled by server settings. You can continue without OTP.';
+
+    setEmailOtpFieldState({
+        inputId: 'clientRegisterVerificationCode',
+        buttonId: 'sendRegisterCodeBtn',
+        required: isEmailOtpRequired,
+        disabledHint
+    });
+
+    setEmailOtpFieldState({
+        inputId: 'clientRecoverVerificationCode',
+        buttonId: 'sendRecoverCodeBtn',
+        required: isEmailOtpRequired,
+        disabledHint
+    });
+}
+
+async function syncEmailOtpRequirementFromHealth() {
+    try {
+        const response = await fetch('/health', { cache: 'no-store' });
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        setEmailOtpRequirement(Boolean(result?.emailVerification?.enabled));
+    } catch (error) {
+        // Keep OTP enabled by default when health check is unavailable.
+    }
+}
+
 async function sendClientEmailVerificationCode({ purpose, email, fullName = '', buttonId }) {
+    if (!isEmailOtpRequired) {
+        setClientAuthMessage('OTP is currently disabled by server settings.', 'error');
+        return;
+    }
+
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!normalizedEmail) {
         setClientAuthMessage('Please enter your email address first.', 'error');
@@ -786,12 +869,17 @@ async function handleClientRegister(event) {
     const confirmPassword = document.getElementById('clientRegisterConfirmPassword').value;
     const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
 
-    if (!fullName || !email || !verificationCode || !password) {
-        setClientAuthMessage('Full name, email, OTP, and password are required.', 'error');
+    if (!fullName || !email || !password || (isEmailOtpRequired && !verificationCode)) {
+        setClientAuthMessage(
+            isEmailOtpRequired
+                ? 'Full name, email, OTP, and password are required.'
+                : 'Full name, email, and password are required.',
+            'error'
+        );
         return;
     }
 
-    if (!EMAIL_CODE_REGEX.test(verificationCode)) {
+    if (isEmailOtpRequired && !EMAIL_CODE_REGEX.test(verificationCode)) {
         setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
         return;
     }
@@ -809,7 +897,7 @@ async function handleClientRegister(event) {
                 fullName,
                 contactNumber,
                 email,
-                verificationCode,
+                verificationCode: isEmailOtpRequired ? verificationCode : '',
                 password,
                 confirmPassword,
                 referralCode: referralCode || null
@@ -844,12 +932,17 @@ async function handleClientRecoverPassword(event) {
     const newPassword = document.getElementById('clientRecoverPassword').value;
     const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
 
-    if (!fullName || !email || !verificationCode || !newPassword || !confirmNewPassword) {
-        setClientAuthMessage('Please complete all reset password fields including OTP.', 'error');
+    if (!fullName || !email || !newPassword || !confirmNewPassword || (isEmailOtpRequired && !verificationCode)) {
+        setClientAuthMessage(
+            isEmailOtpRequired
+                ? 'Please complete all reset password fields including OTP.'
+                : 'Please complete all reset password fields.',
+            'error'
+        );
         return;
     }
 
-    if (!EMAIL_CODE_REGEX.test(verificationCode)) {
+    if (isEmailOtpRequired && !EMAIL_CODE_REGEX.test(verificationCode)) {
         setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
         return;
     }
@@ -871,7 +964,7 @@ async function handleClientRecoverPassword(event) {
             body: JSON.stringify({
                 fullName,
                 email,
-                verificationCode,
+                verificationCode: isEmailOtpRequired ? verificationCode : '',
                 newPassword,
                 confirmPassword: confirmNewPassword
             })
@@ -995,6 +1088,8 @@ function initClientAccountFeatures() {
     resetRegisterPasswordToggles();
     resetEmailCodeButton('sendRegisterCodeBtn');
     resetEmailCodeButton('sendRecoverCodeBtn');
+    setEmailOtpRequirement(true);
+    syncEmailOtpRequirementFromHealth();
 
     if (loginForm && loginForm.dataset.bound !== 'true') {
         loginForm.addEventListener('submit', handleClientLogin);
