@@ -14,6 +14,15 @@ services:
       - key: JWT_SECRET
         generateValue: true
         sync: false
+      - key: SUPABASE_URL
+        value: https://bokirbsfqtqqknvrqlcv.supabase.co
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        value: sb_publishable_IU0Zv0Oqjn_AgDHkV0NpHQ_A9YmQh9u
+        sync: false
+      - key: SUPABASE_DB_URL
+        value: postgresql://postgres:Cy_NetWork_3212@db.bokirbsfqtqqknvrqlcv.supabase.co:5432/postgres
+        sync: false
       - key: ACCOUNT_BACKUP_MONGODB_URI
         value: ""
         sync: false
