@@ -118,6 +118,10 @@ const defaultPackageImages = {
 const CHAT_SESSION_STATUSES = ['ai', 'live', 'closed'];
 const REFERRAL_REWARD_PHP = 100;
 const REFERRAL_REDEEM_VAT_PHP = 15;
+const DEFAULT_ADMIN_USERNAME = 'admin';
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+const DEFAULT_ADMIN_PASSWORD_HASH = '$2b$10$fu/rvl3xWreWyoqF8W4SJ.uII5QybC0N9wPaj353ifmiPwbc2AUzS';
+const LEGACY_DEFAULT_ADMIN_PASSWORD_HASH = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 const PACKAGE_CATALOG = {
     1: { name: 'Starter', unitPrice: 5800, duration: '1 Year License | 50 Meters' },
     2: { name: 'Professional', unitPrice: 8500, duration: '3 Years License | 100 Meters' },
@@ -1168,7 +1172,18 @@ function pgRunAsync(sql, params = []) {
 
 async function initializeDatabase() {
     // Insert default admin
-    await pgRunAsync(`INSERT INTO admins (username, password, email) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING`, ['admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@cynetwork.com']);
+    await pgRunAsync(
+        `INSERT INTO admins (username, password, email) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING`,
+        [DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD_HASH, 'admin@cynetwork.com']
+    );
+
+    // Migrate older default hash to the current documented default password.
+    await pgRunAsync(
+        `UPDATE admins
+         SET password = $1
+         WHERE username = $2 AND password = $3`,
+        [DEFAULT_ADMIN_PASSWORD_HASH, DEFAULT_ADMIN_USERNAME, LEGACY_DEFAULT_ADMIN_PASSWORD_HASH]
+    );
 
     // Insert notification settings
     await pgRunAsync(`INSERT INTO notification_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
@@ -3422,8 +3437,8 @@ startupReady.finally(() => {
     Environment: ${process.env.NODE_ENV || 'development'}
     
     Default Credentials:
-    Username: admin
-    Password: admin123
+    Username: ${DEFAULT_ADMIN_USERNAME}
+    Password: ${DEFAULT_ADMIN_PASSWORD}
     
     API Endpoints:
     POST   /api/login
