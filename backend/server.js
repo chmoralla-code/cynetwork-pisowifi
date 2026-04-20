@@ -164,6 +164,10 @@ const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
 const SMTP_ALLOW_UNAUTH = parseBooleanFlag(process.env.SMTP_ALLOW_UNAUTH, false);
 const SMTP_FROM_EMAIL = String(process.env.SMTP_FROM_EMAIL || '').trim();
 const SMTP_FROM_NAME = String(process.env.SMTP_FROM_NAME || 'CYNETWORK PISOWIFI').trim();
+const ALLOW_DEV_EMAIL_CODE_FALLBACK = parseBooleanFlag(
+    process.env.ALLOW_DEV_EMAIL_CODE_FALLBACK,
+    !isProduction
+);
 
 let clientEmailTransporter = null;
 let clientEmailCodeSchemaPromise = null;
@@ -799,7 +803,10 @@ async function requestClientEmailVerificationCode({ email, purpose, fullName = '
         throw createHttpError(400, 'Invalid verification purpose.');
     }
 
-    if (!isClientEmailVerificationConfigured()) {
+    const emailDeliveryConfigured = isClientEmailVerificationConfigured();
+    const useDevCodeFallback = !emailDeliveryConfigured && !isProduction && ALLOW_DEV_EMAIL_CODE_FALLBACK;
+
+    if (!emailDeliveryConfigured && !useDevCodeFallback) {
         throw createHttpError(503, 'Email verification is not configured yet. Please contact support.');
     }
 
@@ -857,12 +864,18 @@ async function requestClientEmailVerificationCode({ email, purpose, fullName = '
 
     const verificationCode = generateClientEmailVerificationCode();
 
-    await sendClientEmailCode({
-        email: normalizedEmail,
-        fullName,
-        purpose: normalizedPurpose,
-        code: verificationCode
-    });
+    if (emailDeliveryConfigured) {
+        await sendClientEmailCode({
+            email: normalizedEmail,
+            fullName,
+            purpose: normalizedPurpose,
+            code: verificationCode
+        });
+    } else {
+        console.warn(
+            `[DEV EMAIL CODE FALLBACK] ${normalizedPurpose} code for ${normalizedEmail}: ${verificationCode}`
+        );
+    }
 
     const expiresAtIso = new Date(Date.now() + (EMAIL_CODE_TTL_MINUTES * 60 * 1000)).toISOString();
     const codeDigest = buildClientEmailCodeDigest(normalizedEmail, normalizedPurpose, verificationCode);
@@ -894,7 +907,9 @@ async function requestClientEmailVerificationCode({ email, purpose, fullName = '
         maskedEmail: maskEmailForDisplay(normalizedEmail),
         purpose: normalizedPurpose,
         expiresInMinutes: EMAIL_CODE_TTL_MINUTES,
-        cooldownSeconds: EMAIL_CODE_RESEND_COOLDOWN_SECONDS
+        cooldownSeconds: EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
+        deliveryMethod: emailDeliveryConfigured ? 'email' : 'development-fallback',
+        previewCode: useDevCodeFallback ? verificationCode : null
     };
 }
 
@@ -2497,17 +2512,24 @@ app.post('/api/client/send-email-code', async (req, res) => {
             ? 'account registration'
             : 'password reset';
 
+        const isDevFallback = codeResult.deliveryMethod === 'development-fallback';
+        const message = isDevFallback
+            ? `SMTP is not configured. Development fallback is active for ${actionText}. Use code: ${codeResult.previewCode}`
+            : `Verification code sent to ${codeResult.maskedEmail} for ${actionText}.`;
+
         res.json({
             success: true,
-            message: `Verification code sent to ${codeResult.maskedEmail} for ${actionText}.`,
+            message,
             purpose,
             email: codeResult.maskedEmail,
             expiresInMinutes: codeResult.expiresInMinutes,
-            cooldownSeconds: codeResult.cooldownSeconds
+            cooldownSeconds: codeResult.cooldownSeconds,
+            deliveryMethod: codeResult.deliveryMethod,
+            previewCode: codeResult.previewCode || null
         });
     } catch (error) {
         const statusCode = Number(error?.statusCode || 500);
-        if (statusCode >= 500) {
+        if (statusCode >= 500 && statusCode !== 503) {
             console.error('Failed sending client email code:', error.message || error);
             return res.status(500).json({ error: 'Failed to send verification code right now. Please try again.' });
         }
@@ -4193,6 +4215,7 @@ app.get('/health', (req, res) => {
         emailVerification: {
             enabled: EMAIL_VERIFICATION_ENABLED,
             configured: emailVerificationConfigured,
+            allowDevelopmentFallback: ALLOW_DEV_EMAIL_CODE_FALLBACK,
             smtpHostConfigured: Boolean(SMTP_HOST),
             smtpPort: SMTP_PORT,
             smtpSecure: SMTP_SECURE,
