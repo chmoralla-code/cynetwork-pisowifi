@@ -128,6 +128,16 @@ http://localhost:3000/
 ### Authentication
 - `POST /api/login` - Admin login
 
+### Client Account & Verification
+- `POST /api/client/send-email-code` - Send 6-digit verification code for register/forgot password
+- `POST /api/client/register` - Register client account (requires email verification code)
+- `POST /api/client/login` - Login client account
+- `POST /api/client/forgot-password` - Reset password (requires email verification code)
+- `GET /api/client/me` - Get current client profile
+- `GET /api/client/referral/:code` - Validate referral code
+- `GET /api/client/redemptions` - Get referral redemption history
+- `POST /api/client/redeem-referral` - Submit referral redemption request
+
 ### Orders (requires authentication)
 - `GET /api/orders` - List all orders
 - `GET /api/orders/:id` - Get order details
@@ -181,6 +191,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 ### 3. Production environment values
 - `NODE_ENV=production`
 - `JWT_SECRET` is auto-generated in the blueprint and kept stable across redeploys (`sync: false`).
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_DB_URL` are intentionally placeholders in `render.yaml`; set real values in Render Dashboard before going live.
 - `SUPABASE_URL=https://<project-ref>.supabase.co`
 - `SUPABASE_ANON_KEY=<supabase-publishable-key>`
 - `SUPABASE_DB_URL=<supabase-postgres-connection-string>` (prefer the IPv4 pooler URL with `sslmode=require`)
@@ -196,6 +207,18 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SEMAPHORE_SENDER_NAME=CYNETWORK` (optional sender name)
 - `AMAZON_LEO_SMS_ENABLED=true`
 - `AMAZON_LEO_SMS_PROVIDER=semaphore`
+- `EMAIL_VERIFICATION_ENABLED=true`
+- `SMTP_HOST=<smtp-host>`
+- `SMTP_PORT=587`
+- `SMTP_SECURE=false` (set `true` for SSL ports such as 465)
+- `SMTP_USER=<smtp-username>`
+- `SMTP_PASS=<smtp-password>`
+- `SMTP_ALLOW_UNAUTH=false` (set `true` only for trusted relay without auth)
+- `SMTP_FROM_EMAIL=<no-reply@your-domain.com>`
+- `SMTP_FROM_NAME=CYNETWORK PISOWIFI`
+- `EMAIL_CODE_TTL_MINUTES=10`
+- `EMAIL_CODE_RESEND_COOLDOWN_SECONDS=60`
+- `EMAIL_CODE_MAX_ATTEMPTS=5`
 
 ### 3.1 Initialize Supabase schema before first deploy
 - Open Supabase Dashboard -> SQL Editor.

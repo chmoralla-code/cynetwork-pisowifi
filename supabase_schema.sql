@@ -56,6 +56,23 @@ CREATE TABLE IF NOT EXISTS client_accounts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Client email verification codes table
+CREATE TABLE IF NOT EXISTS client_email_verification_codes (
+    email TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    code_digest TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    consumed_at TEXT,
+    verified_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_email_codes_lookup
+    ON client_email_verification_codes (email, purpose, consumed_at, created_at);
+
 -- Referral rewards table
 CREATE TABLE IF NOT EXISTS referral_rewards (
     id BIGSERIAL PRIMARY KEY,

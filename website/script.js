@@ -44,13 +44,16 @@ const ADDING_EAP_PACKAGE = {
 };
 
 const packages = {
-    1: { name: 'Starter', price: 5800, duration: '1 Year License | 50 Meters' },
-    2: { name: 'Professional', price: 8500, duration: '3 Years License | 100 Meters' },
-    3: { name: 'Enterprise', price: 11000, duration: 'LIFETIME LICENSE | 250 Meters' }
+    1: { name: 'Starter', price: 5800, originalPrice: 7500, duration: '1 Year License | 50 Meters' },
+    2: { name: 'Professional', price: 8500, originalPrice: 10000, duration: '3 Years License | 100 Meters' },
+    3: { name: 'Enterprise', price: 11000, originalPrice: 15000, duration: 'LIFETIME LICENSE | 250 Meters' }
 };
 
 const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
 const CLIENT_AUTH_STORAGE_KEY = 'cynetworkClientAuth';
+const EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS = 60;
+const EMAIL_CODE_REGEX = /^\d{6}$/;
+const emailCodeCooldownIntervals = {};
 
 function formatMoney(value) {
     const numeric = Number(value || 0);
@@ -548,6 +551,185 @@ async function refreshClientAccountSummary(silent = false) {
     }
 }
 
+function toggleAccountPasswordVisibility(inputId, toggleButtonId, ariaLabelPrefix) {
+    const passwordInput = document.getElementById(inputId);
+    const toggleButton = document.getElementById(toggleButtonId);
+
+    if (!passwordInput || !toggleButton) {
+        return;
+    }
+
+    const shouldShowPassword = passwordInput.type === 'password';
+    passwordInput.type = shouldShowPassword ? 'text' : 'password';
+    toggleButton.textContent = shouldShowPassword ? 'Hide' : 'Show';
+    toggleButton.setAttribute(
+        'aria-label',
+        `${shouldShowPassword ? 'Hide' : 'Show'} ${ariaLabelPrefix}`
+    );
+}
+
+function toggleRegisterPasswordVisibility() {
+    toggleAccountPasswordVisibility(
+        'clientRegisterPassword',
+        'clientRegisterPasswordToggle',
+        'register password'
+    );
+}
+
+function toggleRegisterConfirmPasswordVisibility() {
+    toggleAccountPasswordVisibility(
+        'clientRegisterConfirmPassword',
+        'clientRegisterConfirmPasswordToggle',
+        'confirm password'
+    );
+}
+
+function resetRegisterPasswordToggles() {
+    const registerPasswordInput = document.getElementById('clientRegisterPassword');
+    const registerPasswordToggle = document.getElementById('clientRegisterPasswordToggle');
+    const registerConfirmPasswordInput = document.getElementById('clientRegisterConfirmPassword');
+    const registerConfirmPasswordToggle = document.getElementById('clientRegisterConfirmPasswordToggle');
+
+    if (registerPasswordInput) {
+        registerPasswordInput.type = 'password';
+    }
+    if (registerPasswordToggle) {
+        registerPasswordToggle.textContent = 'Show';
+        registerPasswordToggle.setAttribute('aria-label', 'Show register password');
+    }
+
+    if (registerConfirmPasswordInput) {
+        registerConfirmPasswordInput.type = 'password';
+    }
+    if (registerConfirmPasswordToggle) {
+        registerConfirmPasswordToggle.textContent = 'Show';
+        registerConfirmPasswordToggle.setAttribute('aria-label', 'Show confirm password');
+    }
+}
+
+function resetEmailCodeButton(buttonId) {
+    const button = document.getElementById(buttonId);
+    if (!button) {
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    button.disabled = false;
+    button.textContent = 'Send Code';
+}
+
+function startEmailCodeCooldown(buttonId, cooldownSeconds) {
+    const button = document.getElementById(buttonId);
+    if (!button) {
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    let remainingSeconds = Math.max(
+        1,
+        Number.isFinite(Number(cooldownSeconds))
+            ? Math.round(Number(cooldownSeconds))
+            : EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS
+    );
+
+    button.disabled = true;
+    button.textContent = `Resend (${remainingSeconds}s)`;
+
+    emailCodeCooldownIntervals[buttonId] = window.setInterval(() => {
+        remainingSeconds -= 1;
+
+        if (remainingSeconds <= 0) {
+            resetEmailCodeButton(buttonId);
+            return;
+        }
+
+        button.textContent = `Resend (${remainingSeconds}s)`;
+    }, 1000);
+}
+
+async function sendClientEmailVerificationCode({ purpose, email, fullName = '', buttonId }) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+        setClientAuthMessage('Please enter your email address first.', 'error');
+        return;
+    }
+
+    const button = document.getElementById(buttonId);
+    const previousButtonLabel = button?.textContent || 'Send Code';
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Sending...';
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/send-email-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                purpose,
+                email: normalizedEmail,
+                fullName
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            if (button) {
+                button.disabled = false;
+                button.textContent = previousButtonLabel;
+            }
+
+            setClientAuthMessage(result.error || 'Unable to send verification code right now.', 'error');
+            return;
+        }
+
+        const cooldownSeconds = Number(result.cooldownSeconds || EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS);
+        startEmailCodeCooldown(buttonId, cooldownSeconds);
+        setClientAuthMessage(result.message || 'Verification code sent successfully.', 'success');
+    } catch (error) {
+        if (button) {
+            button.disabled = false;
+            button.textContent = previousButtonLabel;
+        }
+
+        setClientAuthMessage('Unable to send verification code right now. Please try again later.', 'error');
+    }
+}
+
+function sendRegisterVerificationCode() {
+    const fullName = document.getElementById('clientRegisterName')?.value?.trim() || '';
+    const email = document.getElementById('clientRegisterEmail')?.value?.trim()?.toLowerCase() || '';
+
+    return sendClientEmailVerificationCode({
+        purpose: 'register',
+        email,
+        fullName,
+        buttonId: 'sendRegisterCodeBtn'
+    });
+}
+
+function sendRecoverVerificationCode() {
+    const fullName = document.getElementById('clientRecoverName')?.value?.trim() || '';
+    const email = document.getElementById('clientRecoverEmail')?.value?.trim()?.toLowerCase() || '';
+
+    return sendClientEmailVerificationCode({
+        purpose: 'forgot_password',
+        email,
+        fullName,
+        buttonId: 'sendRecoverCodeBtn'
+    });
+}
+
 async function handleClientLogin(event) {
     event.preventDefault();
 
@@ -589,12 +771,18 @@ async function handleClientRegister(event) {
     const fullName = document.getElementById('clientRegisterName').value.trim();
     const contactNumber = document.getElementById('clientRegisterContact').value.trim();
     const email = document.getElementById('clientRegisterEmail').value.trim().toLowerCase();
+    const verificationCode = document.getElementById('clientRegisterVerificationCode').value.trim();
     const password = document.getElementById('clientRegisterPassword').value;
     const confirmPassword = document.getElementById('clientRegisterConfirmPassword').value;
     const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
 
-    if (!fullName || !email || !password) {
-        setClientAuthMessage('Full name, email, and password are required.', 'error');
+    if (!fullName || !email || !verificationCode || !password) {
+        setClientAuthMessage('Full name, email, verification code, and password are required.', 'error');
+        return;
+    }
+
+    if (!EMAIL_CODE_REGEX.test(verificationCode)) {
+        setClientAuthMessage('Please enter the 6-digit verification code from your email.', 'error');
         return;
     }
 
@@ -611,6 +799,7 @@ async function handleClientRegister(event) {
                 fullName,
                 contactNumber,
                 email,
+                verificationCode,
                 password,
                 confirmPassword,
                 referralCode: referralCode || null
@@ -629,6 +818,8 @@ async function handleClientRegister(event) {
         setClientAuthMessage('Account created successfully. Share your referral link to earn PHP 100 per successful invite.', 'success');
 
         document.getElementById('clientRegisterForm').reset();
+        resetRegisterPasswordToggles();
+        resetEmailCodeButton('sendRegisterCodeBtn');
     } catch (error) {
         setClientAuthMessage('Unable to register right now. Please try again later.', 'error');
     }
@@ -639,11 +830,17 @@ async function handleClientRecoverPassword(event) {
 
     const fullName = document.getElementById('clientRecoverName').value.trim();
     const email = document.getElementById('clientRecoverEmail').value.trim().toLowerCase();
+    const verificationCode = document.getElementById('clientRecoverVerificationCode').value.trim();
     const newPassword = document.getElementById('clientRecoverPassword').value;
     const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
 
-    if (!fullName || !email || !newPassword || !confirmNewPassword) {
-        setClientAuthMessage('Please complete all reset password fields.', 'error');
+    if (!fullName || !email || !verificationCode || !newPassword || !confirmNewPassword) {
+        setClientAuthMessage('Please complete all reset password fields including verification code.', 'error');
+        return;
+    }
+
+    if (!EMAIL_CODE_REGEX.test(verificationCode)) {
+        setClientAuthMessage('Please enter the 6-digit verification code from your email.', 'error');
         return;
     }
 
@@ -664,6 +861,7 @@ async function handleClientRecoverPassword(event) {
             body: JSON.stringify({
                 fullName,
                 email,
+                verificationCode,
                 newPassword,
                 confirmPassword: confirmNewPassword
             })
@@ -676,6 +874,7 @@ async function handleClientRecoverPassword(event) {
         }
 
         document.getElementById('clientRecoverForm').reset();
+        resetEmailCodeButton('sendRecoverCodeBtn');
         setClientAuthMessage(result.message || 'Password reset successful. You can now login.', 'success');
         switchAccountTab('login');
     } catch (error) {
@@ -782,6 +981,10 @@ function initClientAccountFeatures() {
     const registerForm = document.getElementById('clientRegisterForm');
     const recoverForm = document.getElementById('clientRecoverForm');
     const redeemForm = document.getElementById('referralRedeemForm');
+
+    resetRegisterPasswordToggles();
+    resetEmailCodeButton('sendRegisterCodeBtn');
+    resetEmailCodeButton('sendRecoverCodeBtn');
 
     if (loginForm && loginForm.dataset.bound !== 'true') {
         loginForm.addEventListener('submit', handleClientLogin);
@@ -2608,7 +2811,7 @@ async function generateSupportReply(userMessage) {
     }
 
     if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our current package prices (per piece):\n\n1) Starter - PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
+        return `Here are our SALE package prices (per piece):\n\n1) Starter - from PHP ${formatMoney(packages[1].originalPrice)} to PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - from PHP ${formatMoney(packages[2].originalPrice)} to PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - from PHP ${formatMoney(packages[3].originalPrice)} to PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
     if (hasKeyword(text, ['amazon leo', 'leo package'])) {
