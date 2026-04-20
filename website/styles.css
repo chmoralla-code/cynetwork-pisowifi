@@ -1141,6 +1141,22 @@ body {
     display: grid;
 }
 
+.account-inline-action {
+    margin-top: 0.55rem;
+    border: none;
+    background: transparent;
+    color: var(--accent-red);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-align: left;
+    padding: 0;
+    cursor: pointer;
+}
+
+.account-inline-action:hover {
+    text-decoration: underline;
+}
+
 .account-summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

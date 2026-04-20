@@ -25,7 +25,8 @@ const renderedSupportMessageIds = new Set();
 
 const API_URL = '/api';
 const FREE_SHIPPING_FEE = 0;
-const REFERRAL_REDEEM_VAT_PHP = 15;
+const REFERRAL_REDEEM_DEDUCTION_RATE = 0.10;
+const REFERRAL_REDEEM_DEDUCTION_PERCENT = Math.round(REFERRAL_REDEEM_DEDUCTION_RATE * 100);
 const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
 const AMAZON_LEO_RESERVATION_NOTICE = 'OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!';
 const ADDING_EAP_APPROVAL_NOTICE = 'approval will be within 24 hours business days';
@@ -208,7 +209,7 @@ function normalizeGcashNumber(value) {
 
 function getRedeemComputation() {
     const gross = Number(clientAccount?.referralBalance || 0);
-    const vat = REFERRAL_REDEEM_VAT_PHP;
+    const vat = Math.max(0, Math.round(gross * REFERRAL_REDEEM_DEDUCTION_RATE));
     const net = Math.max(0, gross - vat);
     const canRedeem = Boolean(clientAccount && clientAuthToken && net > 0);
 
@@ -462,7 +463,7 @@ function updateClientAccountUi() {
 }
 
 function switchAccountTab(tabName) {
-    const validTabs = ['login', 'register', 'dashboard'];
+    const validTabs = ['login', 'register', 'recover', 'dashboard'];
     const safeTab = validTabs.includes(tabName) ? tabName : 'login';
 
     validTabs.forEach((tab) => {
@@ -589,10 +590,16 @@ async function handleClientRegister(event) {
     const contactNumber = document.getElementById('clientRegisterContact').value.trim();
     const email = document.getElementById('clientRegisterEmail').value.trim().toLowerCase();
     const password = document.getElementById('clientRegisterPassword').value;
+    const confirmPassword = document.getElementById('clientRegisterConfirmPassword').value;
     const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
 
     if (!fullName || !email || !password) {
         setClientAuthMessage('Full name, email, and password are required.', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        setClientAuthMessage('Password and confirm password do not match.', 'error');
         return;
     }
 
@@ -605,6 +612,7 @@ async function handleClientRegister(event) {
                 contactNumber,
                 email,
                 password,
+                confirmPassword,
                 referralCode: referralCode || null
             })
         });
@@ -626,6 +634,55 @@ async function handleClientRegister(event) {
     }
 }
 
+async function handleClientRecoverPassword(event) {
+    event.preventDefault();
+
+    const fullName = document.getElementById('clientRecoverName').value.trim();
+    const email = document.getElementById('clientRecoverEmail').value.trim().toLowerCase();
+    const newPassword = document.getElementById('clientRecoverPassword').value;
+    const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
+
+    if (!fullName || !email || !newPassword || !confirmNewPassword) {
+        setClientAuthMessage('Please complete all reset password fields.', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        setClientAuthMessage('New password must be at least 6 characters.', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+        setClientAuthMessage('New password and confirm password do not match.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fullName,
+                email,
+                newPassword,
+                confirmPassword: confirmNewPassword
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Password reset failed. Please try again.', 'error');
+            return;
+        }
+
+        document.getElementById('clientRecoverForm').reset();
+        setClientAuthMessage(result.message || 'Password reset successful. You can now login.', 'success');
+        switchAccountTab('login');
+    } catch (error) {
+        setClientAuthMessage('Unable to reset password right now. Please try again later.', 'error');
+    }
+}
+
 async function handleReferralRedeem(event) {
     event.preventDefault();
 
@@ -637,7 +694,7 @@ async function handleReferralRedeem(event) {
 
     const { canRedeem } = getRedeemComputation();
     if (!canRedeem) {
-        setRedeemNotice('Your current referral balance is not enough to redeem after the PHP 15 VAT deduction.', 'error');
+        setRedeemNotice(`Your current referral balance is not enough to redeem after the ${REFERRAL_REDEEM_DEDUCTION_PERCENT}% deduction.`, 'error');
         return;
     }
 
@@ -723,6 +780,7 @@ function initClientAccountFeatures() {
 
     const loginForm = document.getElementById('clientLoginForm');
     const registerForm = document.getElementById('clientRegisterForm');
+    const recoverForm = document.getElementById('clientRecoverForm');
     const redeemForm = document.getElementById('referralRedeemForm');
 
     if (loginForm && loginForm.dataset.bound !== 'true') {
@@ -733,6 +791,11 @@ function initClientAccountFeatures() {
     if (registerForm && registerForm.dataset.bound !== 'true') {
         registerForm.addEventListener('submit', handleClientRegister);
         registerForm.dataset.bound = 'true';
+    }
+
+    if (recoverForm && recoverForm.dataset.bound !== 'true') {
+        recoverForm.addEventListener('submit', handleClientRecoverPassword);
+        recoverForm.dataset.bound = 'true';
     }
 
     if (redeemForm && redeemForm.dataset.bound !== 'true') {
