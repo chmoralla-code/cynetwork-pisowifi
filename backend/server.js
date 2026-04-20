@@ -705,13 +705,13 @@ function buildClientEmailCodeEmailContent({ recipientName = 'Client', purpose, c
         : 'reset your CYNETWORK account password';
 
     const subject = safePurpose === EMAIL_CODE_PURPOSE_REGISTER
-        ? 'CYNETWORK Registration Verification Code'
-        : 'CYNETWORK Password Reset Verification Code';
+        ? 'CYNETWORK Registration OTP'
+        : 'CYNETWORK Password Reset OTP';
 
     const text = [
         `Hi ${safeRecipientName},`,
         '',
-        `Use this verification code to ${actionText}: ${safeCode}`,
+        `Use this OTP to ${actionText}: ${safeCode}`,
         `This code expires in ${expiresText}.`,
         '',
         'If you did not request this code, you can ignore this email.',
@@ -721,7 +721,7 @@ function buildClientEmailCodeEmailContent({ recipientName = 'Client', purpose, c
 
     const html = [
         `<p>Hi ${escapeHtml(safeRecipientName)},</p>`,
-        `<p>Use this verification code to ${escapeHtml(actionText)}:</p>`,
+        `<p>Use this OTP to ${escapeHtml(actionText)}:</p>`,
         `<p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; margin: 14px 0;">${escapeHtml(safeCode)}</p>`,
         `<p>This code expires in <strong>${escapeHtml(expiresText)}</strong>.</p>`,
         '<p>If you did not request this code, you can ignore this email.</p>',
@@ -738,7 +738,7 @@ function buildClientEmailCodeEmailContent({ recipientName = 'Client', purpose, c
 async function sendClientEmailCode({ email, fullName = '', purpose, code }) {
     const transporter = getClientEmailTransporter();
     if (!transporter) {
-        throw createHttpError(503, 'Email verification is not configured yet. Please contact support.');
+        throw createHttpError(503, 'Email OTP is not configured yet. Please contact support.');
     }
 
     const { subject, text, html } = buildClientEmailCodeEmailContent({
@@ -807,7 +807,7 @@ async function requestClientEmailVerificationCode({ email, purpose, fullName = '
     const useDevCodeFallback = !emailDeliveryConfigured && !isProduction && ALLOW_DEV_EMAIL_CODE_FALLBACK;
 
     if (!emailDeliveryConfigured && !useDevCodeFallback) {
-        throw createHttpError(503, 'Email verification is not configured yet. Please contact support.');
+        throw createHttpError(503, 'Email OTP is not configured yet. Please contact support.');
     }
 
     await ensureClientEmailCodeSchema();
@@ -927,7 +927,7 @@ async function verifyClientEmailVerificationCode({ email, purpose, code }) {
     }
 
     if (!/^\d{6}$/.test(normalizedCode)) {
-        throw createHttpError(400, 'Please enter the 6-digit verification code sent to your email.');
+        throw createHttpError(400, 'Please enter the 6-digit OTP sent to your email.');
     }
 
     await ensureClientEmailCodeSchema();
@@ -942,7 +942,7 @@ async function verifyClientEmailVerificationCode({ email, purpose, code }) {
     );
 
     if (!codeRow) {
-        throw createHttpError(400, 'Please request a verification code first.');
+        throw createHttpError(400, 'Please request an OTP first.');
     }
 
     const expiryMs = Date.parse(codeRow.expires_at);
@@ -955,7 +955,7 @@ async function verifyClientEmailVerificationCode({ email, purpose, code }) {
             [normalizedEmail, normalizedPurpose]
         );
 
-        throw createHttpError(400, 'Verification code expired. Please request a new code.');
+        throw createHttpError(400, 'OTP expired. Please request a new OTP.');
     }
 
     const currentAttempts = Number(codeRow.attempt_count || 0);
@@ -977,7 +977,7 @@ async function verifyClientEmailVerificationCode({ email, purpose, code }) {
                 [nextAttemptCount, normalizedEmail, normalizedPurpose]
             );
 
-            throw createHttpError(400, 'Too many invalid attempts. Please request a new verification code.');
+            throw createHttpError(400, 'Too many invalid attempts. Please request a new OTP.');
         }
 
         await sqliteRunAsync(
@@ -989,7 +989,7 @@ async function verifyClientEmailVerificationCode({ email, purpose, code }) {
         );
 
         const attemptsLeft = Math.max(0, maxAttempts - nextAttemptCount);
-        throw createHttpError(400, `Invalid verification code. ${attemptsLeft} attempt(s) remaining.`);
+        throw createHttpError(400, `Invalid OTP. ${attemptsLeft} attempt(s) remaining.`);
     }
 
     await sqliteRunAsync(
@@ -2492,13 +2492,13 @@ app.post('/api/admin/change-password', verifyToken, (req, res) => {
 // CLIENT ACCOUNT & REFERRAL ROUTES
 // =====================================================
 
-app.post('/api/client/send-email-code', async (req, res) => {
+const handleClientSendOtpRequest = async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const fullName = String(req.body.fullName || '').trim();
     const purpose = normalizeEmailVerificationPurpose(req.body.purpose);
 
     if (!purpose) {
-        return res.status(400).json({ error: 'Valid verification purpose is required.' });
+        return res.status(400).json({ error: 'Valid OTP purpose is required.' });
     }
 
     try {
@@ -2514,8 +2514,8 @@ app.post('/api/client/send-email-code', async (req, res) => {
 
         const isDevFallback = codeResult.deliveryMethod === 'development-fallback';
         const message = isDevFallback
-            ? `SMTP is not configured. Development fallback is active for ${actionText}. Use code: ${codeResult.previewCode}`
-            : `Verification code sent to ${codeResult.maskedEmail} for ${actionText}.`;
+            ? `SMTP is not configured. Development fallback is active for ${actionText}. Use OTP: ${codeResult.previewCode}`
+            : `OTP sent to ${codeResult.maskedEmail} for ${actionText}.`;
 
         res.json({
             success: true,
@@ -2531,12 +2531,16 @@ app.post('/api/client/send-email-code', async (req, res) => {
         const statusCode = Number(error?.statusCode || 500);
         if (statusCode >= 500 && statusCode !== 503) {
             console.error('Failed sending client email code:', error.message || error);
-            return res.status(500).json({ error: 'Failed to send verification code right now. Please try again.' });
+            return res.status(500).json({ error: 'Failed to send OTP right now. Please try again.' });
         }
 
-        return res.status(statusCode).json({ error: error.message || 'Unable to send verification code.' });
+        return res.status(statusCode).json({ error: error.message || 'Unable to send OTP.' });
     }
-});
+};
+
+app.post('/api/client/send-otp', handleClientSendOtpRequest);
+// Legacy alias kept for backwards compatibility.
+app.post('/api/client/send-email-code', handleClientSendOtpRequest);
 
 app.post('/api/client/register', (req, res) => {
     const fullName = String(req.body.fullName || '').trim();
@@ -2552,7 +2556,7 @@ app.post('/api/client/register', (req, res) => {
     }
 
     if (!verificationCode) {
-        return res.status(400).json({ error: 'Email verification code is required' });
+        return res.status(400).json({ error: 'Email OTP is required' });
     }
 
     if (password !== confirmPassword) {
@@ -2643,7 +2647,7 @@ app.post('/api/client/register', (req, res) => {
             .catch((verifyError) => {
                 const statusCode = Number(verifyError?.statusCode || 400);
                 return res.status(statusCode).json({
-                    error: verifyError?.message || 'Invalid verification code'
+                    error: verifyError?.message || 'Invalid OTP'
                 });
             });
     };
@@ -2716,7 +2720,7 @@ app.post('/api/client/forgot-password', (req, res) => {
 
     if (!fullName || !email || !newPassword || !confirmPassword || !verificationCode) {
         return res.status(400).json({
-            error: 'Full name, email, verification code, new password, and confirm password are required'
+            error: 'Full name, email, OTP, new password, and confirm password are required'
         });
     }
 
@@ -2787,7 +2791,7 @@ app.post('/api/client/forgot-password', (req, res) => {
                 .catch((verifyError) => {
                     const statusCode = Number(verifyError?.statusCode || 400);
                     return res.status(statusCode).json({
-                        error: verifyError?.message || 'Invalid verification code'
+                        error: verifyError?.message || 'Invalid OTP'
                     });
                 });
         }
@@ -4257,6 +4261,7 @@ startupReady.finally(() => {
     API Endpoints:
     POST   /api/login
     POST   /api/admin/change-password
+    POST   /api/client/send-otp
     POST   /api/client/send-email-code
     POST   /api/client/register
     POST   /api/client/login

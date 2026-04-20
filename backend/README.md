@@ -129,10 +129,11 @@ http://localhost:3000/
 - `POST /api/login` - Admin login
 
 ### Client Account & Verification
-- `POST /api/client/send-email-code` - Send 6-digit verification code for register/forgot password
-- `POST /api/client/register` - Register client account (requires email verification code)
+- `POST /api/client/send-otp` - Send 6-digit OTP for register/forgot password
+- `POST /api/client/send-email-code` - Legacy alias for send OTP
+- `POST /api/client/register` - Register client account (requires email OTP)
 - `POST /api/client/login` - Login client account
-- `POST /api/client/forgot-password` - Reset password (requires email verification code)
+- `POST /api/client/forgot-password` - Reset password (requires email OTP)
 - `GET /api/client/me` - Get current client profile
 - `GET /api/client/referral/:code` - Validate referral code
 - `GET /api/client/redemptions` - Get referral redemption history
@@ -216,7 +217,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SMTP_ALLOW_UNAUTH=false` (set `true` only for trusted relay without auth)
 - `SMTP_FROM_EMAIL=<no-reply@your-domain.com>`
 - `SMTP_FROM_NAME=CYNETWORK PISOWIFI`
-- `ALLOW_DEV_EMAIL_CODE_FALLBACK=true` (local/dev only; allows testing with preview code when SMTP is not configured)
+- `ALLOW_DEV_EMAIL_CODE_FALLBACK=true` (local/dev only; allows testing with preview OTP when SMTP is not configured)
 - `EMAIL_CODE_TTL_MINUTES=10`
 - `EMAIL_CODE_RESEND_COOLDOWN_SECONDS=60`
 - `EMAIL_CODE_MAX_ATTEMPTS=5`
