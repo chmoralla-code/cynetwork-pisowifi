@@ -30,6 +30,8 @@ services:
         value: /var/data/pisowifi-admin.db
       - key: UPLOADS_DIR
         value: /var/data/package-images
+      - key: STARTUP_READY_TIMEOUT_MS
+        value: "15000"
     disk:
       name: cynetwork-data
       mountPath: /var/data

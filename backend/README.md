@@ -181,6 +181,10 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 ### 3. Production environment values
 - `NODE_ENV=production`
 - `JWT_SECRET` is auto-generated in the blueprint and kept stable across redeploys (`sync: false`).
+- `SUPABASE_URL=https://<project-ref>.supabase.co`
+- `SUPABASE_ANON_KEY=<supabase-publishable-key>`
+- `SUPABASE_DB_URL=<supabase-postgres-connection-string>` (prefer the IPv4 pooler URL with `sslmode=require`)
+- `STARTUP_READY_TIMEOUT_MS=15000` (optional startup gate timeout in milliseconds)
 - `ACCOUNT_BACKUP_MONGODB_URI=<mongodb-connection-string>` (recommended for account durability even if the web service/disk is recreated)
 - `ACCOUNT_BACKUP_MONGODB_DB=cynetwork_pisowifi` (optional)
 - `ACCOUNT_BACKUP_MONGODB_COLLECTION=client_account_backups` (optional)
@@ -192,6 +196,11 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SEMAPHORE_SENDER_NAME=CYNETWORK` (optional sender name)
 - `AMAZON_LEO_SMS_ENABLED=true`
 - `AMAZON_LEO_SMS_PROVIDER=semaphore`
+
+### 3.1 Initialize Supabase schema before first deploy
+- Open Supabase Dashboard -> SQL Editor.
+- Run `../supabase_schema.sql` once so all required tables exist.
+- Confirm the `admins` table has a default row or create one manually if needed.
 
 ### 4. Persistent storage
 - Render mounts a persistent disk at `/var/data`.
