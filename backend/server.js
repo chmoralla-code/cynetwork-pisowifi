@@ -2579,6 +2579,12 @@ app.post('/api/submit-order', (req, res) => {
 
     const optionalClientAuth = getOptionalClientAuth(req);
     const clientAccountId = optionalClientAuth?.id ? Number(optionalClientAuth.id) : null;
+
+    if (!clientAccountId) {
+        return res.status(401).json({
+            error: 'Please register or login to your client account before placing an order'
+        });
+    }
     
     let proofBuffer = null;
     
@@ -2682,11 +2688,6 @@ app.post('/api/submit-order', (req, res) => {
         );
     };
 
-    if (!clientAccountId) {
-        insertOrderRow(null);
-        return;
-    }
-
     db.get(
         `SELECT id, referred_by_code
          FROM client_accounts
@@ -2695,11 +2696,16 @@ app.post('/api/submit-order', (req, res) => {
         (accountErr, accountRow) => {
             if (accountErr) {
                 console.error('Client account lookup error:', accountErr.message);
-                insertOrderRow(null);
-                return;
+                return res.status(500).json({ error: 'Failed to validate client account' });
             }
 
-            insertOrderRow(accountRow || null);
+            if (!accountRow) {
+                return res.status(401).json({
+                    error: 'Client account session is invalid. Please login again.'
+                });
+            }
+
+            insertOrderRow(accountRow);
         }
     );
 });

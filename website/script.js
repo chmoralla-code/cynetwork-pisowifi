@@ -248,7 +248,77 @@ function updateCheckoutAccountNotice() {
     }
 
     notice.style.display = 'block';
-    notice.textContent = 'Tip: Create or login to a client account to get your own referral code and earn PHP 100 per successful invite purchase.';
+    notice.textContent = 'Account required: Please register or login to your client account before placing any order.';
+}
+
+function hasAuthenticatedClientAccount() {
+    return Boolean(clientAuthToken && clientAccount && (clientAccount.id || clientAccount.email));
+}
+
+function requireClientAccountForPurchase(actionLabel = 'place an order') {
+    if (hasAuthenticatedClientAccount()) {
+        return true;
+    }
+
+    setClientAuthMessage(`Please register or login first to ${actionLabel}.`, 'error');
+    openAccountModal('register');
+    return false;
+}
+
+function closeMobileNavigationMenu() {
+    const navMenu = document.getElementById('mainNavMenu');
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+
+    if (navMenu) {
+        navMenu.classList.remove('open');
+    }
+
+    if (mobileToggle) {
+        mobileToggle.setAttribute('aria-expanded', 'false');
+        mobileToggle.textContent = '☰';
+    }
+}
+
+function initMobileNavigation() {
+    const navMenu = document.getElementById('mainNavMenu');
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+
+    if (!navMenu || !mobileToggle || mobileToggle.dataset.bound === 'true') {
+        return;
+    }
+
+    mobileToggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isOpen = navMenu.classList.toggle('open');
+        mobileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        mobileToggle.textContent = isOpen ? '✕' : '☰';
+    });
+
+    navMenu.querySelectorAll('a, button').forEach((item) => {
+        item.addEventListener('click', () => {
+            closeMobileNavigationMenu();
+        });
+    });
+
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            closeMobileNavigationMenu();
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!navMenu.classList.contains('open')) {
+            return;
+        }
+
+        if (navMenu.contains(event.target) || mobileToggle.contains(event.target)) {
+            return;
+        }
+
+        closeMobileNavigationMenu();
+    });
+
+    mobileToggle.dataset.bound = 'true';
 }
 
 function saveClientSession(token, account) {
@@ -414,6 +484,8 @@ function openAccountModal(preferredTab = '') {
     if (!modal) {
         return;
     }
+
+    closeMobileNavigationMenu();
 
     modal.classList.add('show');
 
@@ -680,6 +752,10 @@ function initClientAccountFeatures() {
 // =====================================================
 
 function selectPackage(packageNum) {
+    if (!requireClientAccountForPurchase('buy a package')) {
+        return;
+    }
+
     selectedPackage = packageNum;
     const packageData = packages[packageNum];
     selectedUnitPrice = Number(packageData?.price || 0);
@@ -756,6 +832,23 @@ function recalculateSelectedTotal({ refreshQr = true } = {}) {
 
 function handleQuantityChange() {
     recalculateSelectedTotal({ refreshQr: true });
+}
+
+function toggleWifiPasswordVisibility() {
+    const passwordInput = document.getElementById('wifiPassword');
+    const toggleButton = document.getElementById('wifiPasswordToggle');
+
+    if (!passwordInput || !toggleButton) {
+        return;
+    }
+
+    const shouldShowPassword = passwordInput.type === 'password';
+    passwordInput.type = shouldShowPassword ? 'text' : 'password';
+    toggleButton.textContent = shouldShowPassword ? 'Hide' : 'Show';
+    toggleButton.setAttribute(
+        'aria-label',
+        shouldShowPassword ? 'Hide WiFi password' : 'Show WiFi password'
+    );
 }
 
 // =====================================================
@@ -861,6 +954,10 @@ function validatePersonalInfo() {
 // =====================================================
 
 async function completeTransaction() {
+    if (!requireClientAccountForPurchase('place a package order')) {
+        return;
+    }
+
     if (!selectedPackage || !packages[selectedPackage]) {
         alert('Please select a package first.');
         return;
@@ -1069,6 +1166,18 @@ function resetForm() {
     document.getElementById('address').value = '';
     document.getElementById('wifiName').value = '';
     document.getElementById('wifiPassword').value = '';
+
+    const wifiPasswordInput = document.getElementById('wifiPassword');
+    if (wifiPasswordInput) {
+        wifiPasswordInput.type = 'password';
+    }
+
+    const wifiPasswordToggle = document.getElementById('wifiPasswordToggle');
+    if (wifiPasswordToggle) {
+        wifiPasswordToggle.textContent = 'Show';
+        wifiPasswordToggle.setAttribute('aria-label', 'Show WiFi password');
+    }
+
     document.getElementById('wifiRate').value = '';
     document.getElementById('proofImage').value = '';
     document.getElementById('uploadPreview').innerHTML = '';
@@ -1170,6 +1279,10 @@ function resetAmazonLeoReservationForm() {
 }
 
 function openAmazonLeoReservationModal() {
+    if (!requireClientAccountForPurchase('reserve Amazon LEO')) {
+        return;
+    }
+
     const modal = document.getElementById('amazonLeoModal');
     if (!modal) {
         return;
@@ -1193,6 +1306,10 @@ function closeAmazonLeoReservationModal() {
 }
 
 async function submitAmazonLeoReservation() {
+    if (!requireClientAccountForPurchase('submit Amazon LEO reservation')) {
+        return;
+    }
+
     const quantity = normalizeQuantity(document.getElementById('amazonLeoQuantity')?.value || 1);
     const fullName = document.getElementById('amazonLeoFullName')?.value?.trim() || '';
     const contactNumber = document.getElementById('amazonLeoContactNumber')?.value?.trim() || '';
@@ -1380,6 +1497,10 @@ function resetAddingEapForm() {
 }
 
 function openAddingEapModal() {
+    if (!requireClientAccountForPurchase('buy ADDING EAP')) {
+        return;
+    }
+
     const modal = document.getElementById('addingEapModal');
     if (!modal) {
         return;
@@ -1440,6 +1561,10 @@ function handleAddingEapProofUpload(event) {
 }
 
 async function submitAddingEapTransaction() {
+    if (!requireClientAccountForPurchase('submit ADDING EAP transaction')) {
+        return;
+    }
+
     const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
     const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
     const eapPassword = document.getElementById('addingEapPassword')?.value?.trim() || '';
@@ -2464,6 +2589,7 @@ async function generateSupportReply(userMessage) {
 
 // Close picture modal when clicking outside
 document.addEventListener('DOMContentLoaded', function() {
+    initMobileNavigation();
     initPackageImagesFromServer();
     applySavedCustomerDetailsToForm();
     initClientAccountFeatures();

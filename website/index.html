@@ -6,7 +6,7 @@
     <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
     <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
     <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
-    <link rel="stylesheet" href="styles.css?v=20260419-7">
+    <link rel="stylesheet" href="styles.css?v=20260420-4">
 </head>
 <body>
     <!-- Navigation -->
@@ -17,7 +17,17 @@
                 <span class="logo-text">CYNETWORK</span>
                 <span class="logo-subtext">PISOWIFI</span>
             </div>
-            <ul class="nav-menu">
+            <button
+                id="mobileMenuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-label="Toggle navigation menu"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+            >
+                ☰
+            </button>
+            <ul id="mainNavMenu" class="nav-menu">
                 <li><a href="#home" class="nav-link">Home</a></li>
                 <li><a href="#packages" class="nav-link">Packages</a></li>
                 <li><a href="#other-offers" class="nav-link">Other Offers</a></li>
@@ -333,7 +343,18 @@
                     
                     <div class="form-group">
                         <label for="wifiPassword">WiFi Password *</label>
-                        <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                        <div class="password-input-wrap">
+                            <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                            <button
+                                type="button"
+                                id="wifiPasswordToggle"
+                                class="password-toggle-btn"
+                                onclick="toggleWifiPasswordVisibility()"
+                                aria-label="Show WiFi password"
+                            >
+                                Show
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -773,6 +794,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260419-9"></script>
+    <script src="script.js?v=20260420-4"></script>
 </body>
 </html>
