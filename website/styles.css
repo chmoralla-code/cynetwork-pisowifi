@@ -383,11 +383,39 @@ body {
     margin-bottom: 1rem;
 }
 
+.package-price-wrap {
+    margin-bottom: 1.5rem;
+}
+
+.package-sale-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.42rem;
+    padding: 0.18rem 0.56rem;
+    border-radius: 999px;
+    background: #FFE6EA;
+    color: #A3162A;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
 .package-price {
     font-size: 2.5rem;
     font-weight: 700;
     color: var(--accent-red);
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
+}
+
+.package-old-price {
+    display: inline-block;
+    margin-right: 0.5rem;
+    color: #8A8A8A;
+    text-decoration: line-through;
+    font-size: 1rem;
+    font-weight: 600;
+    vertical-align: middle;
 }
 
 .package-features {
@@ -930,6 +958,40 @@ body {
 .password-toggle-btn:hover {
     border-color: var(--accent-red);
     color: var(--accent-red);
+}
+
+.verification-code-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.verification-code-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+.send-code-btn {
+    border: 1px solid #D9D9D9;
+    background: #FFFFFF;
+    color: #444;
+    border-radius: 6px;
+    padding: 0.72rem 0.85rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+
+.send-code-btn:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.send-code-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .form-hint {
@@ -1778,6 +1840,15 @@ body {
     .saved-details-helper {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .verification-code-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .send-code-btn {
+        width: 100%;
     }
 
     .account-dashboard-actions {
