@@ -1048,11 +1048,35 @@ function closeOrderModal() {
 // ORDER ACTIONS
 // =====================================================
 
+function requestTrackingNumber() {
+    const input = window.prompt('Enter tracking number for this delivery:');
+    if (input === null) {
+        return null;
+    }
+
+    const normalized = String(input).trim().toUpperCase();
+    if (!normalized) {
+        alert('Tracking number is required when setting an order to delivery.');
+        return '';
+    }
+
+    return normalized;
+}
+
 async function approveOrder() {
+    const trackingNumber = requestTrackingNumber();
+    if (trackingNumber === null || !trackingNumber) {
+        return;
+    }
+
     try {
         const response = await fetch(`${API_URL}/orders/${currentOrderId}/approve`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}` }
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ trackingNumber })
         });
         
         const data = await response.json();
@@ -1116,6 +1140,16 @@ async function submitReject() {
 }
 
 async function updateStatus(status) {
+    const payload = { status };
+
+    if (status === 'delivery') {
+        const trackingNumber = requestTrackingNumber();
+        if (trackingNumber === null || !trackingNumber) {
+            return;
+        }
+        payload.trackingNumber = trackingNumber;
+    }
+
     try {
         const response = await fetch(`${API_URL}/orders/${currentOrderId}/status`, {
             method: 'POST',
@@ -1123,7 +1157,7 @@ async function updateStatus(status) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ status })
+            body: JSON.stringify(payload)
         });
         
         const data = await response.json();

@@ -117,7 +117,9 @@ const defaultPackageImages = {
 };
 const CHAT_SESSION_STATUSES = ['ai', 'live', 'closed'];
 const REFERRAL_REWARD_PHP = 100;
-const REFERRAL_REDEEM_VAT_PHP = 15;
+const REFERRAL_REDEEM_DEDUCTION_RATE = 0.10;
+const REFERRAL_REDEEM_DEDUCTION_PERCENT = Math.round(REFERRAL_REDEEM_DEDUCTION_RATE * 100);
+const REFERRAL_REDEEM_DEFAULT_DEDUCTION_PHP = 0;
 const DEFAULT_ADMIN_USERNAME = 'admin';
 const DEFAULT_ADMIN_PASSWORD = 'admin123';
 const DEFAULT_ADMIN_PASSWORD_HASH = '$2b$10$fu/rvl3xWreWyoqF8W4SJ.uII5QybC0N9wPaj353ifmiPwbc2AUzS';
@@ -203,6 +205,14 @@ function normalizeGcashNumber(value) {
     }
 
     return '';
+}
+
+function normalizeTrackingNumber(value) {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (!normalized) {
+        return '';
+    }
+    return normalized.slice(0, 80);
 }
 
 function issueClientToken(accountId, email) {
@@ -1422,7 +1432,7 @@ async function restoreClientAccountSnapshotIfNeeded() {
                     redemption.id,
                     redemption.client_account_id,
                     Number(redemption.gross_amount || 0),
-                    Number(redemption.vat_amount || REFERRAL_REDEEM_VAT_PHP),
+                    Number(redemption.vat_amount || REFERRAL_REDEEM_DEFAULT_DEDUCTION_PHP),
                     Number(redemption.net_amount || 0),
                     redemption.gcash_name || '',
                     redemption.gcash_number || '',
@@ -1729,7 +1739,7 @@ async function initializeManagedAccountBackup() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_account_id INTEGER NOT NULL,
             gross_amount INTEGER NOT NULL,
-            vat_amount INTEGER NOT NULL DEFAULT ${REFERRAL_REDEEM_VAT_PHP},
+            vat_amount INTEGER NOT NULL DEFAULT ${REFERRAL_REDEEM_DEFAULT_DEDUCTION_PHP},
             net_amount INTEGER NOT NULL,
             gcash_name TEXT NOT NULL,
             gcash_number TEXT NOT NULL,
@@ -2030,10 +2040,15 @@ app.post('/api/client/register', (req, res) => {
     const contactNumber = String(req.body.contactNumber || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
+    const confirmPassword = String(req.body.confirmPassword || '');
     const rawReferralCode = String(req.body.referralCode || '').trim().toUpperCase();
 
     if (!fullName || !email || !password) {
         return res.status(400).json({ error: 'Full name, email, and password are required' });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'Password and confirm password do not match' });
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -2167,6 +2182,77 @@ app.post('/api/client/login', (req, res) => {
     );
 });
 
+app.post('/api/client/forgot-password', (req, res) => {
+    const fullName = String(req.body.fullName || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const newPassword = String(req.body.newPassword || '');
+    const confirmPassword = String(req.body.confirmPassword || '');
+
+    if (!fullName || !email || !newPassword || !confirmPassword) {
+        return res.status(400).json({ error: 'Full name, email, new password, and confirm password are required' });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+        return res.status(400).json({ error: 'Please provide a valid email address' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    if (newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'New password and confirm password do not match' });
+    }
+
+    db.get(
+        'SELECT id, full_name FROM client_accounts WHERE email = ?',
+        [email],
+        (lookupErr, accountRow) => {
+            if (lookupErr) {
+                return res.status(500).json({ error: 'Failed to verify account details' });
+            }
+
+            if (!accountRow) {
+                return res.status(404).json({ error: 'Account details not found' });
+            }
+
+            const isNameMatch = String(accountRow.full_name || '').trim().toLowerCase() === fullName.toLowerCase();
+            if (!isNameMatch) {
+                return res.status(404).json({ error: 'Account details not found' });
+            }
+
+            bcrypt.hash(newPassword, 10, (hashErr, hash) => {
+                if (hashErr) {
+                    return res.status(500).json({ error: 'Failed to secure new password' });
+                }
+
+                db.run(
+                    `UPDATE client_accounts
+                     SET password = ?,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ?`,
+                    [hash, accountRow.id],
+                    function(updateErr) {
+                        if (updateErr) {
+                            return res.status(500).json({ error: 'Failed to update account password' });
+                        }
+
+                        if (!this.changes) {
+                            return res.status(404).json({ error: 'Account not found' });
+                        }
+
+                        queueClientAccountBackup('client-forgot-password');
+                        res.json({
+                            success: true,
+                            message: 'Password reset successful. You can now login.'
+                        });
+                    }
+                );
+            });
+        }
+    );
+});
+
 app.get('/api/client/me', verifyClientToken, (req, res) => {
     db.get(
         `SELECT
@@ -2257,12 +2343,12 @@ app.post('/api/client/redeem-referral', verifyClientToken, (req, res) => {
             }
 
             const grossAmount = Number(accountRow.referral_balance || 0);
-            const vatAmount = REFERRAL_REDEEM_VAT_PHP;
+            const vatAmount = Math.max(0, Math.round(grossAmount * REFERRAL_REDEEM_DEDUCTION_RATE));
             const netAmount = grossAmount - vatAmount;
 
-            if (grossAmount <= vatAmount) {
+            if (netAmount <= 0) {
                 return res.status(400).json({
-                    error: `Referral balance must be more than PHP ${vatAmount} to redeem.`
+                    error: `Referral balance is not enough after ${REFERRAL_REDEEM_DEDUCTION_PERCENT}% deduction.`
                 });
             }
 
@@ -2316,7 +2402,7 @@ app.post('/api/client/redeem-referral', verifyClientToken, (req, res) => {
                                     netAmount,
                                     gcashName,
                                     gcashNumber,
-                                    'Redemption of rewards will be given within 2 business days.'
+                                    `Redemption of rewards will be given within 2 business days. A ${REFERRAL_REDEEM_DEDUCTION_PERCENT}% deduction was applied.`
                                 ],
                                 function(insertErr) {
                                     if (insertErr) {
@@ -2416,14 +2502,23 @@ app.get('/api/orders/:id', verifyToken, (req, res) => {
 // Approve order
 app.post('/api/orders/:id/approve', verifyToken, (req, res) => {
     const { id } = req.params;
+    const trackingNumber = normalizeTrackingNumber(req.body?.trackingNumber);
+
+    if (!trackingNumber) {
+        return res.status(400).json({ error: 'Tracking number is required when setting order to delivery' });
+    }
     
     db.run(
-        `UPDATE orders SET status = 'delivery', approved_by = ?, updated_at = CURRENT_TIMESTAMP 
+        `UPDATE orders SET status = 'delivery', tracking_number = ?, approved_by = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
-        [req.adminUsername, id],
+        [trackingNumber, req.adminUsername, id],
         function(err) {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
+            }
+
+            if (!this.changes) {
+                return res.status(404).json({ error: 'Order not found' });
             }
 
             maybeApplyReferralRewardOnOrderConfirmation(id, 'delivery', (rewardErr, rewardMeta) => {
@@ -2487,18 +2582,35 @@ app.post('/api/orders/:id/reject', verifyToken, (req, res) => {
 app.post('/api/orders/:id/status', verifyToken, (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
+    const trackingNumber = normalizeTrackingNumber(req.body?.trackingNumber);
     
     const validStatuses = ['pending', 'approved', 'delivery', 'rejected', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: 'Invalid status' });
     }
+
+    if (status === 'delivery' && !trackingNumber) {
+        return res.status(400).json({ error: 'Tracking number is required when setting order to delivery' });
+    }
+
+    const updateQuery = status === 'delivery'
+        ? `UPDATE orders SET status = ?, tracking_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        : `UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+
+    const updateParams = status === 'delivery'
+        ? [status, trackingNumber, id]
+        : [status, id];
     
     db.run(
-        `UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [status, id],
+        updateQuery,
+        updateParams,
         function(err) {
             if (err) {
                 return res.status(500).json({ error: 'Database error' });
+            }
+
+            if (!this.changes) {
+                return res.status(404).json({ error: 'Order not found' });
             }
 
             maybeApplyReferralRewardOnOrderConfirmation(id, status, (rewardErr, rewardMeta) => {
@@ -3591,6 +3703,7 @@ startupReady.finally(() => {
     POST   /api/admin/change-password
     POST   /api/client/register
     POST   /api/client/login
+    POST   /api/client/forgot-password
     GET    /api/client/me
     GET    /api/client/referral/:code
     GET    /api/client/redemptions

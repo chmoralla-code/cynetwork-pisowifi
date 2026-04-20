@@ -6,7 +6,7 @@
     <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
     <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
     <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
-    <link rel="stylesheet" href="styles.css?v=20260420-4">
+    <link rel="stylesheet" href="styles.css?v=20260420-5">
 </head>
 <body>
     <!-- Navigation -->
@@ -634,6 +634,7 @@
             <div class="account-tabs" role="tablist" aria-label="Client account tabs">
                 <button type="button" id="accountTabLogin" class="account-tab-btn active" onclick="switchAccountTab('login')">Login</button>
                 <button type="button" id="accountTabRegister" class="account-tab-btn" onclick="switchAccountTab('register')">Register</button>
+                <button type="button" id="accountTabRecover" class="account-tab-btn" onclick="switchAccountTab('recover')">Forgot Password</button>
                 <button type="button" id="accountTabDashboard" class="account-tab-btn" onclick="switchAccountTab('dashboard')">My Account</button>
             </div>
 
@@ -650,6 +651,30 @@
                         <input type="password" id="clientLoginPassword" placeholder="Enter password" minlength="6" required>
                     </div>
                     <button type="submit" class="next-btn">Login</button>
+                    <button type="button" class="account-inline-action" onclick="switchAccountTab('recover')">Forgot your password?</button>
+                </form>
+            </div>
+
+            <div id="accountRecoverPanel" class="account-panel">
+                <form id="clientRecoverForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientRecoverName">Full Name *</label>
+                        <input type="text" id="clientRecoverName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverEmail">Email *</label>
+                        <input type="email" id="clientRecoverEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverPassword">New Password *</label>
+                        <input type="password" id="clientRecoverPassword" placeholder="At least 6 characters" minlength="6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverConfirmPassword">Confirm New Password *</label>
+                        <input type="password" id="clientRecoverConfirmPassword" placeholder="Re-enter new password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="next-btn">Reset Password</button>
+                    <button type="button" class="back-btn" onclick="switchAccountTab('login')">Back to Login</button>
                 </form>
             </div>
 
@@ -670,6 +695,10 @@
                     <div class="form-group">
                         <label for="clientRegisterPassword">Password *</label>
                         <input type="password" id="clientRegisterPassword" placeholder="At least 6 characters" minlength="6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterConfirmPassword">Confirm Password *</label>
+                        <input type="password" id="clientRegisterConfirmPassword" placeholder="Re-enter password" minlength="6" required>
                     </div>
                     <div class="form-group">
                         <label for="registerReferralCode">Referral Code (optional)</label>
@@ -720,11 +749,11 @@
 
                     <div class="redeem-reward-wrap">
                         <h4>Redeem Referral Award</h4>
-                        <p class="redeem-note">VAT deduction per redemption: ₱15.00</p>
+                        <p class="redeem-note">Deduction per redemption: 10% of available rewards.</p>
 
                         <div class="redeem-breakdown">
                             <p><strong>Available Rewards:</strong> ₱<span id="redeemGrossAmount">0</span>.00</p>
-                            <p><strong>Less VAT:</strong> ₱<span id="redeemVatAmount">15</span>.00</p>
+                            <p><strong>Less 10%:</strong> ₱<span id="redeemVatAmount">0</span>.00</p>
                             <p><strong>Estimated Payout:</strong> ₱<span id="redeemNetAmount">0</span>.00</p>
                         </div>
 
@@ -794,6 +823,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=20260420-4"></script>
+    <script src="script.js?v=20260420-5"></script>
 </body>
 </html>
