@@ -882,6 +882,13 @@ body {
     box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
 }
 
+.form-hint {
+    display: block;
+    margin-top: 0.45rem;
+    font-size: 0.82rem;
+    color: #666;
+}
+
 .saved-details-helper {
     border: 1px solid #E7E7E7;
     border-radius: 8px;

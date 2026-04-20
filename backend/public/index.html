@@ -367,7 +367,8 @@
                         <div class="settings-card">
                             <h3>Admin Account</h3>
                             <p><strong>Username:</strong> <span id="settingsUsername">-</span></p>
-                            <button class="btn btn-danger" onclick="alert('Change password feature coming soon!')">Change Password</button>
+                            <button id="openChangePasswordBtn" type="button" class="btn btn-danger">Change Password</button>
+                            <div id="changePasswordStatus" class="settings-status" style="display: none;"></div>
                         </div>
 
                         <div class="settings-card">
@@ -480,6 +481,42 @@
         </div>
     </div>
 
-    <script src="/admin/admin-script.js?v=20260419-6"></script>
+    <!-- CHANGE PASSWORD MODAL -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Change Admin Password</h2>
+                <button class="close-btn" type="button" onclick="closeChangePasswordModal()">×</button>
+            </div>
+
+            <form id="changePasswordForm" autocomplete="off">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="currentPasswordInput">Current Password</label>
+                        <input type="password" id="currentPasswordInput" minlength="6" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPasswordInput">New Password</label>
+                        <input type="password" id="newPasswordInput" minlength="6" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmNewPasswordInput">Confirm New Password</label>
+                        <input type="password" id="confirmNewPasswordInput" minlength="6" required>
+                    </div>
+
+                    <div id="changePasswordModalStatus" class="settings-status" style="display: none;"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button class="btn btn-danger" type="submit">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/admin/admin-script.js?v=20260420-1"></script>
 </body>
 </html>
