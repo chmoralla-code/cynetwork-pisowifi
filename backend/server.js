@@ -7,10 +7,15 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const { MongoClient } = require('mongodb');
+const { createClient } = require('@supabase/supabase-js');
+const { Client } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
+const { Resolver } = require('dns').promises;
+
+loadEnvironmentFromFile(path.join(__dirname, '.env'));
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -26,6 +31,11 @@ const accountBackupMongoDbName = String(process.env.ACCOUNT_BACKUP_MONGODB_DB ||
 const accountBackupMongoCollectionName = String(
     process.env.ACCOUNT_BACKUP_MONGODB_COLLECTION || 'client_account_backups'
 ).trim();
+const accountBackupMongoSrvFallbackEnabled = parseBooleanFlag(process.env.ACCOUNT_BACKUP_MONGODB_SRV_FALLBACK, true);
+const accountBackupMongoDnsServers = String(process.env.ACCOUNT_BACKUP_MONGODB_DNS_SERVERS || '8.8.8.8,1.1.1.1')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
 const dbPath = configuredDatabasePath
     ? path.resolve(configuredDatabasePath)
     : (isProduction
@@ -44,6 +54,14 @@ if (isProduction && !configuredUploadsDir) {
     console.warn(`UPLOADS_DIR not set; using production default: ${uploadedPackageImagesDir}`);
 }
 
+const supabaseUrl = process.env.SUPABASE_URL || 'https://bokirbsfqtqqknvrqlcv.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_IU0Zv0Oqjn_AgDHkV0NpHQ_A9YmQh9u';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const pgClient = new Client({
+    connectionString: process.env.SUPABASE_DB_URL || 'postgresql://postgres:Cy_NetWork_3212@db.bokirbsfqtqqknvrqlcv.supabase.co:5432/postgres'
+});
+
 let accountBackupMongoClient = null;
 let accountBackupCollection = null;
 let accountBackupSyncInProgress = false;
@@ -53,6 +71,7 @@ let accountBackupHydratedFromRemote = false;
 let accountBackupLastSyncedAt = null;
 let accountBackupLastSyncError = '';
 let accountBackupLastSyncReason = '';
+let accountBackupConnectionMode = accountBackupMongoUri ? 'pending' : 'disabled';
 let resolveStartupReady = null;
 const startupReady = new Promise((resolve) => {
     resolveStartupReady = resolve;
@@ -413,6 +432,46 @@ function parseBooleanFlag(value, fallback = false) {
     }
 
     return fallback;
+}
+
+function loadEnvironmentFromFile(filePath) {
+    if (!filePath || !fs.existsSync(filePath)) {
+        return;
+    }
+
+    let content = '';
+    try {
+        content = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+        console.error('Unable to read .env file:', error.message || error);
+        return;
+    }
+
+    for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) {
+            continue;
+        }
+
+        const separatorIndex = line.indexOf('=');
+        if (separatorIndex <= 0) {
+            continue;
+        }
+
+        const key = line.slice(0, separatorIndex).trim();
+        if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) {
+            continue;
+        }
+
+        let value = line.slice(separatorIndex + 1).trim();
+        if (
+            (value.startsWith('"') && value.endsWith('"'))
+            || (value.startsWith('\'') && value.endsWith('\''))
+        ) {
+            value = value.slice(1, -1);
+        }
+        process.env[key] = value;
+    }
 }
 
 function normalizePhilippineMobileNumber(value) {
@@ -852,7 +911,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
     else console.log(`Connected to SQLite database at: ${dbPath}`);
 });
 
+// Override db methods for production (Supabase)
+if (isProduction) {
+    db.get = (sql, params, callback) => {
+        pgGetAsync(sql, params).then(row => callback(null, row)).catch(err => callback(err));
+    };
+    db.all = (sql, params, callback) => {
+        pgAllAsync(sql, params).then(rows => callback(null, rows)).catch(err => callback(err));
+    };
+    db.run = (sql, params, callback) => {
+        pgRunAsync(sql, params).then(result => {
+            // Simulate sqlite3 callback with this.lastID and this.changes
+            const mockThis = { lastID: result.lastID, changes: result.changes };
+            callback.call(mockThis, null);
+        }).catch(err => callback(err));
+    };
+}
+
 function sqliteGetAsync(sql, params = []) {
+    if (isProduction) {
+        return pgGetAsync(sql, params);
+    }
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
             if (err) {
@@ -865,6 +944,9 @@ function sqliteGetAsync(sql, params = []) {
 }
 
 function sqliteAllAsync(sql, params = []) {
+    if (isProduction) {
+        return pgAllAsync(sql, params);
+    }
     return new Promise((resolve, reject) => {
         db.all(sql, params, (err, rows) => {
             if (err) {
@@ -877,6 +959,9 @@ function sqliteAllAsync(sql, params = []) {
 }
 
 function sqliteRunAsync(sql, params = []) {
+    if (isProduction) {
+        return pgRunAsync(sql, params);
+    }
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
             if (err) {
@@ -889,6 +974,38 @@ function sqliteRunAsync(sql, params = []) {
             });
         });
     });
+}
+
+pgClient.connect((err) => {
+    if (err) console.error('PostgreSQL connection error:', err);
+    else console.log('Connected to Supabase PostgreSQL');
+});
+
+function pgGetAsync(sql, params = []) {
+    return pgClient.query(sql, params).then(res => res.rows[0] || null).catch(err => { throw err; });
+}
+
+function pgAllAsync(sql, params = []) {
+    return pgClient.query(sql, params).then(res => res.rows).catch(err => { throw err; });
+}
+
+function pgRunAsync(sql, params = []) {
+    return pgClient.query(sql, params).then(res => ({ lastID: res.rows[0]?.id || null, changes: res.rowCount })).catch(err => { throw err; });
+}
+
+async function initializeDatabase() {
+    // Insert default admin
+    await pgRunAsync(`INSERT INTO admins (username, password, email) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING`, ['admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@cynetwork.com']);
+
+    // Insert notification settings
+    await pgRunAsync(`INSERT INTO notification_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+
+    // Updates for orders
+    await pgRunAsync(`UPDATE orders SET quantity = 1 WHERE quantity IS NULL OR quantity < 1`);
+    await pgRunAsync(`UPDATE orders SET unit_price = price WHERE unit_price IS NULL OR TRIM(unit_price) = ''`);
+    await pgRunAsync(`UPDATE orders SET shipping_fee = '0' WHERE shipping_fee IS NULL OR TRIM(shipping_fee) = ''`);
+    await pgRunAsync(`UPDATE orders SET total_price = price WHERE total_price IS NULL OR TRIM(total_price) = ''`);
+    await pgRunAsync(`UPDATE orders SET amazon_leo_sms_sent = 0 WHERE amazon_leo_sms_sent IS NULL`);
 }
 
 function normalizeAccountBackupPayload(rawPayload) {
@@ -910,18 +1027,18 @@ function normalizeAccountBackupPayload(rawPayload) {
 
 async function buildClientAccountSnapshot() {
     const [accounts, rewards, redemptions] = await Promise.all([
-        sqliteAllAsync(`
+        pgAllAsync(`
             SELECT id, full_name, contact_number, email, password, referral_code, referred_by_code,
                    referral_balance, referral_reward_count, created_at, updated_at
             FROM client_accounts
             ORDER BY id ASC
         `),
-        sqliteAllAsync(`
+        pgAllAsync(`
             SELECT id, referrer_account_id, referred_account_id, first_order_id, reward_amount, created_at
             FROM referral_rewards
             ORDER BY id ASC
         `),
-        sqliteAllAsync(`
+        pgAllAsync(`
             SELECT id, client_account_id, gross_amount, vat_amount, net_amount, gcash_name, gcash_number,
                    status, note, created_at, updated_at
             FROM referral_redemptions
@@ -943,7 +1060,7 @@ async function restoreClientAccountSnapshotIfNeeded() {
         return false;
     }
 
-    const localAccountCountRow = await sqliteGetAsync('SELECT COUNT(*) AS total FROM client_accounts');
+    const localAccountCountRow = await pgGetAsync('SELECT COUNT(*) AS total FROM client_accounts');
     const localAccountCount = Number(localAccountCountRow?.total || 0);
     if (localAccountCount > 0) {
         return false;
@@ -1092,27 +1209,140 @@ function queueClientAccountBackup(reason = 'update') {
     }, 1200);
 }
 
+function shouldRetryWithSrvDnsFallback(uri, error) {
+    if (!uri || !uri.startsWith('mongodb+srv://') || !error || !accountBackupMongoSrvFallbackEnabled) {
+        return false;
+    }
+
+    const code = String(error.code || '').toUpperCase();
+    const message = String(error.message || '').toLowerCase();
+    return message.includes('querysrv') || code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'ETIMEOUT';
+}
+
+function decodeUriComponentSafely(value) {
+    if (!value) {
+        return '';
+    }
+
+    try {
+        return decodeURIComponent(value);
+    } catch (error) {
+        return value;
+    }
+}
+
+function buildMongoSeedlistUriFromSrv(mongoSrvUri, srvRecords, txtRecords = []) {
+    const parsed = new URL(mongoSrvUri);
+    const authUser = decodeUriComponentSafely(parsed.username);
+    const authPassword = decodeUriComponentSafely(parsed.password);
+    const authSegment = authUser
+        ? `${encodeURIComponent(authUser)}${authPassword ? `:${encodeURIComponent(authPassword)}` : ''}@`
+        : '';
+
+    const hosts = srvRecords
+        .map((record) => `${record.name}:${record.port}`)
+        .join(',');
+    if (!hosts) {
+        throw new Error('MongoDB SRV lookup returned no hosts');
+    }
+
+    const params = new URLSearchParams(parsed.search.replace(/^\?/, ''));
+    if (!params.has('tls')) {
+        params.set('tls', 'true');
+    }
+
+    for (const txtRecord of txtRecords) {
+        const joined = Array.isArray(txtRecord) ? txtRecord.join('') : String(txtRecord || '');
+        const txtParams = new URLSearchParams(joined);
+        for (const [key, value] of txtParams.entries()) {
+            if (!params.has(key)) {
+                params.set(key, value);
+            }
+        }
+    }
+
+    const dbPath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '';
+    const query = params.toString();
+    return `mongodb://${authSegment}${hosts}${dbPath}${query ? `?${query}` : ''}`;
+}
+
+async function resolveMongoSrvUriToSeedlistUri(mongoSrvUri) {
+    const parsed = new URL(mongoSrvUri);
+    const hostname = String(parsed.hostname || '').trim();
+    if (!hostname) {
+        throw new Error('MongoDB SRV URI is missing hostname');
+    }
+
+    const lookupName = `_mongodb._tcp.${hostname}`;
+    const resolver = new Resolver();
+    if (accountBackupMongoDnsServers.length) {
+        resolver.setServers(accountBackupMongoDnsServers);
+    }
+
+    const srvRecords = await resolver.resolveSrv(lookupName);
+    const txtRecords = await resolver.resolveTxt(lookupName).catch(() => []);
+    return buildMongoSeedlistUriFromSrv(mongoSrvUri, srvRecords, txtRecords);
+}
+
+async function connectManagedAccountBackupClient(mongoUri) {
+    const client = new MongoClient(mongoUri, {
+        serverSelectionTimeoutMS: 10000
+    });
+
+    try {
+        await client.connect();
+        const collection = client
+            .db(accountBackupMongoDbName)
+            .collection(accountBackupMongoCollectionName);
+        await collection.findOne({ _id: 'client-account-snapshot' });
+        return { client, collection };
+    } catch (error) {
+        try {
+            await client.close();
+        } catch (closeError) {
+            console.error('Failed to close managed backup connection after error:', closeError.message || closeError);
+        }
+        throw error;
+    }
+}
+
 async function initializeManagedAccountBackup() {
     if (!accountBackupMongoUri) {
+        accountBackupConnectionMode = 'disabled';
         console.log('Managed account backup is disabled (ACCOUNT_BACKUP_MONGODB_URI is not set).');
         return;
     }
 
     try {
-        accountBackupMongoClient = new MongoClient(accountBackupMongoUri, {
-            serverSelectionTimeoutMS: 10000
-        });
-        await accountBackupMongoClient.connect();
-        accountBackupCollection = accountBackupMongoClient
-            .db(accountBackupMongoDbName)
-            .collection(accountBackupMongoCollectionName);
-        await accountBackupCollection.findOne({ _id: 'client-account-snapshot' });
+        let connected = await connectManagedAccountBackupClient(accountBackupMongoUri);
+        accountBackupConnectionMode = accountBackupMongoUri.startsWith('mongodb+srv://') ? 'srv' : 'standard';
+
+        accountBackupMongoClient = connected.client;
+        accountBackupCollection = connected.collection;
 
         await restoreClientAccountSnapshotIfNeeded();
         await pushClientAccountSnapshot('startup');
-        console.log('Managed account backup is enabled (MongoDB).');
+        console.log(`Managed account backup is enabled (MongoDB, mode: ${accountBackupConnectionMode}).`);
     } catch (error) {
-        accountBackupLastSyncError = String(error.message || error);
+        if (shouldRetryWithSrvDnsFallback(accountBackupMongoUri, error)) {
+            try {
+                const fallbackUri = await resolveMongoSrvUriToSeedlistUri(accountBackupMongoUri);
+                const connected = await connectManagedAccountBackupClient(fallbackUri);
+                accountBackupMongoClient = connected.client;
+                accountBackupCollection = connected.collection;
+                accountBackupConnectionMode = 'srv-seedlist-fallback';
+                await restoreClientAccountSnapshotIfNeeded();
+                await pushClientAccountSnapshot('startup');
+                console.log('Managed account backup is enabled (MongoDB, mode: srv-seedlist-fallback).');
+                return;
+            } catch (fallbackError) {
+                accountBackupLastSyncError = String(fallbackError.message || fallbackError);
+            }
+        } else {
+            accountBackupLastSyncError = String(error.message || error);
+        }
+
+        accountBackupConnectionMode = 'error';
         console.error('Failed to initialize managed account backup:', accountBackupLastSyncError);
         if (accountBackupMongoClient) {
             try {
@@ -1127,7 +1357,7 @@ async function initializeManagedAccountBackup() {
 }
 
 // Create tables
-db.serialize(() => {
+/* db.serialize(() => {
     const addColumnIfMissing = (sql, label) => {
         db.run(sql, (err) => {
             if (err && !String(err.message || '').includes('duplicate column name')) {
@@ -1341,7 +1571,7 @@ db.serialize(() => {
         WHERE amazon_leo_sms_sent IS NULL
     `);
 
-    db.get('SELECT 1 AS ready', async () => {
+    pgGetAsync('SELECT 1 AS ready').then(async () => {
         try {
             await initializeManagedAccountBackup();
         } catch (error) {
@@ -1355,6 +1585,7 @@ db.serialize(() => {
     });
 });
 
+/*
 // Create default admin if not exists
 const adminUsername = 'admin';
 const adminPassword = 'admin123';
@@ -1374,6 +1605,7 @@ bcrypt.hash(adminPassword, 10, (err, hash) => {
         }
     });
 });
+*/
 
 // =====================================================
 // AUTHENTICATION MIDDLEWARE
@@ -2954,8 +3186,11 @@ app.get('/health', (req, res) => {
             enabled: Boolean(accountBackupCollection),
             configured: Boolean(accountBackupMongoUri),
             provider: 'mongodb',
+            connectionMode: accountBackupConnectionMode,
             database: accountBackupMongoDbName,
             collection: accountBackupMongoCollectionName,
+            srvFallbackEnabled: accountBackupMongoSrvFallbackEnabled,
+            dnsServers: accountBackupMongoDnsServers,
             hydratedFromRemote: accountBackupHydratedFromRemote,
             lastSyncedAt: accountBackupLastSyncedAt,
             lastSyncReason: accountBackupLastSyncReason || null,

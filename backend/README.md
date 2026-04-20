@@ -184,6 +184,8 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `ACCOUNT_BACKUP_MONGODB_URI=<mongodb-connection-string>` (recommended for account durability even if the web service/disk is recreated)
 - `ACCOUNT_BACKUP_MONGODB_DB=cynetwork_pisowifi` (optional)
 - `ACCOUNT_BACKUP_MONGODB_COLLECTION=client_account_backups` (optional)
+- `ACCOUNT_BACKUP_MONGODB_SRV_FALLBACK=true` (optional, retries with DNS seed-list fallback for `mongodb+srv` failures)
+- `ACCOUNT_BACKUP_MONGODB_DNS_SERVERS=8.8.8.8,1.1.1.1` (optional, DNS servers used by SRV fallback)
 - `DATABASE_PATH=/var/data/pisowifi-admin.db`
 - `UPLOADS_DIR=/var/data/package-images`
 - `SEMAPHORE_API_KEY=<your-semaphore-api-key>` (required for PH SMS sending)
@@ -201,7 +203,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 ### 5. Verify deployment
 - Open `<your-render-url>/health` and confirm `ok: true`.
 - Check `storage.databasePath` in `/health` and confirm it points to `/var/data/pisowifi-admin.db`.
-- Check `/health -> accountBackup.enabled` is `true` and `lastSyncedAt` has a timestamp.
+- Check `/health -> accountBackup.enabled` is `true`, `connectionMode` is `srv`, `standard`, or `srv-seedlist-fallback`, and `lastSyncedAt` has a timestamp.
 - Open `<your-render-url>/` for customer site.
 - Open `<your-render-url>/admin` for admin dashboard.
 - Login with default admin credentials, then change the password.
@@ -237,6 +239,12 @@ taskkill /PID <PID> /F
 - Clear browser cookies and localStorage
 - Verify server is running (`http://localhost:3000/admin`)
 - Check credentials (default: admin/admin123)
+
+### MongoDB `querySrv ECONNREFUSED`
+- Keep `ACCOUNT_BACKUP_MONGODB_URI` set to your Atlas URI.
+- Enable `ACCOUNT_BACKUP_MONGODB_SRV_FALLBACK=true` (default) so the server retries using DNS seed-list resolution.
+- Optionally set `ACCOUNT_BACKUP_MONGODB_DNS_SERVERS` to stable DNS resolvers (example: `8.8.8.8,1.1.1.1`).
+- Check `/health -> accountBackup.connectionMode`; `srv-seedlist-fallback` means fallback is active.
 
 ## Next Steps
 
