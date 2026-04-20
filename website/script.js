@@ -619,7 +619,7 @@ function resetEmailCodeButton(buttonId) {
     }
 
     button.disabled = false;
-    button.textContent = 'Send Code';
+    button.textContent = 'Send OTP';
 }
 
 function startEmailCodeCooldown(buttonId, cooldownSeconds) {
@@ -641,7 +641,7 @@ function startEmailCodeCooldown(buttonId, cooldownSeconds) {
     );
 
     button.disabled = true;
-    button.textContent = `Resend (${remainingSeconds}s)`;
+    button.textContent = `Resend OTP (${remainingSeconds}s)`;
 
     emailCodeCooldownIntervals[buttonId] = window.setInterval(() => {
         remainingSeconds -= 1;
@@ -651,7 +651,7 @@ function startEmailCodeCooldown(buttonId, cooldownSeconds) {
             return;
         }
 
-        button.textContent = `Resend (${remainingSeconds}s)`;
+        button.textContent = `Resend OTP (${remainingSeconds}s)`;
     }, 1000);
 }
 
@@ -663,15 +663,15 @@ async function sendClientEmailVerificationCode({ purpose, email, fullName = '', 
     }
 
     const button = document.getElementById(buttonId);
-    const previousButtonLabel = button?.textContent || 'Send Code';
+    const previousButtonLabel = button?.textContent || 'Send OTP';
 
     if (button) {
         button.disabled = true;
-        button.textContent = 'Sending...';
+        button.textContent = 'Sending OTP...';
     }
 
     try {
-        const response = await fetch(`${API_URL}/client/send-email-code`, {
+        const response = await fetch(`${API_URL}/client/send-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -689,7 +689,7 @@ async function sendClientEmailVerificationCode({ purpose, email, fullName = '', 
                 button.textContent = previousButtonLabel;
             }
 
-            setClientAuthMessage(result.error || 'Unable to send verification code right now.', 'error');
+            setClientAuthMessage(result.error || 'Unable to send OTP right now.', 'error');
             return;
         }
 
@@ -705,14 +705,14 @@ async function sendClientEmailVerificationCode({ purpose, email, fullName = '', 
 
         const cooldownSeconds = Number(result.cooldownSeconds || EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS);
         startEmailCodeCooldown(buttonId, cooldownSeconds);
-        setClientAuthMessage(result.message || 'Verification code sent successfully.', 'success');
+        setClientAuthMessage(result.message || 'OTP sent successfully.', 'success');
     } catch (error) {
         if (button) {
             button.disabled = false;
             button.textContent = previousButtonLabel;
         }
 
-        setClientAuthMessage('Unable to send verification code right now. Please try again later.', 'error');
+        setClientAuthMessage('Unable to send OTP right now. Please try again later.', 'error');
     }
 }
 
@@ -787,12 +787,12 @@ async function handleClientRegister(event) {
     const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
 
     if (!fullName || !email || !verificationCode || !password) {
-        setClientAuthMessage('Full name, email, verification code, and password are required.', 'error');
+        setClientAuthMessage('Full name, email, OTP, and password are required.', 'error');
         return;
     }
 
     if (!EMAIL_CODE_REGEX.test(verificationCode)) {
-        setClientAuthMessage('Please enter the 6-digit verification code from your email.', 'error');
+        setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
         return;
     }
 
@@ -845,12 +845,12 @@ async function handleClientRecoverPassword(event) {
     const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
 
     if (!fullName || !email || !verificationCode || !newPassword || !confirmNewPassword) {
-        setClientAuthMessage('Please complete all reset password fields including verification code.', 'error');
+        setClientAuthMessage('Please complete all reset password fields including OTP.', 'error');
         return;
     }
 
     if (!EMAIL_CODE_REGEX.test(verificationCode)) {
-        setClientAuthMessage('Please enter the 6-digit verification code from your email.', 'error');
+        setClientAuthMessage('Please enter the 6-digit OTP from your email.', 'error');
         return;
     }
 
