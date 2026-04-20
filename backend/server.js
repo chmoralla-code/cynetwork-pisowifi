@@ -13,6 +13,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const { Resolver } = require('dns').promises;
 
 loadEnvironmentFromFile(path.join(__dirname, '.env'));
@@ -139,6 +141,32 @@ const AMAZON_LEO_SMS_TEMPLATE = String(
     process.env.AMAZON_LEO_SMS_TEMPLATE
     || 'CYNETWORK: Hi {name}, confirmed na ang Amazon LEO preorder mo. Order ID: {orderId}, Tracking: {trackingNumber}. Official price will be declared once Amazon officially releases the product. Reservation mo ay naka-line na.'
 ).trim();
+const EMAIL_CODE_PURPOSE_REGISTER = 'register';
+const EMAIL_CODE_PURPOSE_FORGOT_PASSWORD = 'forgot_password';
+const EMAIL_CODE_ALLOWED_PURPOSES = [
+    EMAIL_CODE_PURPOSE_REGISTER,
+    EMAIL_CODE_PURPOSE_FORGOT_PASSWORD
+];
+const EMAIL_CODE_TTL_MINUTES = normalizePositiveInt(process.env.EMAIL_CODE_TTL_MINUTES, 10, 5, 60);
+const EMAIL_CODE_RESEND_COOLDOWN_SECONDS = normalizePositiveInt(
+    process.env.EMAIL_CODE_RESEND_COOLDOWN_SECONDS || process.env.EMAIL_CODE_RESEND_SECONDS,
+    60,
+    15,
+    900
+);
+const EMAIL_CODE_MAX_ATTEMPTS = normalizePositiveInt(process.env.EMAIL_CODE_MAX_ATTEMPTS, 5, 3, 10);
+const EMAIL_VERIFICATION_ENABLED = parseBooleanFlag(process.env.EMAIL_VERIFICATION_ENABLED, true);
+const SMTP_HOST = String(process.env.SMTP_HOST || '').trim();
+const SMTP_PORT = normalizePositiveInt(process.env.SMTP_PORT, 587, 1, 65535);
+const SMTP_SECURE = parseBooleanFlag(process.env.SMTP_SECURE, SMTP_PORT === 465);
+const SMTP_USER = String(process.env.SMTP_USER || '').trim();
+const SMTP_PASS = String(process.env.SMTP_PASS || '').trim();
+const SMTP_ALLOW_UNAUTH = parseBooleanFlag(process.env.SMTP_ALLOW_UNAUTH, false);
+const SMTP_FROM_EMAIL = String(process.env.SMTP_FROM_EMAIL || '').trim();
+const SMTP_FROM_NAME = String(process.env.SMTP_FROM_NAME || 'CYNETWORK PISOWIFI').trim();
+
+let clientEmailTransporter = null;
+let clientEmailCodeSchemaPromise = null;
 
 function createReferralCode() {
     const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -544,6 +572,420 @@ function loadEnvironmentFromFile(filePath) {
         }
         process.env[key] = value;
     }
+}
+
+function createHttpError(statusCode, message) {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+}
+
+function normalizeEmailVerificationPurpose(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+
+    if (normalized === EMAIL_CODE_PURPOSE_REGISTER || normalized === 'signup') {
+        return EMAIL_CODE_PURPOSE_REGISTER;
+    }
+
+    if (['forgot', 'forgot-password', 'forgot_password', 'recover'].includes(normalized)) {
+        return EMAIL_CODE_PURPOSE_FORGOT_PASSWORD;
+    }
+
+    return '';
+}
+
+function isClientEmailVerificationConfigured() {
+    if (!EMAIL_VERIFICATION_ENABLED) {
+        return false;
+    }
+
+    if (!SMTP_HOST || !SMTP_FROM_EMAIL) {
+        return false;
+    }
+
+    if (SMTP_ALLOW_UNAUTH) {
+        return true;
+    }
+
+    return Boolean(SMTP_USER && SMTP_PASS);
+}
+
+function getClientEmailTransporter() {
+    if (!isClientEmailVerificationConfigured()) {
+        return null;
+    }
+
+    if (clientEmailTransporter) {
+        return clientEmailTransporter;
+    }
+
+    const transportOptions = {
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_SECURE
+    };
+
+    if (!SMTP_ALLOW_UNAUTH) {
+        transportOptions.auth = {
+            user: SMTP_USER,
+            pass: SMTP_PASS
+        };
+    }
+
+    clientEmailTransporter = nodemailer.createTransport(transportOptions);
+    return clientEmailTransporter;
+}
+
+function maskEmailForDisplay(email) {
+    const normalized = String(email || '').trim().toLowerCase();
+    const parts = normalized.split('@');
+    if (parts.length !== 2) {
+        return normalized;
+    }
+
+    const local = parts[0];
+    const domain = parts[1];
+    if (local.length <= 2) {
+        return `${local[0] || '*'}*@${domain}`;
+    }
+
+    return `${local[0]}${'*'.repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}@${domain}`;
+}
+
+function generateClientEmailVerificationCode() {
+    return String(Math.floor(100000 + (Math.random() * 900000)));
+}
+
+function buildClientEmailCodeDigest(email, purpose, code) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPurpose = normalizeEmailVerificationPurpose(purpose);
+    const normalizedCode = String(code || '').trim();
+
+    return crypto
+        .createHash('sha256')
+        .update(`${normalizedEmail}|${normalizedPurpose}|${normalizedCode}|${SECRET_KEY}`)
+        .digest('hex');
+}
+
+function timingSafeEqualText(left, right) {
+    const leftText = String(left || '');
+    const rightText = String(right || '');
+
+    const leftBuffer = Buffer.from(leftText, 'utf8');
+    const rightBuffer = Buffer.from(rightText, 'utf8');
+
+    if (leftBuffer.length !== rightBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function buildClientEmailCodeEmailContent({ recipientName = 'Client', purpose, code }) {
+    const safePurpose = normalizeEmailVerificationPurpose(purpose);
+    const safeCode = String(code || '').trim();
+    const safeRecipientName = String(recipientName || '').trim() || 'Client';
+    const expiresText = `${EMAIL_CODE_TTL_MINUTES} minute${EMAIL_CODE_TTL_MINUTES > 1 ? 's' : ''}`;
+
+    const actionText = safePurpose === EMAIL_CODE_PURPOSE_REGISTER
+        ? 'complete your CYNETWORK account registration'
+        : 'reset your CYNETWORK account password';
+
+    const subject = safePurpose === EMAIL_CODE_PURPOSE_REGISTER
+        ? 'CYNETWORK Registration Verification Code'
+        : 'CYNETWORK Password Reset Verification Code';
+
+    const text = [
+        `Hi ${safeRecipientName},`,
+        '',
+        `Use this verification code to ${actionText}: ${safeCode}`,
+        `This code expires in ${expiresText}.`,
+        '',
+        'If you did not request this code, you can ignore this email.',
+        '',
+        'CYNETWORK PISOWIFI'
+    ].join('\n');
+
+    const html = [
+        `<p>Hi ${escapeHtml(safeRecipientName)},</p>`,
+        `<p>Use this verification code to ${escapeHtml(actionText)}:</p>`,
+        `<p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; margin: 14px 0;">${escapeHtml(safeCode)}</p>`,
+        `<p>This code expires in <strong>${escapeHtml(expiresText)}</strong>.</p>`,
+        '<p>If you did not request this code, you can ignore this email.</p>',
+        '<p>CYNETWORK PISOWIFI</p>'
+    ].join('');
+
+    return {
+        subject,
+        text,
+        html
+    };
+}
+
+async function sendClientEmailCode({ email, fullName = '', purpose, code }) {
+    const transporter = getClientEmailTransporter();
+    if (!transporter) {
+        throw createHttpError(503, 'Email verification is not configured yet. Please contact support.');
+    }
+
+    const { subject, text, html } = buildClientEmailCodeEmailContent({
+        recipientName: fullName,
+        purpose,
+        code
+    });
+
+    await transporter.sendMail({
+        from: SMTP_FROM_NAME
+            ? `"${SMTP_FROM_NAME}" <${SMTP_FROM_EMAIL}>`
+            : SMTP_FROM_EMAIL,
+        to: email,
+        subject,
+        text,
+        html
+    });
+}
+
+function ensureClientEmailCodeSchema() {
+    if (clientEmailCodeSchemaPromise) {
+        return clientEmailCodeSchemaPromise;
+    }
+
+    clientEmailCodeSchemaPromise = (async () => {
+        await sqliteRunAsync(`
+            CREATE TABLE IF NOT EXISTS client_email_verification_codes (
+                email TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                code_digest TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                max_attempts INTEGER NOT NULL DEFAULT ${EMAIL_CODE_MAX_ATTEMPTS},
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                consumed_at TEXT,
+                verified_at TEXT
+            )
+        `);
+
+        await sqliteRunAsync(
+            'CREATE INDEX IF NOT EXISTS idx_client_email_codes_lookup ON client_email_verification_codes (email, purpose, consumed_at, created_at)'
+        );
+    })().catch((error) => {
+        clientEmailCodeSchemaPromise = null;
+        throw error;
+    });
+
+    return clientEmailCodeSchemaPromise;
+}
+
+async function requestClientEmailVerificationCode({ email, purpose, fullName = '' }) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPurpose = normalizeEmailVerificationPurpose(purpose);
+    const normalizedName = String(fullName || '').trim().toLowerCase();
+
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+        throw createHttpError(400, 'Please provide a valid email address.');
+    }
+
+    if (!EMAIL_CODE_ALLOWED_PURPOSES.includes(normalizedPurpose)) {
+        throw createHttpError(400, 'Invalid verification purpose.');
+    }
+
+    if (!isClientEmailVerificationConfigured()) {
+        throw createHttpError(503, 'Email verification is not configured yet. Please contact support.');
+    }
+
+    await ensureClientEmailCodeSchema();
+
+    if (normalizedPurpose === EMAIL_CODE_PURPOSE_REGISTER) {
+        const existingAccount = await sqliteGetAsync(
+            'SELECT id FROM client_accounts WHERE email = ?',
+            [normalizedEmail]
+        );
+
+        if (existingAccount) {
+            throw createHttpError(409, 'Email is already registered.');
+        }
+    }
+
+    if (normalizedPurpose === EMAIL_CODE_PURPOSE_FORGOT_PASSWORD) {
+        const accountRow = await sqliteGetAsync(
+            'SELECT id, full_name FROM client_accounts WHERE email = ?',
+            [normalizedEmail]
+        );
+
+        if (!accountRow) {
+            throw createHttpError(404, 'Account details not found.');
+        }
+
+        if (normalizedName) {
+            const storedName = String(accountRow.full_name || '').trim().toLowerCase();
+            if (storedName !== normalizedName) {
+                throw createHttpError(404, 'Account details not found.');
+            }
+        }
+    }
+
+    const latestCodeRow = await sqliteGetAsync(
+        `SELECT created_at
+         FROM client_email_verification_codes
+         WHERE email = ? AND purpose = ?
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [normalizedEmail, normalizedPurpose]
+    );
+
+    if (latestCodeRow?.created_at) {
+        const lastCreatedAtMs = Date.parse(latestCodeRow.created_at);
+        if (Number.isFinite(lastCreatedAtMs)) {
+            const elapsedSeconds = Math.floor((Date.now() - lastCreatedAtMs) / 1000);
+            const remainingSeconds = EMAIL_CODE_RESEND_COOLDOWN_SECONDS - elapsedSeconds;
+
+            if (remainingSeconds > 0) {
+                throw createHttpError(429, `Please wait ${remainingSeconds} second(s) before requesting a new code.`);
+            }
+        }
+    }
+
+    const verificationCode = generateClientEmailVerificationCode();
+
+    await sendClientEmailCode({
+        email: normalizedEmail,
+        fullName,
+        purpose: normalizedPurpose,
+        code: verificationCode
+    });
+
+    const expiresAtIso = new Date(Date.now() + (EMAIL_CODE_TTL_MINUTES * 60 * 1000)).toISOString();
+    const codeDigest = buildClientEmailCodeDigest(normalizedEmail, normalizedPurpose, verificationCode);
+
+    await sqliteRunAsync(
+        `UPDATE client_email_verification_codes
+         SET consumed_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE email = ? AND purpose = ? AND consumed_at IS NULL`,
+        [normalizedEmail, normalizedPurpose]
+    );
+
+    await sqliteRunAsync(
+        `INSERT INTO client_email_verification_codes (
+            email,
+            purpose,
+            code_digest,
+            attempt_count,
+            max_attempts,
+            expires_at,
+            created_at,
+            updated_at
+         ) VALUES (?, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [normalizedEmail, normalizedPurpose, codeDigest, EMAIL_CODE_MAX_ATTEMPTS, expiresAtIso]
+    );
+
+    return {
+        email: normalizedEmail,
+        maskedEmail: maskEmailForDisplay(normalizedEmail),
+        purpose: normalizedPurpose,
+        expiresInMinutes: EMAIL_CODE_TTL_MINUTES,
+        cooldownSeconds: EMAIL_CODE_RESEND_COOLDOWN_SECONDS
+    };
+}
+
+async function verifyClientEmailVerificationCode({ email, purpose, code }) {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPurpose = normalizeEmailVerificationPurpose(purpose);
+    const normalizedCode = String(code || '').trim();
+
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+        throw createHttpError(400, 'Please provide a valid email address.');
+    }
+
+    if (!EMAIL_CODE_ALLOWED_PURPOSES.includes(normalizedPurpose)) {
+        throw createHttpError(400, 'Invalid verification purpose.');
+    }
+
+    if (!/^\d{6}$/.test(normalizedCode)) {
+        throw createHttpError(400, 'Please enter the 6-digit verification code sent to your email.');
+    }
+
+    await ensureClientEmailCodeSchema();
+
+    const codeRow = await sqliteGetAsync(
+        `SELECT code_digest, attempt_count, max_attempts, expires_at
+         FROM client_email_verification_codes
+         WHERE email = ? AND purpose = ? AND consumed_at IS NULL
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [normalizedEmail, normalizedPurpose]
+    );
+
+    if (!codeRow) {
+        throw createHttpError(400, 'Please request a verification code first.');
+    }
+
+    const expiryMs = Date.parse(codeRow.expires_at);
+    if (Number.isFinite(expiryMs) && Date.now() > expiryMs) {
+        await sqliteRunAsync(
+            `UPDATE client_email_verification_codes
+             SET consumed_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE email = ? AND purpose = ? AND consumed_at IS NULL`,
+            [normalizedEmail, normalizedPurpose]
+        );
+
+        throw createHttpError(400, 'Verification code expired. Please request a new code.');
+    }
+
+    const currentAttempts = Number(codeRow.attempt_count || 0);
+    const maxAttempts = Math.max(1, Number(codeRow.max_attempts || EMAIL_CODE_MAX_ATTEMPTS));
+    const nextAttemptCount = currentAttempts + 1;
+
+    const expectedDigest = String(codeRow.code_digest || '');
+    const receivedDigest = buildClientEmailCodeDigest(normalizedEmail, normalizedPurpose, normalizedCode);
+    const matched = timingSafeEqualText(expectedDigest, receivedDigest);
+
+    if (!matched) {
+        if (nextAttemptCount >= maxAttempts) {
+            await sqliteRunAsync(
+                `UPDATE client_email_verification_codes
+                 SET attempt_count = ?,
+                     consumed_at = CURRENT_TIMESTAMP,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE email = ? AND purpose = ? AND consumed_at IS NULL`,
+                [nextAttemptCount, normalizedEmail, normalizedPurpose]
+            );
+
+            throw createHttpError(400, 'Too many invalid attempts. Please request a new verification code.');
+        }
+
+        await sqliteRunAsync(
+            `UPDATE client_email_verification_codes
+             SET attempt_count = ?,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE email = ? AND purpose = ? AND consumed_at IS NULL`,
+            [nextAttemptCount, normalizedEmail, normalizedPurpose]
+        );
+
+        const attemptsLeft = Math.max(0, maxAttempts - nextAttemptCount);
+        throw createHttpError(400, `Invalid verification code. ${attemptsLeft} attempt(s) remaining.`);
+    }
+
+    await sqliteRunAsync(
+        `UPDATE client_email_verification_codes
+         SET attempt_count = ?,
+             consumed_at = CURRENT_TIMESTAMP,
+             verified_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE email = ? AND purpose = ? AND consumed_at IS NULL`,
+        [nextAttemptCount, normalizedEmail, normalizedPurpose]
+    );
 }
 
 function normalizePhilippineMobileNumber(value) {
@@ -2035,6 +2477,45 @@ app.post('/api/admin/change-password', verifyToken, (req, res) => {
 // CLIENT ACCOUNT & REFERRAL ROUTES
 // =====================================================
 
+app.post('/api/client/send-email-code', async (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const fullName = String(req.body.fullName || '').trim();
+    const purpose = normalizeEmailVerificationPurpose(req.body.purpose);
+
+    if (!purpose) {
+        return res.status(400).json({ error: 'Valid verification purpose is required.' });
+    }
+
+    try {
+        const codeResult = await requestClientEmailVerificationCode({
+            email,
+            purpose,
+            fullName
+        });
+
+        const actionText = purpose === EMAIL_CODE_PURPOSE_REGISTER
+            ? 'account registration'
+            : 'password reset';
+
+        res.json({
+            success: true,
+            message: `Verification code sent to ${codeResult.maskedEmail} for ${actionText}.`,
+            purpose,
+            email: codeResult.maskedEmail,
+            expiresInMinutes: codeResult.expiresInMinutes,
+            cooldownSeconds: codeResult.cooldownSeconds
+        });
+    } catch (error) {
+        const statusCode = Number(error?.statusCode || 500);
+        if (statusCode >= 500) {
+            console.error('Failed sending client email code:', error.message || error);
+            return res.status(500).json({ error: 'Failed to send verification code right now. Please try again.' });
+        }
+
+        return res.status(statusCode).json({ error: error.message || 'Unable to send verification code.' });
+    }
+});
+
 app.post('/api/client/register', (req, res) => {
     const fullName = String(req.body.fullName || '').trim();
     const contactNumber = String(req.body.contactNumber || '').trim();
@@ -2042,9 +2523,14 @@ app.post('/api/client/register', (req, res) => {
     const password = String(req.body.password || '');
     const confirmPassword = String(req.body.confirmPassword || '');
     const rawReferralCode = String(req.body.referralCode || '').trim().toUpperCase();
+    const verificationCode = String(req.body.verificationCode || '').trim();
 
     if (!fullName || !email || !password) {
         return res.status(400).json({ error: 'Full name, email, and password are required' });
+    }
+
+    if (!verificationCode) {
+        return res.status(400).json({ error: 'Email verification code is required' });
     }
 
     if (password !== confirmPassword) {
@@ -2123,6 +2609,23 @@ app.post('/api/client/register', (req, res) => {
         });
     };
 
+    const finalizeRegistration = (referralCodeToStore = null) => {
+        verifyClientEmailVerificationCode({
+            email,
+            purpose: EMAIL_CODE_PURPOSE_REGISTER,
+            code: verificationCode
+        })
+            .then(() => {
+                createAccount(referralCodeToStore);
+            })
+            .catch((verifyError) => {
+                const statusCode = Number(verifyError?.statusCode || 400);
+                return res.status(statusCode).json({
+                    error: verifyError?.message || 'Invalid verification code'
+                });
+            });
+    };
+
     if (rawReferralCode) {
         db.get(
             'SELECT id FROM client_accounts WHERE referral_code = ?',
@@ -2136,13 +2639,13 @@ app.post('/api/client/register', (req, res) => {
                     return res.status(400).json({ error: 'Referral code is invalid' });
                 }
 
-                createAccount(rawReferralCode);
+                finalizeRegistration(rawReferralCode);
             }
         );
         return;
     }
 
-    createAccount(null);
+    finalizeRegistration(null);
 });
 
 app.post('/api/client/login', (req, res) => {
@@ -2187,9 +2690,12 @@ app.post('/api/client/forgot-password', (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const newPassword = String(req.body.newPassword || '');
     const confirmPassword = String(req.body.confirmPassword || '');
+    const verificationCode = String(req.body.verificationCode || '').trim();
 
-    if (!fullName || !email || !newPassword || !confirmPassword) {
-        return res.status(400).json({ error: 'Full name, email, new password, and confirm password are required' });
+    if (!fullName || !email || !newPassword || !confirmPassword || !verificationCode) {
+        return res.status(400).json({
+            error: 'Full name, email, verification code, new password, and confirm password are required'
+        });
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -2221,34 +2727,47 @@ app.post('/api/client/forgot-password', (req, res) => {
                 return res.status(404).json({ error: 'Account details not found' });
             }
 
-            bcrypt.hash(newPassword, 10, (hashErr, hash) => {
-                if (hashErr) {
-                    return res.status(500).json({ error: 'Failed to secure new password' });
-                }
-
-                db.run(
-                    `UPDATE client_accounts
-                     SET password = ?,
-                         updated_at = CURRENT_TIMESTAMP
-                     WHERE id = ?`,
-                    [hash, accountRow.id],
-                    function(updateErr) {
-                        if (updateErr) {
-                            return res.status(500).json({ error: 'Failed to update account password' });
+            verifyClientEmailVerificationCode({
+                email,
+                purpose: EMAIL_CODE_PURPOSE_FORGOT_PASSWORD,
+                code: verificationCode
+            })
+                .then(() => {
+                    bcrypt.hash(newPassword, 10, (hashErr, hash) => {
+                        if (hashErr) {
+                            return res.status(500).json({ error: 'Failed to secure new password' });
                         }
 
-                        if (!this.changes) {
-                            return res.status(404).json({ error: 'Account not found' });
-                        }
+                        db.run(
+                            `UPDATE client_accounts
+                             SET password = ?,
+                                 updated_at = CURRENT_TIMESTAMP
+                             WHERE id = ?`,
+                            [hash, accountRow.id],
+                            function(updateErr) {
+                                if (updateErr) {
+                                    return res.status(500).json({ error: 'Failed to update account password' });
+                                }
 
-                        queueClientAccountBackup('client-forgot-password');
-                        res.json({
-                            success: true,
-                            message: 'Password reset successful. You can now login.'
-                        });
-                    }
-                );
-            });
+                                if (!this.changes) {
+                                    return res.status(404).json({ error: 'Account not found' });
+                                }
+
+                                queueClientAccountBackup('client-forgot-password');
+                                res.json({
+                                    success: true,
+                                    message: 'Password reset successful. You can now login.'
+                                });
+                            }
+                        );
+                    });
+                })
+                .catch((verifyError) => {
+                    const statusCode = Number(verifyError?.statusCode || 400);
+                    return res.status(statusCode).json({
+                        error: verifyError?.message || 'Invalid verification code'
+                    });
+                });
         }
     );
 });
@@ -3633,6 +4152,7 @@ app.get('/package-images/:filename', (req, res) => {
 app.get('/health', (req, res) => {
     const databaseExists = fs.existsSync(dbPath);
     const uploadsDirExists = fs.existsSync(uploadedPackageImagesDir);
+    const emailVerificationConfigured = isClientEmailVerificationConfigured();
     let databaseSizeBytes = null;
     let databaseStatError = null;
 
@@ -3669,6 +4189,19 @@ app.get('/health', (req, res) => {
             lastSyncedAt: accountBackupLastSyncedAt,
             lastSyncReason: accountBackupLastSyncReason || null,
             lastSyncError: accountBackupLastSyncError || null
+        },
+        emailVerification: {
+            enabled: EMAIL_VERIFICATION_ENABLED,
+            configured: emailVerificationConfigured,
+            smtpHostConfigured: Boolean(SMTP_HOST),
+            smtpPort: SMTP_PORT,
+            smtpSecure: SMTP_SECURE,
+            smtpAuthConfigured: SMTP_ALLOW_UNAUTH || Boolean(SMTP_USER && SMTP_PASS),
+            smtpAllowUnauth: SMTP_ALLOW_UNAUTH,
+            fromEmailConfigured: Boolean(SMTP_FROM_EMAIL),
+            codeTtlMinutes: EMAIL_CODE_TTL_MINUTES,
+            resendCooldownSeconds: EMAIL_CODE_RESEND_COOLDOWN_SECONDS,
+            maxAttempts: EMAIL_CODE_MAX_ATTEMPTS
         }
     });
 });
@@ -3701,6 +4234,7 @@ startupReady.finally(() => {
     API Endpoints:
     POST   /api/login
     POST   /api/admin/change-password
+    POST   /api/client/send-email-code
     POST   /api/client/register
     POST   /api/client/login
     POST   /api/client/forgot-password

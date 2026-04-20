@@ -15,13 +15,13 @@ services:
         generateValue: true
         sync: false
       - key: SUPABASE_URL
-        value: https://bokirbsfqtqqknvrqlcv.supabase.co
+        value: set-in-render-dashboard
         sync: false
       - key: SUPABASE_ANON_KEY
-        value: sb_publishable_IU0Zv0Oqjn_AgDHkV0NpHQ_A9YmQh9u
+        value: set-in-render-dashboard
         sync: false
       - key: SUPABASE_DB_URL
-        value: postgresql://postgres:Cy_NetWork_3212@db.bokirbsfqtqqknvrqlcv.supabase.co:5432/postgres
+        value: set-in-render-dashboard
         sync: false
       - key: ACCOUNT_BACKUP_MONGODB_URI
         value: ""
@@ -32,6 +32,34 @@ services:
         value: /var/data/package-images
       - key: STARTUP_READY_TIMEOUT_MS
         value: "15000"
+      - key: EMAIL_VERIFICATION_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        value: set-in-render-dashboard
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        value: set-in-render-dashboard
+        sync: false
+      - key: SMTP_PASS
+        value: set-in-render-dashboard
+        sync: false
+      - key: SMTP_ALLOW_UNAUTH
+        value: "false"
+      - key: SMTP_FROM_EMAIL
+        value: set-in-render-dashboard
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: CYNETWORK PISOWIFI
+      - key: EMAIL_CODE_TTL_MINUTES
+        value: "10"
+      - key: EMAIL_CODE_RESEND_COOLDOWN_SECONDS
+        value: "60"
+      - key: EMAIL_CODE_MAX_ATTEMPTS
+        value: "5"
     disk:
       name: cynetwork-data
       mountPath: /var/data
