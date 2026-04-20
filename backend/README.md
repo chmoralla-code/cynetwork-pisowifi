@@ -216,6 +216,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SMTP_ALLOW_UNAUTH=false` (set `true` only for trusted relay without auth)
 - `SMTP_FROM_EMAIL=<no-reply@your-domain.com>`
 - `SMTP_FROM_NAME=CYNETWORK PISOWIFI`
+- `ALLOW_DEV_EMAIL_CODE_FALLBACK=true` (local/dev only; allows testing with preview code when SMTP is not configured)
 - `EMAIL_CODE_TTL_MINUTES=10`
 - `EMAIL_CODE_RESEND_COOLDOWN_SECONDS=60`
 - `EMAIL_CODE_MAX_ATTEMPTS=5`

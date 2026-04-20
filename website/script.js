@@ -693,6 +693,16 @@ async function sendClientEmailVerificationCode({ purpose, email, fullName = '', 
             return;
         }
 
+        if (result.previewCode && EMAIL_CODE_REGEX.test(String(result.previewCode))) {
+            const codeInputId = purpose === 'register'
+                ? 'clientRegisterVerificationCode'
+                : 'clientRecoverVerificationCode';
+            const codeInput = document.getElementById(codeInputId);
+            if (codeInput && !codeInput.value.trim()) {
+                codeInput.value = String(result.previewCode);
+            }
+        }
+
         const cooldownSeconds = Number(result.cooldownSeconds || EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS);
         startEmailCodeCooldown(buttonId, cooldownSeconds);
         setClientAuthMessage(result.message || 'Verification code sent successfully.', 'success');
