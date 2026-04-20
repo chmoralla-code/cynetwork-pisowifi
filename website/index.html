@@ -684,27 +684,9 @@
                         <input type="email" id="clientRecoverEmail" placeholder="you@example.com" required>
                     </div>
                     <div class="form-group">
-                        <label for="clientRecoverVerificationCode">Email OTP *</label>
-                        <div class="verification-code-row">
-                            <input
-                                type="text"
-                                id="clientRecoverVerificationCode"
-                                placeholder="6-digit OTP"
-                                inputmode="numeric"
-                                pattern="[0-9]{6}"
-                                maxlength="6"
-                                required
-                            >
-                            <button
-                                type="button"
-                                id="sendRecoverCodeBtn"
-                                class="send-code-btn"
-                                onclick="sendRecoverVerificationCode()"
-                            >
-                                Send OTP
-                            </button>
-                        </div>
-                        <small class="form-hint">We will send a 6-digit OTP to your email.</small>
+                        <label for="clientRecoverContact">Registered Contact Number *</label>
+                        <input type="tel" id="clientRecoverContact" placeholder="+63 9XX XXX XXXX" required>
+                        <small class="form-hint">Use the same contact number you used during registration.</small>
                     </div>
                     <div class="form-group">
                         <label for="clientRecoverPassword">New Password *</label>
@@ -726,35 +708,12 @@
                         <input type="text" id="clientRegisterName" placeholder="Juan Dela Cruz" required>
                     </div>
                     <div class="form-group">
-                        <label for="clientRegisterContact">Contact Number</label>
-                        <input type="tel" id="clientRegisterContact" placeholder="+63 9XX XXX XXXX">
+                        <label for="clientRegisterContact">Contact Number *</label>
+                        <input type="tel" id="clientRegisterContact" placeholder="+63 9XX XXX XXXX" required>
                     </div>
                     <div class="form-group">
                         <label for="clientRegisterEmail">Email *</label>
                         <input type="email" id="clientRegisterEmail" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="clientRegisterVerificationCode">Email OTP *</label>
-                        <div class="verification-code-row">
-                            <input
-                                type="text"
-                                id="clientRegisterVerificationCode"
-                                placeholder="6-digit OTP"
-                                inputmode="numeric"
-                                pattern="[0-9]{6}"
-                                maxlength="6"
-                                required
-                            >
-                            <button
-                                type="button"
-                                id="sendRegisterCodeBtn"
-                                class="send-code-btn"
-                                onclick="sendRegisterVerificationCode()"
-                            >
-                                Send OTP
-                            </button>
-                        </div>
-                        <small class="form-hint">Send OTP first, then enter it to finish registration.</small>
                     </div>
                     <div class="form-group">
                         <label for="clientRegisterPassword">Password *</label>
