@@ -19,8 +19,12 @@ loadEnvironmentFromFile(path.join(__dirname, '.env'));
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const SECRET_KEY = process.env.JWT_SECRET || 'cynetwork-pisowifi-secret-2026';
 const isProduction = String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+const jwtSecretFromEnv = String(process.env.JWT_SECRET || '').trim();
+if (isProduction && !jwtSecretFromEnv) {
+    throw new Error('JWT_SECRET environment variable is required in production.');
+}
+const SECRET_KEY = jwtSecretFromEnv || 'cynetwork-pisowifi-secret-2026';
 const persistentDataDir = '/var/data';
 const adminPublicDir = path.join(__dirname, 'public');
 const clientPublicDir = path.join(__dirname, '..', 'website');
@@ -54,13 +58,24 @@ if (isProduction && !configuredUploadsDir) {
     console.warn(`UPLOADS_DIR not set; using production default: ${uploadedPackageImagesDir}`);
 }
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://bokirbsfqtqqknvrqlcv.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'sb_publishable_IU0Zv0Oqjn_AgDHkV0NpHQ_A9YmQh9u';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = String(process.env.SUPABASE_URL || '').trim();
+const supabaseKey = String(process.env.SUPABASE_ANON_KEY || '').trim();
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+if (isProduction && !supabase) {
+    console.warn('SUPABASE_URL and SUPABASE_ANON_KEY are not both set; supabase-js client is disabled.');
+}
 
-const pgClient = new Client({
-    connectionString: process.env.SUPABASE_DB_URL || 'postgresql://postgres:Cy_NetWork_3212@db.bokirbsfqtqqknvrqlcv.supabase.co:5432/postgres'
-});
+const postgresConnectionString = String(process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '').trim();
+if (isProduction && !postgresConnectionString) {
+    throw new Error('SUPABASE_DB_URL (or DATABASE_URL) is required in production.');
+}
+
+const pgClient = postgresConnectionString
+    ? new Client({
+        connectionString: postgresConnectionString,
+        ssl: isProduction ? { rejectUnauthorized: false } : undefined
+    })
+    : null;
 
 let accountBackupMongoClient = null;
 let accountBackupCollection = null;
@@ -76,6 +91,24 @@ let resolveStartupReady = null;
 const startupReady = new Promise((resolve) => {
     resolveStartupReady = resolve;
 });
+const startupGateTimeoutMs = Number.parseInt(process.env.STARTUP_READY_TIMEOUT_MS || '15000', 10);
+let startupGateTimer = null;
+
+function releaseStartupGate(reason = 'ready') {
+    if (typeof resolveStartupReady !== 'function') {
+        return;
+    }
+
+    console.log(`Startup gate released (${reason}).`);
+    resolveStartupReady();
+    resolveStartupReady = null;
+}
+
+if (Number.isFinite(startupGateTimeoutMs) && startupGateTimeoutMs > 0) {
+    startupGateTimer = setTimeout(() => {
+        releaseStartupGate(`timeout after ${startupGateTimeoutMs}ms`);
+    }, startupGateTimeoutMs);
+}
 
 const defaultPackageImages = {
     1: 'assets/images/package1.png',
@@ -911,20 +944,139 @@ const db = new sqlite3.Database(dbPath, (err) => {
     else console.log(`Connected to SQLite database at: ${dbPath}`);
 });
 
+function normalizeDbParams(params) {
+    if (Array.isArray(params)) {
+        return params;
+    }
+
+    if (params === undefined || params === null) {
+        return [];
+    }
+
+    return [params];
+}
+
+function normalizeDbCallArgs(params, callback) {
+    if (typeof params === 'function') {
+        return {
+            params: [],
+            callback: params
+        };
+    }
+
+    return {
+        params: normalizeDbParams(params),
+        callback
+    };
+}
+
+function convertSqliteQuestionMarksToPostgres(sqlText) {
+    let output = '';
+    let placeholderIndex = 0;
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+
+    for (let i = 0; i < sqlText.length; i += 1) {
+        const currentChar = sqlText[i];
+        const nextChar = sqlText[i + 1];
+
+        if (!inDoubleQuote && currentChar === '\'') {
+            if (inSingleQuote && nextChar === '\'') {
+                output += "''";
+                i += 1;
+                continue;
+            }
+
+            inSingleQuote = !inSingleQuote;
+            output += currentChar;
+            continue;
+        }
+
+        if (!inSingleQuote && currentChar === '"') {
+            if (inDoubleQuote && nextChar === '"') {
+                output += '""';
+                i += 1;
+                continue;
+            }
+
+            inDoubleQuote = !inDoubleQuote;
+            output += currentChar;
+            continue;
+        }
+
+        if (!inSingleQuote && !inDoubleQuote && currentChar === '?') {
+            placeholderIndex += 1;
+            output += `$${placeholderIndex}`;
+            continue;
+        }
+
+        output += currentChar;
+    }
+
+    return output;
+}
+
+function translateSqliteFunctionsToPostgres(sqlText) {
+    return sqlText
+        .replace(/\bBEGIN\s+IMMEDIATE\s+TRANSACTION\b/ig, 'BEGIN')
+        .replace(/\bINSERT\s+OR\s+IGNORE\s+INTO\b/ig, 'INSERT INTO')
+        .replace(/date\(created_at,\s*'localtime'\)/ig, 'DATE(created_at)')
+        .replace(/date\('now',\s*'localtime'\)/ig, 'CURRENT_DATE')
+        .replace(/date\('now',\s*'-6 day',\s*'localtime'\)/ig, "(CURRENT_DATE - INTERVAL '6 day')")
+        .replace(/strftime\('%Y-%m',\s*created_at,\s*'localtime'\)/ig, "to_char(created_at, 'YYYY-MM')")
+        .replace(/strftime\('%Y-%m',\s*'now',\s*'localtime'\)/ig, "to_char(NOW(), 'YYYY-MM')");
+}
+
+function buildPostgresQuery(sql, options = {}) {
+    const rawSql = String(sql || '');
+    const hasInsertOrIgnore = /\bINSERT\s+OR\s+IGNORE\s+INTO\b/i.test(rawSql);
+    const forWrite = Boolean(options.forWrite);
+
+    let convertedSql = translateSqliteFunctionsToPostgres(rawSql)
+        .trim()
+        .replace(/;+\s*$/, '');
+
+    if (hasInsertOrIgnore && !/\bON\s+CONFLICT\b/i.test(convertedSql)) {
+        convertedSql = `${convertedSql} ON CONFLICT DO NOTHING`;
+    }
+
+    const isInsertStatement = /^\s*INSERT\b/i.test(convertedSql);
+    if (forWrite && isInsertStatement && !/\bRETURNING\b/i.test(convertedSql)) {
+        convertedSql = `${convertedSql} RETURNING id`;
+    }
+
+    return convertSqliteQuestionMarksToPostgres(convertedSql);
+}
+
+function runPostgresQuery(sql, params = [], options = {}) {
+    if (!pgClient) {
+        return Promise.reject(new Error('PostgreSQL client is not configured.'));
+    }
+
+    const postgresSql = buildPostgresQuery(sql, options);
+    return pgClient.query(postgresSql, normalizeDbParams(params));
+}
+
 // Override db methods for production (Supabase)
 if (isProduction) {
     db.get = (sql, params, callback) => {
-        pgGetAsync(sql, params).then(row => callback(null, row)).catch(err => callback(err));
+        const { params: normalizedParams, callback: normalizedCallback } = normalizeDbCallArgs(params, callback);
+        const handler = (typeof normalizedCallback === 'function') ? normalizedCallback : () => {};
+        pgGetAsync(sql, normalizedParams).then(row => handler(null, row)).catch(err => handler(err));
     };
     db.all = (sql, params, callback) => {
-        pgAllAsync(sql, params).then(rows => callback(null, rows)).catch(err => callback(err));
+        const { params: normalizedParams, callback: normalizedCallback } = normalizeDbCallArgs(params, callback);
+        const handler = (typeof normalizedCallback === 'function') ? normalizedCallback : () => {};
+        pgAllAsync(sql, normalizedParams).then(rows => handler(null, rows)).catch(err => handler(err));
     };
     db.run = (sql, params, callback) => {
-        pgRunAsync(sql, params).then(result => {
+        const { params: normalizedParams, callback: normalizedCallback } = normalizeDbCallArgs(params, callback);
+        const handler = (typeof normalizedCallback === 'function') ? normalizedCallback : () => {};
+        pgRunAsync(sql, normalizedParams).then(result => {
             // Simulate sqlite3 callback with this.lastID and this.changes
             const mockThis = { lastID: result.lastID, changes: result.changes };
-            callback.call(mockThis, null);
-        }).catch(err => callback(err));
+            handler.call(mockThis, null);
+        }).catch(err => handler(err));
     };
 }
 
@@ -976,21 +1128,42 @@ function sqliteRunAsync(sql, params = []) {
     });
 }
 
-pgClient.connect((err) => {
-    if (err) console.error('PostgreSQL connection error:', err);
-    else console.log('Connected to Supabase PostgreSQL');
-});
+if (pgClient) {
+    pgClient.connect((err) => {
+        if (err) {
+            console.error('PostgreSQL connection error:', err);
+        } else {
+            console.log('Connected to Supabase PostgreSQL');
+            void initializeDatabase()
+                .catch((startupError) => {
+                    console.error('PostgreSQL startup data initialization failed:', startupError.message || startupError);
+                })
+                .finally(() => {
+                    void initializeManagedAccountBackup().catch((backupError) => {
+                        console.error('Managed account backup startup error:', backupError.message || backupError);
+                    });
+                });
+        }
+
+        releaseStartupGate(err ? 'postgres connect failed' : 'postgres connected');
+    });
+} else {
+    console.warn('SUPABASE_DB_URL is not configured; PostgreSQL features are disabled.');
+    releaseStartupGate('postgres disabled');
+}
 
 function pgGetAsync(sql, params = []) {
-    return pgClient.query(sql, params).then(res => res.rows[0] || null).catch(err => { throw err; });
+    return runPostgresQuery(sql, params).then(res => res.rows[0] || null).catch(err => { throw err; });
 }
 
 function pgAllAsync(sql, params = []) {
-    return pgClient.query(sql, params).then(res => res.rows).catch(err => { throw err; });
+    return runPostgresQuery(sql, params).then(res => res.rows).catch(err => { throw err; });
 }
 
 function pgRunAsync(sql, params = []) {
-    return pgClient.query(sql, params).then(res => ({ lastID: res.rows[0]?.id || null, changes: res.rowCount })).catch(err => { throw err; });
+    return runPostgresQuery(sql, params, { forWrite: true })
+        .then(res => ({ lastID: res.rows[0]?.id || null, changes: res.rowCount }))
+        .catch(err => { throw err; });
 }
 
 async function initializeDatabase() {
@@ -1086,10 +1259,21 @@ async function restoreClientAccountSnapshotIfNeeded() {
     try {
         for (const account of accounts) {
             await sqliteRunAsync(
-                `INSERT OR REPLACE INTO client_accounts (
+                `INSERT INTO client_accounts (
                     id, full_name, contact_number, email, password, referral_code, referred_by_code,
                     referral_balance, referral_reward_count, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET
+                    full_name = EXCLUDED.full_name,
+                    contact_number = EXCLUDED.contact_number,
+                    email = EXCLUDED.email,
+                    password = EXCLUDED.password,
+                    referral_code = EXCLUDED.referral_code,
+                    referred_by_code = EXCLUDED.referred_by_code,
+                    referral_balance = EXCLUDED.referral_balance,
+                    referral_reward_count = EXCLUDED.referral_reward_count,
+                    created_at = EXCLUDED.created_at,
+                    updated_at = EXCLUDED.updated_at`,
                 [
                     account.id,
                     account.full_name,
@@ -1108,9 +1292,15 @@ async function restoreClientAccountSnapshotIfNeeded() {
 
         for (const reward of rewards) {
             await sqliteRunAsync(
-                `INSERT OR REPLACE INTO referral_rewards (
+                `INSERT INTO referral_rewards (
                     id, referrer_account_id, referred_account_id, first_order_id, reward_amount, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?)`,
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET
+                    referrer_account_id = EXCLUDED.referrer_account_id,
+                    referred_account_id = EXCLUDED.referred_account_id,
+                    first_order_id = EXCLUDED.first_order_id,
+                    reward_amount = EXCLUDED.reward_amount,
+                    created_at = EXCLUDED.created_at`,
                 [
                     reward.id,
                     reward.referrer_account_id,
@@ -1124,10 +1314,21 @@ async function restoreClientAccountSnapshotIfNeeded() {
 
         for (const redemption of redemptions) {
             await sqliteRunAsync(
-                `INSERT OR REPLACE INTO referral_redemptions (
+                `INSERT INTO referral_redemptions (
                     id, client_account_id, gross_amount, vat_amount, net_amount, gcash_name, gcash_number,
                     status, note, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE SET
+                    client_account_id = EXCLUDED.client_account_id,
+                    gross_amount = EXCLUDED.gross_amount,
+                    vat_amount = EXCLUDED.vat_amount,
+                    net_amount = EXCLUDED.net_amount,
+                    gcash_name = EXCLUDED.gcash_name,
+                    gcash_number = EXCLUDED.gcash_number,
+                    status = EXCLUDED.status,
+                    note = EXCLUDED.note,
+                    created_at = EXCLUDED.created_at,
+                    updated_at = EXCLUDED.updated_at`,
                 [
                     redemption.id,
                     redemption.client_account_id,
@@ -3204,7 +3405,12 @@ app.get('/health', (req, res) => {
 // =====================================================
 
 startupReady.finally(() => {
-    app.listen(PORT, () => {
+    if (startupGateTimer) {
+        clearTimeout(startupGateTimer);
+        startupGateTimer = null;
+    }
+
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`
     ========================================
     CYNETWORK PISOWIFI Admin Backend
