@@ -2501,6 +2501,10 @@ const handleClientSendOtpRequest = async (req, res) => {
         return res.status(400).json({ error: 'Valid OTP purpose is required.' });
     }
 
+    if (!EMAIL_VERIFICATION_ENABLED) {
+        return res.status(400).json({ error: 'Email OTP is currently disabled by server settings.' });
+    }
+
     try {
         const codeResult = await requestClientEmailVerificationCode({
             email,
@@ -2555,7 +2559,7 @@ app.post('/api/client/register', (req, res) => {
         return res.status(400).json({ error: 'Full name, email, and password are required' });
     }
 
-    if (!verificationCode) {
+    if (EMAIL_VERIFICATION_ENABLED && !verificationCode) {
         return res.status(400).json({ error: 'Email OTP is required' });
     }
 
@@ -2636,6 +2640,11 @@ app.post('/api/client/register', (req, res) => {
     };
 
     const finalizeRegistration = (referralCodeToStore = null) => {
+        if (!EMAIL_VERIFICATION_ENABLED) {
+            createAccount(referralCodeToStore);
+            return;
+        }
+
         verifyClientEmailVerificationCode({
             email,
             purpose: EMAIL_CODE_PURPOSE_REGISTER,
@@ -2718,9 +2727,11 @@ app.post('/api/client/forgot-password', (req, res) => {
     const confirmPassword = String(req.body.confirmPassword || '');
     const verificationCode = String(req.body.verificationCode || '').trim();
 
-    if (!fullName || !email || !newPassword || !confirmPassword || !verificationCode) {
+    if (!fullName || !email || !newPassword || !confirmPassword || (EMAIL_VERIFICATION_ENABLED && !verificationCode)) {
         return res.status(400).json({
-            error: 'Full name, email, OTP, new password, and confirm password are required'
+            error: EMAIL_VERIFICATION_ENABLED
+                ? 'Full name, email, OTP, new password, and confirm password are required'
+                : 'Full name, email, new password, and confirm password are required'
         });
     }
 
@@ -2753,40 +2764,49 @@ app.post('/api/client/forgot-password', (req, res) => {
                 return res.status(404).json({ error: 'Account details not found' });
             }
 
+            const updatePassword = () => {
+                bcrypt.hash(newPassword, 10, (hashErr, hash) => {
+                    if (hashErr) {
+                        return res.status(500).json({ error: 'Failed to secure new password' });
+                    }
+
+                    db.run(
+                        `UPDATE client_accounts
+                         SET password = ?,
+                             updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ?`,
+                        [hash, accountRow.id],
+                        function(updateErr) {
+                            if (updateErr) {
+                                return res.status(500).json({ error: 'Failed to update account password' });
+                            }
+
+                            if (!this.changes) {
+                                return res.status(404).json({ error: 'Account not found' });
+                            }
+
+                            queueClientAccountBackup('client-forgot-password');
+                            res.json({
+                                success: true,
+                                message: 'Password reset successful. You can now login.'
+                            });
+                        }
+                    );
+                });
+            };
+
+            if (!EMAIL_VERIFICATION_ENABLED) {
+                updatePassword();
+                return;
+            }
+
             verifyClientEmailVerificationCode({
                 email,
                 purpose: EMAIL_CODE_PURPOSE_FORGOT_PASSWORD,
                 code: verificationCode
             })
                 .then(() => {
-                    bcrypt.hash(newPassword, 10, (hashErr, hash) => {
-                        if (hashErr) {
-                            return res.status(500).json({ error: 'Failed to secure new password' });
-                        }
-
-                        db.run(
-                            `UPDATE client_accounts
-                             SET password = ?,
-                                 updated_at = CURRENT_TIMESTAMP
-                             WHERE id = ?`,
-                            [hash, accountRow.id],
-                            function(updateErr) {
-                                if (updateErr) {
-                                    return res.status(500).json({ error: 'Failed to update account password' });
-                                }
-
-                                if (!this.changes) {
-                                    return res.status(404).json({ error: 'Account not found' });
-                                }
-
-                                queueClientAccountBackup('client-forgot-password');
-                                res.json({
-                                    success: true,
-                                    message: 'Password reset successful. You can now login.'
-                                });
-                            }
-                        );
-                    });
+                    updatePassword();
                 })
                 .catch((verifyError) => {
                     const statusCode = Number(verifyError?.statusCode || 400);

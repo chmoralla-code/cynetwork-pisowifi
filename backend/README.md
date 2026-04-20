@@ -208,7 +208,7 @@ This project now includes a Render blueprint file at `../render.yaml` for always
 - `SEMAPHORE_SENDER_NAME=CYNETWORK` (optional sender name)
 - `AMAZON_LEO_SMS_ENABLED=true`
 - `AMAZON_LEO_SMS_PROVIDER=semaphore`
-- `EMAIL_VERIFICATION_ENABLED=true`
+- `EMAIL_VERIFICATION_ENABLED=true` (set `false` to allow register/forgot-password without OTP while SMTP is unavailable)
 - `SMTP_HOST=<smtp-host>`
 - `SMTP_PORT=587`
 - `SMTP_SECURE=false` (set `true` for SSL ports such as 465)
