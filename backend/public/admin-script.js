@@ -121,6 +121,10 @@ function setupEventListeners() {
     document.getElementById('telegramEnabled')?.addEventListener('change', syncNotificationInputState);
     document.getElementById('intergramEnabled')?.addEventListener('change', syncNotificationInputState);
 
+    // Admin password settings
+    document.getElementById('openChangePasswordBtn')?.addEventListener('click', openChangePasswordModal);
+    document.getElementById('changePasswordForm')?.addEventListener('submit', submitChangePassword);
+
     // Close modals by clicking outside
     window.addEventListener('click', (event) => {
         if (event.target.id === 'orderModal') {
@@ -128,6 +132,9 @@ function setupEventListeners() {
         }
         if (event.target.id === 'rejectModal') {
             closeRejectModal();
+        }
+        if (event.target.id === 'changePasswordModal') {
+            closeChangePasswordModal();
         }
     });
 }
@@ -194,6 +201,8 @@ function logout() {
     currentChatSessionId = null;
     currentChatLastMessageId = 0;
     notificationSettings = null;
+    closeChangePasswordModal();
+    setChangePasswordStatus('');
 
     showLoginPage();
 }
@@ -428,6 +437,117 @@ function setNotificationSettingsStatus(message, type = 'info') {
     statusEl.style.display = 'block';
     statusEl.textContent = message;
     statusEl.className = `settings-status ${type}`;
+}
+
+function setChangePasswordStatus(message, type = 'info', elementId = 'changePasswordStatus') {
+    const statusEl = document.getElementById(elementId);
+    if (!statusEl) {
+        return;
+    }
+
+    if (!message) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+        statusEl.className = 'settings-status';
+        return;
+    }
+
+    statusEl.style.display = 'block';
+    statusEl.textContent = message;
+    statusEl.className = `settings-status ${type}`;
+}
+
+function openChangePasswordModal() {
+    const modal = document.getElementById('changePasswordModal');
+    if (!modal) {
+        return;
+    }
+
+    setChangePasswordStatus('', 'info', 'changePasswordModalStatus');
+    modal.classList.add('show');
+    document.getElementById('currentPasswordInput')?.focus();
+}
+
+function closeChangePasswordModal() {
+    const modal = document.getElementById('changePasswordModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+
+    document.getElementById('changePasswordForm')?.reset();
+    setChangePasswordStatus('', 'info', 'changePasswordModalStatus');
+}
+
+async function submitChangePassword(event) {
+    event.preventDefault();
+
+    if (!authToken) {
+        setChangePasswordStatus('Please login again before changing password.', 'error', 'changePasswordModalStatus');
+        return;
+    }
+
+    const currentPassword = String(document.getElementById('currentPasswordInput')?.value || '');
+    const newPassword = String(document.getElementById('newPasswordInput')?.value || '');
+    const confirmNewPassword = String(document.getElementById('confirmNewPasswordInput')?.value || '');
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+        setChangePasswordStatus('Please complete all password fields.', 'error', 'changePasswordModalStatus');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        setChangePasswordStatus('New password must be at least 6 characters.', 'error', 'changePasswordModalStatus');
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+        setChangePasswordStatus('New password and confirmation do not match.', 'error', 'changePasswordModalStatus');
+        return;
+    }
+
+    if (currentPassword === newPassword) {
+        setChangePasswordStatus('New password must be different from current password.', 'error', 'changePasswordModalStatus');
+        return;
+    }
+
+    try {
+        setChangePasswordStatus('Updating password...', 'info', 'changePasswordModalStatus');
+
+        const response = await fetch(`${API_URL}/admin/change-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                currentPassword,
+                newPassword
+            })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            if (response.status === 401) {
+                if (String(data.error || '').toLowerCase().includes('current password')) {
+                    setChangePasswordStatus('Current password is incorrect.', 'error', 'changePasswordModalStatus');
+                    return;
+                }
+
+                logout();
+                return;
+            }
+
+            throw new Error(data.error || 'Failed to update password');
+        }
+
+        setChangePasswordStatus('Password updated successfully.', 'success', 'changePasswordModalStatus');
+        setChangePasswordStatus('Admin password updated successfully.', 'success');
+        document.getElementById('changePasswordForm')?.reset();
+    } catch (error) {
+        console.error('Error changing admin password:', error);
+        setChangePasswordStatus(error.message || 'Failed to update password.', 'error', 'changePasswordModalStatus');
+        setChangePasswordStatus(error.message || 'Failed to update password.', 'error');
+    }
 }
 
 function updateNotificationMonitorStateLabel() {
@@ -846,7 +966,7 @@ async function viewOrder(orderId) {
                     </div>
 
                     <div class="detail-group">
-                        <label>WiFi Rate</label>
+                        <label>WiFi Rate (Mbps / JuanFi)</label>
                         <p>${order.wifi_rate}</p>
                     </div>
 

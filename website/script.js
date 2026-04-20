@@ -67,6 +67,20 @@ function normalizeQuantity(value) {
     return Math.min(100, Math.max(1, parsed));
 }
 
+function normalizeWifiRateMbps(value) {
+    const numeric = Number(String(value || '').trim());
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '';
+    }
+
+    const rounded = Math.round(numeric * 100) / 100;
+    const normalized = Number.isInteger(rounded)
+        ? String(rounded)
+        : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+
+    return `${normalized} Mbps`;
+}
+
 function loadSavedCustomerDetails() {
     try {
         const raw = localStorage.getItem(CUSTOMER_DETAILS_STORAGE_KEY);
@@ -854,14 +868,20 @@ async function completeTransaction() {
 
     const wifiName = document.getElementById('wifiName').value.trim();
     const wifiPassword = document.getElementById('wifiPassword').value.trim();
-    const wifiRate = document.getElementById('wifiRate').value;
+    const wifiRateInput = document.getElementById('wifiRate').value;
+    const normalizedWifiRate = normalizeWifiRateMbps(wifiRateInput);
 
     recalculateSelectedTotal({ refreshQr: false });
     const orderQuantity = normalizeQuantity(selectedQuantity);
     const selectedPackageData = packages[selectedPackage];
     
-    if (!wifiName || !wifiPassword || !wifiRate) {
+    if (!wifiName || !wifiPassword || !wifiRateInput) {
         alert('Please fill in all WiFi configuration fields');
+        return;
+    }
+
+    if (!normalizedWifiRate) {
+        alert('Please enter a valid WiFi data rate limit in Mbps.');
         return;
     }
 
@@ -907,7 +927,7 @@ async function completeTransaction() {
         address: address,
         wifiName: wifiName,
         wifiPassword: wifiPassword,
-        wifiRate: wifiRate,
+        wifiRate: normalizedWifiRate,
         proofImage: uploadedProofImage
     };
 
@@ -2423,8 +2443,8 @@ async function generateSupportReply(userMessage) {
         return 'Typical flow:\n- Preorder form submission: a few minutes\n- Order review and shipping update: depends on queue and location\n\nFor urgent follow-up, type: I need live customer support.';
     }
 
-    if (hasKeyword(text, ['wifi', 'ssid', 'password', 'voucher', 'portal'])) {
-        return 'On checkout, set your WiFi Name (SSID), Password, and preferred rate limit.\n\nTip: Use a strong password and avoid special characters unsupported by your router.';
+    if (hasKeyword(text, ['wifi', 'juanfi', 'ssid', 'password', 'voucher', 'portal'])) {
+        return 'On checkout, set your WiFi Name (SSID), Password, and JuanFi data rate limit in Mbps.\n\nTip: Use a strong password and avoid special characters unsupported by your router.';
     }
 
     if (hasKeyword(text, ['slow', 'lag', 'mabagal', 'buffer', 'speed', 'internet'])) {
@@ -2439,7 +2459,7 @@ async function generateSupportReply(userMessage) {
         return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
     }
 
-    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, ADDING EAP flow, proof upload, WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, ADDING EAP flow, proof upload, JuanFi WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
 }
 
 // Close picture modal when clicking outside

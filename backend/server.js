@@ -159,6 +159,31 @@ function normalizePriceInt(value, fallback = 0) {
     return Math.max(0, Math.round(numeric));
 }
 
+function normalizeWifiRateForStorage(value, packageId = 0) {
+    const raw = String(value || '').trim();
+
+    // ADDING EAP flow stores credential-like text in wifi_rate field.
+    if (Number(packageId) === 5) {
+        return raw || 'N/A';
+    }
+
+    if (!raw || /^n\/a$/i.test(raw)) {
+        return 'N/A';
+    }
+
+    const numeric = Number(raw.replace(/mbps/ig, '').trim());
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return raw;
+    }
+
+    const rounded = Math.round(numeric * 100) / 100;
+    const normalized = Number.isInteger(rounded)
+        ? String(rounded)
+        : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+
+    return `${normalized} Mbps`;
+}
+
 function toMoneyText(value) {
     return String(normalizePriceInt(value, 0));
 }
@@ -1892,6 +1917,61 @@ app.post('/api/login', (req, res) => {
     });
 });
 
+app.post('/api/admin/change-password', verifyToken, (req, res) => {
+    const currentPassword = String(req.body.currentPassword || '');
+    const newPassword = String(req.body.newPassword || '');
+
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    if (currentPassword === newPassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+    }
+
+    const adminId = Number(req.adminId || 0);
+    const adminUsername = String(req.adminUsername || '').trim();
+
+    const lookupQuery = adminId
+        ? 'SELECT id, username, password FROM admins WHERE id = ?'
+        : 'SELECT id, username, password FROM admins WHERE username = ?';
+    const lookupParams = adminId ? [adminId] : [adminUsername];
+
+    db.get(lookupQuery, lookupParams, (lookupErr, adminRow) => {
+        if (lookupErr || !adminRow) {
+            return res.status(401).json({ error: 'Unable to verify admin account' });
+        }
+
+        bcrypt.compare(currentPassword, adminRow.password, (compareErr, isMatch) => {
+            if (compareErr || !isMatch) {
+                return res.status(401).json({ error: 'Current password is incorrect' });
+            }
+
+            bcrypt.hash(newPassword, 10, (hashErr, newHash) => {
+                if (hashErr) {
+                    return res.status(500).json({ error: 'Failed to secure new password' });
+                }
+
+                db.run('UPDATE admins SET password = ? WHERE id = ?', [newHash, adminRow.id], function(updateErr) {
+                    if (updateErr) {
+                        return res.status(500).json({ error: 'Failed to update password' });
+                    }
+
+                    if (!this.changes) {
+                        return res.status(404).json({ error: 'Admin account not found' });
+                    }
+
+                    res.json({ success: true, message: 'Password updated successfully' });
+                });
+            });
+        });
+    });
+});
+
 // =====================================================
 // CLIENT ACCOUNT & REFERRAL ROUTES
 // =====================================================
@@ -2416,7 +2496,6 @@ app.post('/api/submit-order', (req, res) => {
     const normalizedAddress = String(address || '').trim();
     const normalizedWifiName = String(wifiName || 'PREORDER').trim() || 'PREORDER';
     const normalizedWifiPassword = String(wifiPassword || 'PREORDER').trim() || 'PREORDER';
-    const normalizedWifiRate = String(wifiRate || 'N/A').trim() || 'N/A';
 
     // Validate required fields
     if (!packageId || !normalizedFullName || !normalizedContactNumber || !normalizedAddress) {
@@ -2429,6 +2508,7 @@ app.post('/api/submit-order', (req, res) => {
     const resolvedDuration = catalog?.duration || String(duration || 'Custom Duration');
     const resolvedUnitPrice = catalog?.unitPrice ?? normalizePriceInt(price, 0);
     const resolvedQuantity = normalizePositiveInt(quantity, 1, 1, 100);
+    const normalizedWifiRate = normalizeWifiRateForStorage(wifiRate, normalizedPackageId);
     const shippingFee = 0;
     const totalPrice = resolvedUnitPrice * resolvedQuantity + shippingFee;
 
@@ -3442,6 +3522,7 @@ startupReady.finally(() => {
     
     API Endpoints:
     POST   /api/login
+    POST   /api/admin/change-password
     POST   /api/client/register
     POST   /api/client/login
     GET    /api/client/me
