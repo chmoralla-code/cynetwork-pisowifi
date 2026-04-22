@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CYNETWORK PISOWIFI - Premium WiFi solutions offering high-speed, reliable internet connectivity with flexible packages and professional installation.">
+    <meta name="keywords" content="WiFi, internet, connectivity, WiFi packages, fast internet, reliable WiFi, PISOWIFI">
+    <meta name="author" content="CYNETWORK">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#E63946">
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="CYNETWORK PISOWIFI - Premium WiFi Solutions">
+    <meta property="og:description" content="Experience ultra-fast, reliable internet with CYNETWORK PISOWIFI. Flexible packages for Starter, Professional, and Enterprise needs.">
+    <meta property="og:url" content="https://cynetwork-pisowifi.com">
+    <meta property="og:image" content="assets/images/cynetwork-url-logo.png">
+    <meta property="og:image:alt" content="CYNETWORK PISOWIFI Logo">
+    <meta property="og:site_name" content="CYNETWORK PISOWIFI">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter/X Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CYNETWORK PISOWIFI - Premium WiFi Solutions">
+    <meta name="twitter:description" content="Experience ultra-fast, reliable internet with CYNETWORK PISOWIFI. Flexible packages for everyone.">
+    <meta name="twitter:image" content="assets/images/cynetwork-url-logo.png">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://cynetwork-pisowifi.com">
+    
+    <!-- Additional SEO -->
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    <meta name="copyright" content="2026 CYNETWORK. All rights reserved.">
+    
+    <title>CYNETWORK PISOWIFI - Premium WiFi Solutions</title>
+    <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="stylesheet" href="styles-premium.css?v=20260421-1">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-text">CYNETWORK</span>
+                <span class="logo-subtext">PISOWIFI</span>
+            </div>
+            <button
+                id="mobileMenuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-label="Toggle navigation menu"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+            >
+                ☰
+            </button>
+            <ul id="mainNavMenu" class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#packages" class="nav-link">Packages</a></li>
+                <li><a href="#other-offers" class="nav-link">Other Offers</a></li>
+                <li><a href="#tutorials" class="nav-link">Tutorials</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><button type="button" class="account-nav-btn" onclick="openAccountModal()">Client Account</button></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>Premium WiFi Solutions</h1>
+            <p class="hero-subtitle">Experience ultra-fast, reliable internet connectivity</p>
+            <button class="cta-button" onclick="scrollToPackages()">Explore Packages</button>
+        </div>
+        <div class="hero-overlay"></div>
+    </section>
+
+    <!-- Features Strip -->
+    <section class="features-strip">
+        <div class="feature-item">
+            <span class="feature-icon">🚚</span>
+            <h4>Free Shipping</h4>
+            <p>Nationwide delivery at no cost</p>
+        </div>
+        <div class="feature-item">
+            <span class="feature-icon">🔒</span>
+            <h4>Secure Payment</h4>
+            <p>100% secure checkout via GCash</p>
+        </div>
+        <div class="feature-item">
+            <span class="feature-icon">↩️</span>
+            <h4>Easy Returns</h4>
+            <p>30-day return policy</p>
+        </div>
+    </section>
+
+    <!-- Packages Section -->
+    <section id="packages" class="packages-section">
+        <div class="section-header">
+            <h2>Our Packages</h2>
+            <p class="section-subtitle">Choose the perfect plan for your connectivity needs</p>
+        </div>
+        
+        <div class="packages-grid">
+            <!-- Package 1 -->
+            <div class="package-card" data-package="1">
+                <div class="package-badge">STARTER</div>
+                <div class="package-image-container">
+                    <img src="assets/images/package1.png" alt="Starter Package" class="package-image">
+                    <div class="package-overlay">
+                        <button class="view-full-btn" onclick="viewFullPicture(1)">View Details</button>
+                    </div>
+                </div>
+                <div class="package-content">
+                    <h3>Starter</h3>
+                    <p class="package-duration">1 Year License | 50 Meters</p>
+                    <div class="price-section">
+                        <span class="package-old-price">₱7,500</span>
+                        <p class="package-price">₱5,800</p>
+                        <span class="discount-badge">-23%</span>
+                    </div>
+                    <ul class="package-features">
+                        <li>✓ 1 Year License</li>
+                        <li>✓ Telegram Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Anti Lag</li>
+                        <li>✓ Voucher Generation</li>
+                        <li>✓ Local Server</li>
+                        <li>✓ Custom Portal</li>
+                        <li>✓ 20-30 Clients</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(1)">SELECT PLAN</button>
+                </div>
+            </div>
+
+            <!-- Package 2 - Featured -->
+            <div class="package-card featured" data-package="2">
+                <div class="package-badge featured-badge">MOST POPULAR</div>
+                <div class="package-image-container">
+                    <img src="assets/images/package2.png" alt="Professional Package" class="package-image">
+                    <div class="package-overlay">
+                        <button class="view-full-btn" onclick="viewFullPicture(2)">View Details</button>
+                    </div>
+                </div>
+                <div class="package-content">
+                    <h3>Professional</h3>
+                    <p class="package-duration">3 Years License | 100 Meters</p>
+                    <div class="price-section">
+                        <span class="package-old-price">₱10,000</span>
+                        <p class="package-price">₱8,500</p>
+                        <span class="discount-badge">-15%</span>
+                    </div>
+                    <ul class="package-features">
+                        <li>✓ 3 Year License</li>
+                        <li>✓ Telegram Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Anti Lag</li>
+                        <li>✓ Voucher Generation</li>
+                        <li>✓ Local Server</li>
+                        <li>✓ Custom Portal</li>
+                        <li>✓ 40-60 Clients</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(2)">SELECT PLAN</button>
+                </div>
+            </div>
+
+            <!-- Package 3 -->
+            <div class="package-card" data-package="3">
+                <div class="package-badge">ENTERPRISE</div>
+                <div class="package-image-container">
+                    <img src="assets/images/package3.png" alt="Enterprise Package" class="package-image">
+                    <div class="package-overlay">
+                        <button class="view-full-btn" onclick="viewFullPicture(3)">View Details</button>
+                    </div>
+                </div>
+                <div class="package-content">
+                    <h3>Enterprise</h3>
+                    <p class="package-duration">Lifetime License | 250 Meters</p>
+                    <div class="price-section">
+                        <span class="package-old-price">₱15,000</span>
+                        <p class="package-price">₱11,000</p>
+                        <span class="discount-badge">-27%</span>
+                    </div>
+                    <ul class="package-features">
+                        <li>✓ Lifetime License</li>
+                        <li>✓ Telegram Monitoring</li>
+                        <li>✓ Pause Time Feature</li>
+                        <li>✓ Voucher Generation</li>
+                        <li>✓ Local Server</li>
+                        <li>✓ Custom Portal</li>
+                        <li>✓ 80-100 Clients</li>
+                        <li>✓ Advanced Anti Lag</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(3)">SELECT PLAN</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Other Offers Section -->
+    <section id="other-offers" class="other-offers-section">
+        <div class="section-header">
+            <h2>Additional Services</h2>
+            <p class="section-subtitle">Expand your connectivity options</p>
+        </div>
+
+        <div class="other-offers-grid">
+            <div class="other-offer-card">
+                <div class="other-offer-media">
+                    <img src="assets/images/amazon-leo.webp" alt="Amazon LEO Package" class="other-offer-image">
+                </div>
+                <div class="other-offer-content">
+                    <span class="other-offer-tag">PRE-ORDER</span>
+                    <h3>Amazon LEO Internet</h3>
+                    <p>Reserve your spot now. Official pricing coming soon!</p>
+                    <button class="other-offer-btn" onclick="openAmazonLeoReservationModal()">
+                        PREORDER NOW
+                    </button>
+                </div>
+            </div>
+
+            <div class="other-offer-card">
+                <div class="other-offer-media">
+                    <img src="assets/images/adding-eap.png" alt="Adding EAP Service" class="other-offer-image">
+                </div>
+                <div class="other-offer-content">
+                    <span class="other-offer-tag">ADD-ON</span>
+                    <h3>Add TP-Link Product</h3>
+                    <p>Enhance your setup with professional equipment. ₱350</p>
+                    <button class="other-offer-btn" onclick="openAddingEapModal()">
+                        ADD EQUIPMENT
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tutorials Section -->
+    <section id="tutorials" class="tutorials-section">
+        <div class="section-header">
+            <h2>Installation Guides</h2>
+            <p class="section-subtitle">Step-by-step setup instructions for each package</p>
+        </div>
+
+        <div class="tutorials-grid">
+            <article class="tutorial-card">
+                <div class="tutorial-image-container">
+                    <img src="assets/images/package1.png" alt="Starter Setup" class="tutorial-image">
+                </div>
+                <div class="tutorial-content">
+                    <h3>Starter Setup</h3>
+                    <p class="tutorial-sub">1 Year | 50m Range | 20-30 Clients</p>
+                    <ol class="tutorial-steps">
+                        <li>Mount the Starter unit near your modem</li>
+                        <li>Connect WAN/LAN cable and verify portal access</li>
+                        <li>Configure SSID, password, and bandwidth limits</li>
+                    </ol>
+                    <button type="button" class="tutorial-btn" onclick="viewFullPicture(1)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-image-container">
+                    <img src="assets/images/package2.png" alt="Professional Setup" class="tutorial-image">
+                </div>
+                <div class="tutorial-content">
+                    <h3>Professional Setup</h3>
+                    <p class="tutorial-sub">3 Years | 100m Range | 40-60 Clients</p>
+                    <ol class="tutorial-steps">
+                        <li>Install central router and connect Professional unit</li>
+                        <li>Enable monitoring and test payment workflow</li>
+                        <li>Run signal and speed tests during peak hours</li>
+                    </ol>
+                    <button type="button" class="tutorial-btn" onclick="viewFullPicture(2)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-image-container">
+                    <img src="assets/images/package3.png" alt="Enterprise Setup" class="tutorial-image">
+                </div>
+                <div class="tutorial-content">
+                    <h3>Enterprise Setup</h3>
+                    <p class="tutorial-sub">Lifetime | 250m Range | 80-100 Clients</p>
+                    <ol class="tutorial-steps">
+                        <li>Deploy main unit and access points by coverage map</li>
+                        <li>Configure anti-lag and user limit profiles</li>
+                        <li>Perform full activation test with payment and voucher</li>
+                    </ol>
+                    <button type="button" class="tutorial-btn" onclick="viewFullPicture(3)">View Diagram</button>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <div class="about-container">
+            <h2>About CYNETWORK PISOWIFI</h2>
+            <p>We deliver premium WiFi solutions designed for everyone. Our systems combine reliability, speed, and affordability to provide you with the best connectivity experience possible.</p>
+        </div>
+    </section>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Complete Your Payment</h2>
+            
+            <!-- Step 1: QR Code Payment -->
+            <div id="step1" class="payment-step active">
+                <h3>Step 1: Scan QR Code to Pay via GCash</h3>
+                <p class="package-selected">
+                    Package: <span id="selectedPackageText">Starter</span><br>
+                    Unit Price: ₱<span id="selectedUnitPrice">5800</span>.00<br>
+                    Quantity: <span id="selectedQuantityText">1</span> piece(s)<br>
+                    Total Payment: ₱<span id="selectedPrice">5800</span>.00
+                </p>
+                <p class="shipping-free-note">🚚 Shipping Fee: FREE (₱0)</p>
+
+                <div class="form-group quantity-group">
+                    <label for="orderQuantity">How many pieces do you want? *</label>
+                    <input type="number" id="orderQuantity" min="1" max="100" value="1" oninput="handleQuantityChange()" required>
+                    <p class="quantity-summary">Total: ₱<span id="selectedTotalPrice">5800</span>.00</p>
+                </div>
+
+                <div id="checkoutAccountNotice" class="checkout-account-notice" style="display: none;"></div>
+                
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan with GCash App to Pay</p>
+                </div>
+                
+                <button class="next-btn" onclick="nextStep()">Payment Completed</button>
+            </div>
+
+            <!-- Step 2: Upload Proof of Payment -->
+            <div id="step2" class="payment-step">
+                <h3>Step 2: Upload Proof of Payment</h3>
+                <p>Upload a screenshot of your successful GCash transaction</p>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="proofImage" accept="image/*" onchange="handleFileUpload(event)">
+                    <label for="proofImage">
+                        <span class="upload-icon">📸</span>
+                        <span class="upload-text">Click to upload or drag and drop</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+                
+                <div id="uploadPreview" class="upload-preview"></div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validateProof()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Personal Information -->
+            <div id="step3" class="payment-step">
+                <h3>Step 3: Your Information</h3>
+                <p>Enter your delivery and account details</p>
+                
+                <form id="personalForm">
+                    <div class="form-group">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contactNumber">Contact Number *</label>
+                        <input type="tel" id="contactNumber" placeholder="+63 9XX XXX XXXX" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="address">Full Address *</label>
+                        <textarea id="address" placeholder="Street, City, Province, Postal Code" rows="3" required></textarea>
+                    </div>
+                </form>                
+
+                <div class="saved-details-helper">
+                    <p class="saved-details-note">Save details for faster checkout next time</p>
+                    <button type="button" class="saved-details-clear" onclick="clearSavedCustomerDetails()">Clear</button>
+                </div>
+
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validatePersonalInfo()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 4: WiFi Configuration -->
+            <div id="step4" class="payment-step">
+                <h3>Step 4: Configure WiFi</h3>
+                <p>Set up your WiFi network details</p>
+                
+                <form id="wifiForm">
+                    <div class="form-group">
+                        <label for="wifiName">WiFi Name (SSID) *</label>
+                        <input type="text" id="wifiName" placeholder="MyWiFi_Home" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiPassword">WiFi Password *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                            <button type="button" id="wifiPasswordToggle" class="password-toggle-btn" onclick="toggleWifiPasswordVisibility()">Show</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiRate">Data Rate Limit (Mbps) *</label>
+                        <input type="number" id="wifiRate" min="0.1" step="0.1" placeholder="e.g., 10" required>
+                        <small class="form-hint">Enter your preferred speed limit</small>
+                    </div>
+                </form>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="submit-btn" onclick="completeTransaction()">Complete Order</button>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="successMessage" class="payment-step" style="display: none; text-align: center;">
+                <div class="success-icon">✓</div>
+                <h3>Order Confirmed!</h3>
+                <p>Your WiFi package has been successfully ordered.</p>
+                <p class="order-id">Order ID: <span id="orderId"></span></p>
+                <button class="success-btn" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Modal -->
+    <div id="accountModal" class="modal">
+        <div class="modal-content account-modal">
+            <span class="close" onclick="closeAccountModal()">&times;</span>
+            <div class="account-tabs">
+                <button id="accountTabLogin" class="tab-btn active" onclick="switchAccountTab('login')">Login</button>
+                <button id="accountTabRegister" class="tab-btn" onclick="switchAccountTab('register')">Register</button>
+                <button id="accountTabDashboard" class="tab-btn" onclick="switchAccountTab('dashboard')">Dashboard</button>
+            </div>
+
+            <!-- Login Panel -->
+            <div id="accountLoginPanel" class="account-panel active">
+                <h3>Client Login</h3>
+                <form id="loginForm" onsubmit="handleClientLogin(event)">
+                    <div class="form-group">
+                        <label for="loginEmail">Email Address</label>
+                        <input type="email" id="loginEmail" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Login</button>
+                </form>
+                <div id="accountAuthMessage" class="account-auth-message" style="display: none;"></div>
+            </div>
+
+            <!-- Register Panel -->
+            <div id="accountRegisterPanel" class="account-panel">
+                <h3>Create Account</h3>
+                <form id="registerForm" onsubmit="handleClientRegister(event)">
+                    <div class="form-group">
+                        <label for="registerEmail">Email Address</label>
+                        <input type="email" id="registerEmail" placeholder="your@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Password</label>
+                        <input type="password" id="registerPassword" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Register</button>
+                </form>
+            </div>
+
+            <!-- Dashboard Panel -->
+            <div id="accountDashboardPanel" class="account-panel">
+                <h3>Account Dashboard</h3>
+                <div id="accountDashboardLoggedOut" style="display: block;">
+                    <p>Please login to access your dashboard.</p>
+                </div>
+                <div id="accountDashboardLoggedIn" style="display: none;">
+                    <p>Welcome back!</p>
+                    <button type="button" class="logout-btn" onclick="handleClientLogout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal for Full Pictures -->
+    <div id="imageModal" class="modal">
+        <div class="image-modal-content">
+            <span class="close" onclick="closeImageModal()">&times;</span>
+            <img id="fullImage" src="" alt="Package Image">
+        </div>
+    </div>
+
+    <script src="script.js?v=20260421-1"></script>
+</body>
+</html>

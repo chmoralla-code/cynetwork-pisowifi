@@ -2980,4 +2980,116 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initSupportChat();
+
+    // =====================================================
+    // PARTICLE TRAIL CURSOR EFFECT
+    // =====================================================
+    const particleContainer = document.createElement('div');
+    particleContainer.id = 'particle-container';
+    particleContainer.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+    `;
+    document.body.appendChild(particleContainer);
+
+    const particles = [];
+    const particleColors = ['#FFD700', '#FFC700', '#FFB700', '#FFA700', '#FF9700'];
+
+    function createParticle(x, y) {
+        const particle = document.createElement('div');
+        const size = Math.random() * 8 + 4;
+        const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+        const duration = Math.random() * 0.6 + 0.4;
+
+        particle.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            width: ${size}px;
+            height: ${size}px;
+            background: ${color};
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: 0 0 ${size * 1.5}px ${color};
+            animation: particle-fade ${duration}s ease-out forwards;
+        `;
+
+        particleContainer.appendChild(particle);
+
+        setTimeout(() => {
+            particle.remove();
+        }, duration * 1000);
+    }
+
+    // Add animation keyframes
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes particle-fade {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx, ${Math.random() * 40 - 20}px), var(--ty, ${Math.random() * 40 - 20}px)) scale(0);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    let lastParticleTime = 0;
+    const particleDelay = 30;
+
+    document.addEventListener('mousemove', (e) => {
+        const now = Date.now();
+        if (now - lastParticleTime > particleDelay) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            const offsetY = (Math.random() - 0.5) * 20;
+            createParticle(e.clientX + offsetX, e.clientY + offsetY);
+            lastParticleTime = now;
+        }
+    });
+
+    // Create particles on click for extra effect
+    document.addEventListener('click', (e) => {
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                const angle = (i / 5) * Math.PI * 2;
+                const distance = 15;
+                const x = e.clientX + Math.cos(angle) * distance;
+                const y = e.clientY + Math.sin(angle) * distance;
+                createParticle(x, y);
+            }, i * 20);
+        }
+    });
 });
+
+// Additional particle animation styles
+(function() {
+    const styles = document.createElement('style');
+    styles.textContent = `
+        @keyframes particle-float {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translate(calc(var(--vx) * 60px), calc(var(--vy) * 60px)) scale(0) rotate(360deg);
+            }
+        }
+
+        body {
+            cursor: none;
+        }
+    `;
+    document.head.appendChild(styles);
+})();
