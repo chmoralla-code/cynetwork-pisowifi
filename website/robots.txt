@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Allow: /website/
+Disallow: /private/
+Disallow: /admin/
+
+# Crawl delay
+Crawl-delay: 1
+
+# Sitemaps
+Sitemap: https://cynetwork-pisowifi.com/sitemap.xml
+
+# Allow specific bots
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
