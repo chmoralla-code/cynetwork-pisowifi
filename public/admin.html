@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CYNETWORK PISOWIFI Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="logo">CYNETWORK <span>PISOWIFI</span></div>
+    <p class="tag">Admin Dashboard</p>
+  </header>
+
+  <main class="admin-container">
+    <div class="panel glass">
+      <h2>Orders</h2>
+      <table id="ordersTable">
+        <thead><tr><th>Order</th><th>Package</th><th>Price</th><th>Name</th><th>Contact</th><th>Proof</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <div id="chatModal" class="modal hidden">
+    <div class="modal-content">
+      <header>Chat — <span id="chatOrderId"></span> <button id="closeChat">✖</button></header>
+      <div id="chatMessages" class="messages"></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="Type a message as Admin..." autocomplete="off" />
+        <button class="btn">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

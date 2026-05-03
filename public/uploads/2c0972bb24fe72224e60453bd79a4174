@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" viewBox="0 0 240 160">
+  <defs>
+    <linearGradient id="g3" x1="0" x2="1">
+      <stop offset="0" stop-color="#8affc1"/>
+      <stop offset="1" stop-color="#7ef9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="160" rx="12" fill="#031020"/>
+  <g transform="translate(22,18)">
+    <polygon points="12,56 36,12 60,56" fill="url(#g3)" opacity="0.12"/>
+    <text x="90" y="46" font-family="Orbitron, sans-serif" font-size="14" fill="#9bd">Ultra</text>
+    <text x="38" y="52" font-family="Orbitron, sans-serif" font-size="22" fill="#bff">U</text>
+  </g>
+</svg>

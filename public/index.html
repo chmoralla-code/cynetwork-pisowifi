@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PisoWifi - Affordable Internet Packages</title>
+    <script src="/socket.io/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -app            ngrok http 3000le-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2a1b1b 0%, #5a4a4a 50%, #8a7a7a 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(42, 27, 27, 0.95);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(200, 50, 50, 0.2);
+        }
+
+        header .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 900;
+            text-decoration: none;
+            color: #C83232;
+            letter-spacing: -1px;
+        }
+
+        nav a {
+            color: #d0d0d0;
+            text-decoration: none;
+            margin-left: 2.5rem;
+            transition: color 0.3s;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        nav a:hover {
+            color: #C83232;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .hero {
+            background: linear-gradient(180deg, rgba(200, 50, 50, 0.2) 0%, transparent 100%);
+            color: white;
+            padding: 120px 2rem 80px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            background: linear-gradient(135deg, #E63946 0%, #FF6B6B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 20px;
+            margin-bottom: 40px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            color: #d0d0d0;
+            font-weight: 300;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
+            color: #fff;
+            padding: 15px 50px;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 16px;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+        }
+
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(200, 50, 50, 0.4);
+        }
+
+        section {
+            padding: 80px 2rem;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 60px;
+            color: #ffffff;
+            font-weight: 900;
+            letter-spacing: -1px;
+        }
+
+        .pricing-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .pricing-card {
+            background: linear-gradient(135deg, rgba(80, 50, 50, 0.8) 0%, rgba(60, 40, 40, 0.8) 100%);
+            border-radius: 16px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            border: 1px solid rgba(200, 50, 50, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-15px);
+            box-shadow: 0 30px 80px rgba(200, 50, 50, 0.3);
+            border-color: rgba(200, 50, 50, 0.4);
+        }
+        /* Added for visual selection */
+        .pricing-card.selected {
+            border-color: #ff6b6b;
+            box-shadow: 0 0 40px rgba(200, 50, 50, 0.5);
+        }
+
+        .pricing-card.featured {
+            border: 2px solid #C83232;
+            background: linear-gradient(135deg, rgba(200, 50, 50, 0.15) 0%, rgba(80, 50, 50, 0.9) 100%);
+        }
+
+        .pricing-card.featured::before {
+            content: "FEATURED";
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #C83232, #E63946);
+            color: #fff;
+            padding: 6px 24px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+        /* Added for "Recommended" badge */
+        .recommended-badge {
+            position: absolute;
+            top: -15px;
+            right: 20px;
+            background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%); /* Green gradient */
+            color: #fff;
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .package-name {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+
+        .price {
+            font-size: 56px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #C83232, #FF6B6B);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .price-label {
+            color: #d0d0d0;
+            font-size: 14px;
+            margin-bottom: 40px;
+            font-weight: 500;
+        }
+
+        .features-list {
+            text-align: left;
+            margin: 40px 0;
+            list-style: none;
+        }
+
+        .features-list li {
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(200, 50, 50, 0.1);
+            color: #d0d0d0;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .features-list li::before {
+            content: "✓ ";
+            color: #C83232;
+            font-weight: 900;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+
+        .select-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 40px;
+            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 0.5px;
+        }
+
+        .select-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 35px rgba(200, 50, 50, 0.3);
+        }
+
+        .features-section {
+            background: linear-gradient(180deg, rgba(200, 50, 50, 0.05) 0%, transparent 100%);
+        }
+
+        .features-list-main {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            list-style: none;
+        }
+
+        .features-list-main li {
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(80, 50, 50, 0.6) 0%, rgba(60, 40, 40, 0.6) 100%);
+            border-radius: 12px;
+            border-left: 4px solid #C83232;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            border: 1px solid rgba(200, 50, 50, 0.1);
+        }
+
+        .features-list-main li:hover {
+            border-color: rgba(200, 50, 50, 0.4);
+            box-shadow: 0 10px 30px rgba(200, 50, 50, 0.2);
+        }
+
+        .features-list-main strong {
+            color: #C83232;
+            display: block;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .features-list-main li {
+            color: #d0d0d0;
+            line-height: 1.6;
+        }
+
+        .contact-section { /* Added id="contact" */
+            background: linear-gradient(135deg, rgba(200, 50, 50, 0.2) 0%, rgba(200, 50, 50, 0.05) 100%);
+            color: white;
+            text-align: center;
+            border-top: 1px solid rgba(200, 50, 50, 0.2);
+            border-bottom: 1px solid rgba(200, 50, 50, 0.2);
+        }
+
+        .contact-section h2 {
+            color: white;
+        }
+
+        .contact-section p {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #d0d0d0;
+        }
+
+        footer {
+            background-color: rgba(42, 27, 27, 0.95);
+            color: #d0d0d0;
+            text-align: center;
+            padding: 30px 2rem;
+            border-top: 1px solid rgba(200, 50, 50, 0.1);
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            nav {
+                display: none;
+            }
+
+            header .container {
+                flex-direction: column;
+            }
+
+            .pricing-container {
+                grid-template-columns: 1fr;
+            }
+
+            .features-list-main {
+                grid-template-columns: 1fr;
+            }
+
+            h2 {
+                font-size: 36px;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            display: none; /* Hidden by default */
+            background-color: rgba(0, 0, 0, 0.8);
+            animation: fadeInModal 0.3s ease-in-out;
+        }
+
+        @keyframes fadeInModal {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content, .order-modal-content { /* Combined styles for general modal content and new order modal */
+            background-color: rgba(42, 27, 27, 0.95);
+            margin: auto;
+            padding: 40px;
+            border: 2px solid #C83232;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 700px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: slideInModal 0.5s ease-out;
+            box-shadow: 0 0 50px rgba(200, 50, 50, 0.6), 0 0 100px rgba(200, 50, 50, 0.3);
+        }
+
+        @keyframes slideInModal {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -60%);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        .modal-content img, .order-modal-content img {
+            width: 100%;
+            border-radius: 15px;
+            animation: glowPulse 2s ease-in-out infinite;
+            border: 3px solid #C83232;
+            box-shadow: 0 0 30px rgba(230, 57, 70, 0.6);
+        }
+
+        @keyframes glowPulse {
+            0%, 100% {
+                box-shadow: 0 0 30px rgba(230, 57, 70, 0.6), inset 0 0 20px rgba(200, 50, 50, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(230, 57, 70, 0.8), inset 0 0 30px rgba(200, 50, 50, 0.4);
+            }
+        }
+
+        .close-modal, .close-order-modal, .close-payment { /* Combined close button styles */
+            color: #C83232;
+            float: right;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close-modal:hover {
+            color: #ff6b6b;
+        }
+
+        .modal-title, .order-modal-title, .payment-title { /* Combined title styles */
+            color: #C83232;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
+        .gaming-text {
+            color: #d0d0d0;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 16px;
+            animation: textGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes textGlow {
+            0%, 100% {
+                color: #d0d0d0;
+                text-shadow: 0 0 5px rgba(200, 50, 50, 0.3);
+            }
+            50% {
+                color: #C83232;
+                text-shadow: 0 0 15px rgba(200, 50, 50, 0.8);
+            }
+        }
+
+        @keyframes slideInImage {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: translate(0, 0);
+            }
+            100% {
+                transform: translate(50px, 50px);
+            }
+        }
+
+        .buy-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 40px;
+            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 0.5px;
+        }
+
+        .buy-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 35px rgba(200, 50, 50, 0.3);
+        }
+
+        /* Payment Modals */
+        .payment-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            animation: fadeInModal 0.3s ease-in-out;
+        }
+
+        .payment-step {
+            margin-bottom: 20px;
+        }
+
+        .qr-placeholder {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 14px;
+            margin: 20px 0;
+            border: 2px dashed #C83232;
+        }
+        /* New Order Modal specific styles */
+        .order-modal-step {
+            display: none; /* Hidden by default */
+        }
+        .order-modal-step.active {
+            display: block;
+        }
+        .order-modal-step-indicator {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #d0d0d0;
+            font-size: 14px;
+        }
+        .order-modal-step-indicator span {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            line-height: 25px;
+            border-radius: 50%;
+            background: rgba(200, 50, 50, 0.2);
+            color: #C83232;
+            margin: 0 5px;
+            font-weight: bold;
+        }
+        .order-modal-step-indicator span.active {
+            background: #C83232;
+            color: #fff;
+        }
+        .order-summary {
+            background: rgba(80, 50, 50, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(200, 50, 50, 0.2);
+        }
+        .order-summary p {
+            margin-bottom: 8px;
+            color: #d0d0d0;
+        }
+        .order-summary strong {
+            color: #C83232;
+        }
+        .order-summary .price {
+            font-size: 28px;
+        }
+        .qr-code-img {
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            display: block;
+            margin: 20px auto;
+            border: 3px solid #C83232;
+            border-radius: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #d0d0d0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(60, 40, 40, 0.8);
+            border: 1px solid #C83232;
+            border-radius: 8px;
+            color: #fff;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            background: rgba(80, 50, 50, 0.9);
+            border-color: #ff6b6b;
+            box-shadow: 0 0 10px rgba(200, 50, 50, 0.3);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-submit:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(200, 50, 50, 0.3);
+        }
+
+        .btn-next, .btn-prev { /* Combined styles for navigation buttons */
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-next:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(200, 50, 50, 0.3);
+        }
+
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .status-pending {
+            background: rgba(200, 100, 50, 0.3);
+            color: #ffb366;
+            border: 1px solid #ff8800;
+        }
+
+        .status-approved {
+            background: rgba(50, 150, 50, 0.3);
+            color: #66ff66;
+            border: 1px solid #00aa00;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-label {
+            display: block;
+            padding: 12px;
+            background: rgba(80, 50, 50, 0.6);
+            border: 2px dashed #C83232;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            color: #d0d0d0;
+            transition: all 0.3s;
+        }
+
+        .file-label:hover {
+            background: rgba(100, 60, 60, 0.6);
+            border-color: #ff6b6b;
+        }
+
+        /* Chat Styles */
+        .chat-modal { /* Renamed from .chat-panel for consistency with app.js */
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            max-height: 550px;
+            background: rgba(42, 27, 27, 0.98);
+            border: 2px solid #C83232;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            z-index: 999;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .chat-modal.active { /* Renamed from .chat-panel.active */
+            display: flex;
+        }
+
+        .chat-header {
+            background: rgba(200, 50, 50, 0.2);
+            padding: 15px;
+            border-bottom: 1px solid #C83232;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .chat-header-title {
+            color: #C83232;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .chat-close-btn {
+            background: none;
+            border: none;
+            color: #C83232;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-close-btn:hover, .close-order-modal:hover {
+            color: #ff6b6b;
+        }
+
+        #chatMessages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: rgba(80, 50, 50, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chat-message {
+            padding: 10px 12px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            max-width: 90%;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Renamed .chat-message to .message and .chat-message.buyer to .message.me for consistency with app.js */
+        #chatMessages .message {
+            padding: 10px 12px;
+            border-radius: 8px;
+            word-wrap: break-word;
+            max-width: 90%;
+            animation: fadeIn 0.3s ease-in;
+            color: #d0d0d0;
+            font-size: 12px;
+        }
+        #chatMessages .message.me {
+            background: rgba(100, 200, 50, 0.3);
+            border-left: 3px solid #66ff66;
+            align-self: flex-end;
+        }
+
+        .chat-message .text {
+            color: #d0d0d0;
+            font-size: 12px;
+        }
+
+        /* Removed .chat-message .time as app.js doesn't use it */
+        #chatMessages .message strong { /* For 'from' field */
+            font-weight: 700;
+            font-size: 11px;
+            color: #ffb366; /* Highlight sender name */
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            border-top: 1px solid #C83232;
+            background: rgba(42, 27, 27, 0.8);
+            border-radius: 0 0 10px 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #C83232;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 12px;
+        }
+
+        #messageInput::placeholder {
+            color: #888;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .chat-send-btn {
+            padding: 8px 15px;
+            background: #C83232;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 11px;
+            transition: all 0.3s;
+        }
+
+        .chat-send-btn:hover {
+            background: #ff6b6b;
+            transform: translateY(-2px);
+        }
+
+        .chat-btn-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #C83232;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 998;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 5px 20px rgba(200, 50, 50, 0.4);
+            transition: all 0.3s;
+        }
+
+        .chat-btn-toggle:hover {
+            background: #ff6b6b;
+            transform: scale(1.1);
+        }
+
+        .chat-btn-toggle.hidden {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            .chat-modal { /* Renamed from .chat-panel */
+                width: 100vw;
+                height: 100vh;
+                max-height: 100vh;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+        }
+    </style>
+    <!-- Hidden select and price tag for JS logic, similar to app.js -->
+    <select id="packageSelect" style="display: none;">
+        <option value="PACKAGE 1" data-price="5800">PACKAGE 1</option>
+        <option value="PACKAGE 2" data-price="8500">PACKAGE 2</option>
+        <option value="PACKAGE 3" data-price="12000">PACKAGE 3</option>
+    </select>
+    <span id="priceTag" style="display: none;"></span>
+
+    <!-- Feed for real-time notifications -->
+    <div id="feed" class="feed" style="display: none;">
+        <div class="notice">Welcome to PisoWifi!</div>
+    </div>
+
+    <!-- Placeholder for QR code image -->
+    <img id="gcashQrCode" src="https://via.placeholder.com/250x250?text=GCash+QR+Code" alt="GCash QR Code" style="display: none;">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <a href="#" class="logo">🌐 PisoWifi</a>
+            <nav>
+                <a href="#packages">Packages</a>
+                <a href="#features-section">Features</a>
+                <a href="#contact-section">Contact</a>
+                <a href="#" id="trackOrderNavBtn">Track Order</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Affordable Internet for Everyone</h1>
+            <p>Get high-speed internet access at unbeatable prices. PisoWifi brings connectivity within your reach.</p>
+            <button class="cta-button" data-scroll-to="packages">Get Started Today</button>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="packages">
+        <div class="container">
+            <h2>Our Packages</h2>
+            <div class="pricing-container">
+                <!-- Package 1 - Now uses data attributes and opens order modal -->
+                <div class="pricing-card pkg-card" data-package-id="PACKAGE 1" data-price="5800">
+                    <div class="package-name">PACKAGE 1</div>
+                    <div class="price">₱5,800</div>
+                    <div class="price-label">One-time — 1 Year License</div>
+                    <ul class="features-list">
+                        <li>1 year license</li>
+                        <li>Telegram realtime sales monitoring</li>
+                        <li>Pause / Resume / Extend subscriptions</li>
+                        <li>Voucher system for promos</li>
+                        <li>Suitable for 20–25 concurrent clients</li>
+                        <li>Gaming priority with anti-lag optimizations</li>
+                    </ul>
+                    <button class="select-btn">BUY</button> <!-- This button will now open the new order modal -->
+                </div>
+
+                <!-- Package 2 - Now uses data attributes and opens order modal -->
+                <div class="pricing-card pkg-card" data-package-id="PACKAGE 2" data-price="8500">
+                    <div class="package-name">PACKAGE 2</div>
+                    <div class="price">₱8,500</div>
+                    <div class="price-label">One-time — 1 Year License</div>
+                    <ul class="features-list">
+                        <li>1 year license</li>
+                        <li>Telegram realtime sales monitoring</li>
+                        <li>Pause / Resume / Extend subscriptions</li>
+                        <li>Voucher system for promos</li>
+                        <li>Suitable for 40–80 concurrent clients</li>
+                        <li>100 meters range signal (eap110 tplink)</li>
+                        <li>Gaming priority with anti-lag optimizations</li>
+                    </ul>
+                    <button class="select-btn">BUY</button>
+                </div>
+
+                <!-- Package 3 - Featured and Recommended -->
+                <div class="pricing-card featured pkg-card" data-package-id="PACKAGE 3" data-price="12000">
+                    <div class="recommended-badge">RECOMMENDED</div> <!-- Added recommended badge -->
+                    <div class="package-name">PACKAGE 3</div>
+                    <div class="price">₱12,000</div>
+                    <div class="price-label">One-time — 1 Year License</div>
+                    <ul class="features-list">
+                        <li>1 year license</li>
+                        <li>Telegram realtime sales monitoring</li>
+                        <li>Pause / Resume / Extend subscriptions</li>
+                        <li>Voucher system for promos</li>
+                        <li>Suitable for 80–150 concurrent clients</li>
+                        <li>200 meters dual AP eap110 tplink</li>
+                        <li>Gaming priority with anti-lag optimizations</li>
+                    </ul>
+                    <button class="select-btn">BUY</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features-section" class="features-section">
+        <div class="container">
+            <h2>Why Choose PisoWifi?</h2>
+            <ul class="features-list-main">
+                <li><strong>💰 Affordable</strong><br>Competitive pricing that doesn't compromise quality</li>
+                <li><strong>⚡ Fast & Reliable</strong><br>High-speed connections you can count on</li>
+                <li><strong>📱 24/7 Support</strong><br>Our team is always ready to help</li>
+                <li><strong>🔒 Secure</strong><br>Protected network with encryption</li>
+                <li><strong>🌍 Wide Coverage</strong><br>Available in many areas</li>
+                <li><strong>📊 Transparent</strong><br>No hidden fees or surprise charges</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact-section" class="contact-section">
+        <div class="container">
+            <h2>Ready to Go Online?</h2>
+            <p>Choose your plan and start enjoying fast, affordable internet today!</p>
+            <button class="cta-button" data-scroll-to="packages">Subscribe Now</button>
+            <p style="margin-top: 30px; opacity: 0.9;">📞 Call us: 09505339963 | 📧 Email: support@pisowifi.com</p>
+            <p style="margin-top: 15px; opacity: 0.9;">
+                <a href="https://www.facebook.com/profile.php?id=61584774638218" style="color: #C83232; text-decoration: none; font-weight: 600;" target="_blank">📘 Follow us on Facebook</a>
+            </p>
+            <p style="margin-top: 15px;">
+                <button class="cta-button" onclick="openTrackingModal()" style="background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);">🔍 Track Your Order</button>
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 PisoWifi. All rights reserved. Bringing connectivity to the Philippines.</p>
+    </footer>
+
+    <!-- New Unified Order Modal -->
+    <div id="orderModal" class="modal">
+        <div class="order-modal-content">
+            <span class="close-order-modal">&times;</span>
+            <div class="order-modal-title">Complete Your Order</div>
+
+            <div class="order-modal-step-indicator">
+                <span id="step1Indicator" class="active">1</span>
+                <span id="step2Indicator">2</span>
+                <span id="step3Indicator">3</span>
+                <span id="step4Indicator">4</span>
+            </div>
+
+            <form id="orderForm" enctype="multipart/form-data">
+                <!-- Step 1: Package Summary & Payment Method (QR) -->
+                <div id="orderStep1" class="order-modal-step active">
+                    <div class="order-summary">
+                        <p>Package: <strong id="orderPkgSummary"></strong></p>
+                        <p>Amount: <strong id="orderPriceSummary" class="price"></strong></p>
+                    </div>
+                    <p style="color: #d0d0d0; text-align: center; margin-bottom: 15px; font-size: 14px;">📱 Scan this QR code using GCash app:</p>
+                    <img id="modalQrCode" src="https://via.placeholder.com/250x250?text=GCash+QR+Code" alt="GCash QR Code" class="qr-code-img">
+                    <p style="color: #ffb366; text-align: center; margin-bottom: 20px; font-size: 12px;">⚠️ Keep your GCash receipt for proof of payment</p>
+                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: Upload Proof</button>
+                </div>
+
+                <!-- Step 2: Proof of Payment -->
+                <div id="orderStep2" class="order-modal-step">
+                    <div class="status-message status-pending">
+                        ⏳ Status: <strong>PENDING</strong><br>
+                        <small>Your order will be confirmed after payment verification.</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Receipt/Screenshot:</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="proofInput" name="proof" accept="image/*,.pdf" />
+                            <label for="proofInput" class="file-label">📤 Click to upload or drag and drop</label>
+                        </div>
+                        <small style="color: #888; display: block; margin-top: 8px;">Accepted formats: JPG, PNG, PDF</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Reference Number:</label>
+                        <input type="text" id="refNumber" name="refNumber" placeholder="GCash Reference Number" />
+                    </div>
+                    <button type="button" class="btn-prev" onclick="prevOrderStep()">⬅️ Back</button>
+                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: Shipping Info</button>
+                </div>
+
+                <!-- Step 3: Shipping Information -->
+                <div id="orderStep3" class="order-modal-step">
+                    <div class="form-group">
+                        <label>Full Name:</label>
+                        <input type="text" id="fullName" name="fullName" placeholder="Enter your full name" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Number:</label>
+                        <input type="text" id="contactNumber" name="contactNumber" placeholder="09XXXXXXXXX" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Full Address:</label>
+                        <textarea id="fullAddress" name="fullAddress" placeholder="Street, Barangay, City, Province, ZIP Code" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address:</label>
+                        <input type="email" id="contactEmail" name="contactEmail" placeholder="your-email@example.com" required />
+                    </div>
+                    <p style="color: #888; font-size: 12px; margin-bottom: 15px;">📍 Shipping via J&T Express | 📧 We'll send updates to your email</p>
+                    <button type="button" class="btn-prev" onclick="prevOrderStep()">⬅️ Back</button>
+                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: WiFi Setup</button>
+                </div>
+
+                <!-- Step 4: WiFi Configuration -->
+                <div id="orderStep4" class="order-modal-step">
+                    <div class="form-group">
+                        <label>Preferred WiFi Name (SSID):</label>
+                        <input type="text" id="wifiName" name="wifiName" placeholder="e.g. PisoWifi-YourName" required />
+                    </div>
+                    <div class="form-group">
+                        <label>WiFi Rates Configuration:</label>
+                        <p style="font-size: 12px; color: #888; margin-bottom: 5px;">Set your time rates (e.g. 10mins, 1 hour)</p>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                            <span style="min-width: 40px; font-weight: bold;">?1:</span>
+                            <input type="text" id="rate1" name="rate1" placeholder="e.g. 10mins" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                            <span style="min-width: 40px; font-weight: bold;">?5:</span>
+                            <input type="text" id="rate5" name="rate5" placeholder="e.g. 1 hour" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                            <span style="min-width: 40px; font-weight: bold;">?10:</span>
+                            <input type="text" id="rate10" name="rate10" placeholder="e.g. 3 hours" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                            <span style="min-width: 40px; font-weight: bold;">?20:</span>
+                            <input type="text" id="rate20" name="rate20" placeholder="e.g. 8 hours" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
+                        </div>
+                    </div>
+                    <button type="button" class="btn-prev" onclick="prevOrderStep()">Back</button>
+                    <button type="submit" class="btn-submit">Complete Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <!-- Order Tracking Modal -->
+    <div id="trackingModal" class="payment-modal">
+        <div class="payment-modal-content">
+            <span class="close-modal" onclick="closeTrackingModal()">&times;</span>
+            <div class="payment-title">🔍 Track Your Order</div>
+            <div class="form-group">
+                <label>Enter Order ID:</label>
+                <input type="text" id="trackingOrderId" placeholder="e.g., ORDER-1234567890" />
+            </div>
+            <button class="btn-next" onclick="searchOrder()">🔎 Search Order</button>
+            
+            <div id="recentOrders" style="margin-top: 15px; display: none;">
+                <p style="color: #888; font-size: 12px; margin-bottom: 5px;">Recent Searches:</p>
+                <div id="recentOrdersList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+            </div>
+            
+            <div id="trackingResult" style="margin-top: 30px; display: none;">
+                <div class="status-message" id="trackingStatus"></div>
+                <div style="background: rgba(80, 50, 50, 0.6); padding: 20px; border-radius: 12px; margin-top: 15px;">
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📦 Package:</strong> <span id="trackPkg"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>💰 Amount:</strong> <span id="trackAmt"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>👤 Name:</strong> <span id="trackName"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📍 Address:</strong> <span id="trackAddr"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📱 Contact:</strong> <span id="trackContact"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📧 Email:</strong> <span id="trackEmail"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>#️⃣ Ref. No.:</strong> <span id="trackRefNumber"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📸 Proof:</strong> <span id="trackProof"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📶 WiFi Name:</strong> <span id="trackWifiName"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>⏱️ Rates:</strong> <span id="trackRates"></span></p>
+                    <p style="color: #d0d0d0; margin: 10px 0;"><strong> Order Date:</strong> <span id="trackDate"></span></p>
+                    <p style="color: #C83232; margin: 10px 0; font-size: 16px;"><strong>Status: <span id="trackStatusText"></span></strong></p>
+                </div>
+                <div id="trackingActions" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn-next" style="flex: 1;" onclick="openChatModal()">💬 Chat with Seller</button>
+                    <button class="btn-next" style="flex: 1; background: #222;" onclick="printReceipt()">🖨️ Receipt</button>
+                    <button id="cancelOrderBtn" class="btn-submit" style="flex: 1; background: #555; display: none;" onclick="cancelOrder()">❌ Cancel Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="successModal" class="payment-modal">
+        <div class="payment-modal-content" style="text-align: center;">
+            <div class="payment-title">🎉 Order Placed!</div>
+            <p style="color: #66ff66; font-size: 18px; margin: 20px 0; font-weight: 700;">Your order has been placed and is awaiting verification!</p>
+            <p style="color: #d0d0d0; margin-bottom: 15px;">We'll notify you once the admin verifies your payment and confirms the order.</p>
+            <p style="color: #888; font-size: 12px;">Order ID: <strong id="orderID" style="color: #C83232;"></strong></p>
+            <p style="color: #d0d0d0; margin-bottom: 15px; font-size: 12px;">💡 Use this Order ID to track your order status anytime</p>
+            <button class="btn-next" onclick="closeSuccessModal()">✅ Close</button>
+        </div>
+    </div>
+
+    <!-- Chat Modal (Renamed from Chat Panel) -->
+    <div id="chatModal" class="chat-modal">
+        <div class="chat-header">
+            <div class="chat-header-title">💬 Chat with PisoWifi</div>
+            <button class="chat-close-btn" onclick="closeChatModal()">✕</button>
+        </div>
+        <div id="chatMessages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="messageInput" placeholder="Type a message..." />
+            <button class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+        </div>
+    </div>
+
+    <button id="chatToggleBtn" class="chat-btn-toggle" style="display: none;" onclick="openChatModal()" title="Chat with seller">💬</button>
+
+    <script src="app.js"></script>
+</body>
+</html>
