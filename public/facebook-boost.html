@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Choose your Facebook boost service for followers, views, or reactions. Transparent PHP 100 per 1K pricing with secure payment workflow.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#101629">
+    <title>Facebook Boost Packages | CYNETWORK PISOWIFI</title>
+    <link rel="canonical" href="https://cynetwork-pisowifi.onrender.com/facebook-boost.html">
+    <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="stylesheet" href="facebook-boost.css?v=20260425-1">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="aurora aurora-a"></div>
+    <div class="aurora aurora-b"></div>
+
+    <main class="boost-page">
+        <a href="other-packages.html" class="back-link">← Back to Other Offers</a>
+
+        <section class="hero-card">
+            <p class="hero-tag">SOCIAL GROWTH SERVICE</p>
+            <h1>Facebook Boost Packages</h1>
+            <p class="hero-sub">Choose <strong>Followers</strong>, <strong>Views</strong>, or <strong>Reactions</strong>. Rate starts at <strong>PHP 100 per 1K</strong>, with custom counts from <strong>0-1million</strong>.</p>
+            <div class="hero-metrics">
+                <div class="metric-box">
+                    <span class="metric-label">Base Rate</span>
+                    <span class="metric-value">PHP 100 / 1K</span>
+                </div>
+                <div class="metric-box">
+                    <span class="metric-label">Range</span>
+                    <span class="metric-value">0 - 1million</span>
+                </div>
+                <div class="metric-box">
+                    <span class="metric-label">Delivery Type</span>
+                    <span class="metric-value">Digital</span>
+                </div>
+            </div>
+            <p class="reactions-soon">Now available: Followers, Views, and Reactions boost services.</p>
+
+            <div class="referral-help" aria-label="Referral explanation buttons">
+                <button type="button" class="ghost-btn info-btn" id="toggleGeneralReferralBtn" aria-controls="generalReferralPanel" aria-expanded="false">How Referral System Works</button>
+                <button type="button" class="ghost-btn info-btn" id="toggleFbReferralBtn" aria-controls="fbReferralPanel" aria-expanded="false">How Facebook Boost Referral Works</button>
+            </div>
+
+            <article id="generalReferralPanel" class="referral-panel hidden" aria-live="polite">
+                <h3>Simple Referral System</h3>
+                <ol>
+                    <li>Create or login to your client account.</li>
+                    <li>Share your referral code with a friend.</li>
+                    <li>When your friend buys and the admin confirms the order, your referral reward is added to your balance.</li>
+                </ol>
+            </article>
+
+            <article id="fbReferralPanel" class="referral-panel hidden" aria-live="polite">
+                <h3>Facebook Boost Referral (Simple)</h3>
+                <ol>
+                    <li>Invite a client using your referral code.</li>
+                    <li>If the client buys 1,000 Facebook followers, you earn PHP 30.</li>
+                    <li>The PHP 30 is credited only once after admin confirms that order.</li>
+                </ol>
+            </article>
+        </section>
+
+        <section class="flow-card" id="step1Card">
+            <h2>Step 1: Choose Package and Pay</h2>
+            <p class="step-note">Same transaction process as other packages, but no delivery address and no WiFi configuration required.</p>
+
+            <div class="field-grid">
+                <label class="field-label" for="serviceTypeInput">
+                    Boost Service Type *
+                    <select id="serviceTypeInput" required>
+                        <option value="followers">Followers Boost</option>
+                        <option value="views">Views Boost</option>
+                        <option value="reactions">Reactions Boost</option>
+                    </select>
+                    <span class="field-help">Pick which Facebook metric you want to boost.</span>
+                </label>
+
+                <label class="field-label" for="followersInput">
+                    <span id="desiredAmountLabel">Desired Followers</span>
+                    <input type="number" id="followersInput" min="0" max="1000000" value="" >
+                    <span class="field-help" id="desiredAmountHelp">Enter any amount from 0 to 1,000,000 followers.</span>
+                </label>
+
+                <label class="field-label" for="pageLinkInput">
+                    Facebook Page/Profile Link *
+                    <input type="url" id="pageLinkInput" placeholder="https://facebook.com/your-page" required>
+                    <span class="field-help" id="pageLinkHelp">Paste the exact link where followers will be boosted.</span>
+                </label>
+            </div>
+
+            <div class="price-panel">
+                <div class="price-line">Package Unit: <strong id="unitBlockText">1 follower custom</strong></div>
+                <div class="price-line"><span id="serviceTotalLabel">Followers Total:</span> <strong id="followersText">1</strong></div>
+                <div class="price-line total">Total Payment: <strong>PHP <span id="totalPriceText">1</span></strong></div>
+            </div>
+
+            <div id="authNotice" class="auth-notice"></div>
+
+            <div class="qr-wrap">
+                <img src="assets/images/gcash-static-qr.jpg?v=20260419-2" alt="GCash QR code for Facebook boost checkout" class="qr-image">
+                <p>Scan this QR code with GCash and complete your payment before going to Step 2.</p>
+            </div>
+
+            <button type="button" class="action-btn" id="toStep2Btn">I Have Paid - Continue</button>
+        </section>
+
+        <section class="flow-card hidden" id="step2Card">
+            <h2>Step 2: Upload Proof of Payment</h2>
+            <p class="step-note">Upload your payment screenshot so our team can validate your transaction.</p>
+
+            <label class="upload-area" for="proofInput">
+                <input type="file" id="proofInput" accept="image/*" required>
+                <span class="upload-title">Upload Proof Image</span>
+                <span class="upload-sub">PNG, JPG, WEBP up to 10MB</span>
+            </label>
+            <p id="proofStatus" class="proof-status">No file selected yet.</p>
+            <div id="proofPreview" class="proof-preview"></div>
+
+            <div class="button-row">
+                <button type="button" class="ghost-btn" id="backToStep1Btn">Back</button>
+                <button type="button" class="action-btn" id="toStep3Btn">Next</button>
+            </div>
+        </section>
+
+        <section class="flow-card hidden" id="step3Card">
+            <h2>Step 3: Submit Transaction Details</h2>
+            <p class="step-note">Provide contact details for updates. No delivery address and no WiFi configuration needed.</p>
+
+            <div class="field-grid">
+                <label class="field-label" for="fullNameInput">
+                    Full Name *
+                    <input type="text" id="fullNameInput" placeholder="Juan Dela Cruz" required>
+                </label>
+
+                <label class="field-label" for="contactInput">
+                    Contact Number (PH) *
+                    <input type="tel" id="contactInput" placeholder="+639XXXXXXXXX" required>
+                </label>
+
+                <label class="field-label full-width" for="notesInput">
+                    Notes (Optional)
+                    <textarea id="notesInput" rows="3" placeholder="Campaign notes or preferred follower profile"></textarea>
+                </label>
+            </div>
+
+            <div class="button-row">
+                <button type="button" class="ghost-btn" id="backToStep2Btn">Back</button>
+                <button type="button" class="action-btn" id="submitBoostBtn">Submit Transaction</button>
+            </div>
+        </section>
+
+        <section class="flow-card hidden" id="step4Card">
+            <h2>Transaction Submitted</h2>
+            <div class="confirm-grid">
+                <p>Order ID: <strong id="confirmOrderId">--</strong></p>
+                <p>Tracking Number: <strong id="confirmTracking">--</strong></p>
+                <p>Status: <strong id="confirmStatus">PENDING</strong></p>
+                <p>Service Type: <strong id="confirmServiceType">Followers</strong></p>
+                <p>Requested Total: <strong id="confirmFollowers">1,000</strong></p>
+                <p>Total Paid: <strong>PHP <span id="confirmTotal">100</span></strong></p>
+            </div>
+            <p class="step-note">Our team will review your proof, then process your Facebook boost request.</p>
+                <div class="button-row">
+                <a href="other-packages.html" class="action-link">Back to Main Site</a>
+            </div>
+        </section>
+    </main>
+
+    <script src="facebook-boost.js?v=20260423-3"></script>
+</body>
+</html>

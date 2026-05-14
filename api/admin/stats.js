@@ -1,41 +1,62 @@
 import { supabase } from '../_lib/supabase';
 
 export default async function handler(req, res) {
-  // Simple check for Admin API Key or similar for demo protection
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.ADMIN_API_KEY}`) {
-    return res.status(401).json({ error: 'UNAUTHORIZED' });
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   try {
-    // Analytics: Total Orders, Revenue, Pending
-    const { data: stats, error } = await supabase
+    const { data: orders, error } = await supabase
       .from('piso_orders')
-      .select('status, price');
+      .select('price, status, created_at');
 
     if (error) throw error;
 
-    const totalOrders = stats.length;
-    const revenue = stats.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
-    const pending = stats.filter(s => s.status === 'pending').length;
+    const revenue = orders
+      .filter(o => o.status === 'approved' || o.status === 'delivery' || o.status === 'completed')
+      .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
 
-    // Daily Stats Placeholder
-    const dailyStats = [
-      { day: 'Mon', value: 12 },
-      { day: 'Tue', value: 19 },
-      { day: 'Wed', value: 3 },
-      { day: 'Thu', value: 5 },
-      { day: 'Fri', value: 2 },
-      { day: 'Sat', value: 3 },
-    ];
+    const totalOrders = orders.length;
+    const pending = orders.filter(o => o.status === 'pending').length;
+    const approved = orders.filter(o => o.status === 'approved').length;
+    const delivery = orders.filter(o => o.status === 'delivery').length;
+    const rejected = orders.filter(o => o.status === 'rejected').length;
+    const completed = orders.filter(o => o.status === 'completed').length;
+    const cancelled = orders.filter(o => o.status === 'cancelled').length;
+
+    // Sales report metrics
+    const today = new Date().toISOString().split('T')[0];
+    const thisMonth = new Date().toISOString().slice(0, 7);
+
+    const todaySales = orders
+      .filter(o => o.created_at.startsWith(today) && (o.status === 'approved' || o.status === 'delivery' || o.status === 'completed'))
+      .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+
+    const monthSales = orders
+      .filter(o => o.created_at.startsWith(thisMonth) && (o.status === 'approved' || o.status === 'delivery' || o.status === 'completed'))
+      .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+
+    const unitsSold = orders.filter(o => o.status === 'approved' || o.status === 'delivery' || o.status === 'completed').length;
+    const avgOrderValue = unitsSold > 0 ? revenue / unitsSold : 0;
 
     return res.json({
+      revenue: `₱${revenue.toLocaleString()}`,
       totalOrders,
-      revenue,
       pending,
-      dailyStats
+      approved,
+      delivery,
+      rejected,
+      completed,
+      cancelled,
+      todaySales: `₱${todaySales.toLocaleString()}`,
+      monthSales: `₱${monthSales.toLocaleString()}`,
+      unitsSold,
+      avgOrderValue: `₱${Math.round(avgOrderValue).toLocaleString()}`,
+      weeklySales: [], // To be implemented properly if needed
+      labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
     });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
   }
 }

@@ -1,7 +1,20 @@
 import { supabase } from '../_lib/supabase';
 
 export default async function handler(req, res) {
+  const { id } = req.query;
+
   if (req.method === 'GET') {
+    if (id) {
+      const { data, error } = await supabase
+        .from('piso_orders')
+        .select('*')
+        .or(`order_id.eq.${id},tracking_number.eq.${id}`)
+        .single();
+      
+      if (error) return res.status(404).json({ error: 'Order not found' });
+      return res.json(data);
+    }
+
     const { data, error } = await supabase
       .from('piso_orders')
       .select('*')
@@ -12,15 +25,65 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const orderData = req.body;
+    const { 
+      packageId, packageName, price, unitPrice, totalPrice, 
+      shippingFee, quantity, duration, fullName, contactNumber, 
+      address, wifiName, wifiPassword, wifiRate, proofImage,
+      refNumber, contactEmail
+    } = req.body;
+
+    const order_id = 'CNW-' + Math.random().toString(36).substr(2,6).toUpperCase();
+    const tracking_number = 'TRK-' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2,4).toUpperCase();
+    
     const { data, error } = await supabase
       .from('piso_orders')
       .insert([{ 
-        ...orderData, 
-        order_id: 'CNW-' + Math.random().toString(36).substr(2,6).toUpperCase(),
+        order_id,
+        tracking_number,
+        full_name: fullName,
+        package: packageId,
+        package_name: packageName,
+        price: Number(price) || 0,
+        unit_price: Number(unitPrice) || 0,
+        total_price: Number(totalPrice) || 0,
+        shipping_fee: Number(shippingFee) || 0,
+        quantity: Number(quantity) || 1,
+        duration: duration,
+        contact_number: contactNumber,
+        full_address: address,
+        contact_email: contactEmail,
+        wifi_name: wifiName,
+        wifi_password: wifiPassword,
+        wifi_rate: wifiRate,
+        proof_image: proofImage,
+        ref_number: refNumber,
         status: 'pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }])
+      .select()
+      .single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    
+    // Return orderId and trackingNumber as expected by script.js
+    return res.json({
+        ...data,
+        orderId: data.order_id,
+        trackingNumber: data.tracking_number
+    });
+  }
+
+  if (req.method === 'PUT') {
+    if (!id) return res.status(400).json({ error: 'Order ID required' });
+    
+    const { data, error } = await supabase
+      .from('piso_orders')
+      .update({
+          ...req.body,
+          updated_at: new Date().toISOString()
+      })
+      .eq('order_id', id)
       .select()
       .single();
 
@@ -28,6 +91,18 @@ export default async function handler(req, res) {
     return res.json(data);
   }
 
-  res.setHeader('Allow', ['GET', 'POST']);
+  if (req.method === 'DELETE') {
+    if (!id) return res.status(400).json({ error: 'Order ID required' });
+
+    const { error } = await supabase
+      .from('piso_orders')
+      .delete()
+      .eq('order_id', id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ message: 'Order deleted' });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
   res.status(405).end(`Method ${req.method} Not Allowed`);
 }

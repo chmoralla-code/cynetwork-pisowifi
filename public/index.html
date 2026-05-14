@@ -3,1230 +3,992 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PisoWifi - Affordable Internet Packages</title>
-    <script src="/socket.io/socket.io.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -app            ngrok http 3000le-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #ffffff;
-            background: linear-gradient(135deg, #2a1b1b 0%, #5a4a4a 50%, #8a7a7a 100%);
-            background-attachment: fixed;
-            min-height: 100vh;
-        }
-
-        header {
-            background: rgba(42, 27, 27, 0.95);
-            color: white;
-            padding: 1.5rem 2rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            border-bottom: 1px solid rgba(200, 50, 50, 0.2);
-        }
-
-        header .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 28px;
-            font-weight: 900;
-            text-decoration: none;
-            color: #C83232;
-            letter-spacing: -1px;
-        }
-
-        nav a {
-            color: #d0d0d0;
-            text-decoration: none;
-            margin-left: 2.5rem;
-            transition: color 0.3s;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        nav a:hover {
-            color: #C83232;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        .hero {
-            background: linear-gradient(180deg, rgba(200, 50, 50, 0.2) 0%, transparent 100%);
-            color: white;
-            padding: 120px 2rem 80px;
-            text-align: center;
-        }
-
-        .hero h1 {
-            font-size: 64px;
-            margin-bottom: 20px;
-            font-weight: 900;
-            letter-spacing: -2px;
-            background: linear-gradient(135deg, #E63946 0%, #FF6B6B 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 40px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-            color: #d0d0d0;
-            font-weight: 300;
-        }
-
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
-            color: #fff;
-            padding: 15px 50px;
-            text-decoration: none;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 16px;
-            transition: all 0.3s;
-            border: none;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-        }
-
-        .cta-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 10px 30px rgba(200, 50, 50, 0.4);
-        }
-
-        section {
-            padding: 80px 2rem;
-        }
-
-        h2 {
-            text-align: center;
-            font-size: 48px;
-            margin-bottom: 60px;
-            color: #ffffff;
-            font-weight: 900;
-            letter-spacing: -1px;
-        }
-
-        .pricing-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 40px;
-            margin-bottom: 40px;
-        }
-
-        .pricing-card {
-            background: linear-gradient(135deg, rgba(80, 50, 50, 0.8) 0%, rgba(60, 40, 40, 0.8) 100%);
-            border-radius: 16px;
-            padding: 50px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-            text-align: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            border: 1px solid rgba(200, 50, 50, 0.1);
-            backdrop-filter: blur(10px);
-        }
-
-        .pricing-card:hover {
-            transform: translateY(-15px);
-            box-shadow: 0 30px 80px rgba(200, 50, 50, 0.3);
-            border-color: rgba(200, 50, 50, 0.4);
-        }
-        /* Added for visual selection */
-        .pricing-card.selected {
-            border-color: #ff6b6b;
-            box-shadow: 0 0 40px rgba(200, 50, 50, 0.5);
-        }
-
-        .pricing-card.featured {
-            border: 2px solid #C83232;
-            background: linear-gradient(135deg, rgba(200, 50, 50, 0.15) 0%, rgba(80, 50, 50, 0.9) 100%);
-        }
-
-        .pricing-card.featured::before {
-            content: "FEATURED";
-            position: absolute;
-            top: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #C83232, #E63946);
-            color: #fff;
-            padding: 6px 24px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 12px;
-            letter-spacing: 1px;
-        }
-        /* Added for "Recommended" badge */
-        .recommended-badge {
-            position: absolute;
-            top: -15px;
-            right: 20px;
-            background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%); /* Green gradient */
-            color: #fff;
-            padding: 6px 15px;
-            border-radius: 20px;
-            font-weight: 700;
-            font-size: 12px;
-            letter-spacing: 1px;
-            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
-        }
-
-        .package-name {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 15px;
-            color: #ffffff;
-            letter-spacing: -0.5px;
-        }
-
-        .price {
-            font-size: 56px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #C83232, #FF6B6B);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-            letter-spacing: -1px;
-        }
-
-        .price-label {
-            color: #d0d0d0;
-            font-size: 14px;
-            margin-bottom: 40px;
-            font-weight: 500;
-        }
-
-        .features-list {
-            text-align: left;
-            margin: 40px 0;
-            list-style: none;
-        }
-
-        .features-list li {
-            padding: 14px 0;
-            border-bottom: 1px solid rgba(200, 50, 50, 0.1);
-            color: #d0d0d0;
-            font-size: 15px;
-            font-weight: 500;
-        }
-
-        .features-list li::before {
-            content: "✓ ";
-            color: #C83232;
-            font-weight: 900;
-            margin-right: 12px;
-            font-size: 18px;
-        }
-
-        .features-list li:last-child {
-            border-bottom: none;
-        }
-
-        .select-btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 40px;
-            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
-            color: #fff;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            letter-spacing: 0.5px;
-        }
-
-        .select-btn:hover {
-            transform: scale(1.02);
-            box-shadow: 0 15px 35px rgba(200, 50, 50, 0.3);
-        }
-
-        .features-section {
-            background: linear-gradient(180deg, rgba(200, 50, 50, 0.05) 0%, transparent 100%);
-        }
-
-        .features-list-main {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 30px;
-            list-style: none;
-        }
-
-        .features-list-main li {
-            padding: 30px;
-            background: linear-gradient(135deg, rgba(80, 50, 50, 0.6) 0%, rgba(60, 40, 40, 0.6) 100%);
-            border-radius: 12px;
-            border-left: 4px solid #C83232;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s;
-            border: 1px solid rgba(200, 50, 50, 0.1);
-        }
-
-        .features-list-main li:hover {
-            border-color: rgba(200, 50, 50, 0.4);
-            box-shadow: 0 10px 30px rgba(200, 50, 50, 0.2);
-        }
-
-        .features-list-main strong {
-            color: #C83232;
-            display: block;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-
-        .features-list-main li {
-            color: #d0d0d0;
-            line-height: 1.6;
-        }
-
-        .contact-section { /* Added id="contact" */
-            background: linear-gradient(135deg, rgba(200, 50, 50, 0.2) 0%, rgba(200, 50, 50, 0.05) 100%);
-            color: white;
-            text-align: center;
-            border-top: 1px solid rgba(200, 50, 50, 0.2);
-            border-bottom: 1px solid rgba(200, 50, 50, 0.2);
-        }
-
-        .contact-section h2 {
-            color: white;
-        }
-
-        .contact-section p {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #d0d0d0;
-        }
-
-        footer {
-            background-color: rgba(42, 27, 27, 0.95);
-            color: #d0d0d0;
-            text-align: center;
-            padding: 30px 2rem;
-            border-top: 1px solid rgba(200, 50, 50, 0.1);
-            font-size: 14px;
-        }
-
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 40px;
-            }
-
-            nav {
-                display: none;
-            }
-
-            header .container {
-                flex-direction: column;
-            }
-
-            .pricing-container {
-                grid-template-columns: 1fr;
-            }
-
-            .features-list-main {
-                grid-template-columns: 1fr;
-            }
-
-            h2 {
-                font-size: 36px;
-            }
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            display: none; /* Hidden by default */
-            background-color: rgba(0, 0, 0, 0.8);
-            animation: fadeInModal 0.3s ease-in-out;
-        }
-
-        @keyframes fadeInModal {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-
-        .modal-content, .order-modal-content { /* Combined styles for general modal content and new order modal */
-            background-color: rgba(42, 27, 27, 0.95);
-            margin: auto;
-            padding: 40px;
-            border: 2px solid #C83232;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 700px;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation: slideInModal 0.5s ease-out;
-            box-shadow: 0 0 50px rgba(200, 50, 50, 0.6), 0 0 100px rgba(200, 50, 50, 0.3);
-        }
-
-        @keyframes slideInModal {
-            from {
-                opacity: 0;
-                transform: translate(-50%, -60%);
-            }
-            to {
-                opacity: 1;
-                transform: translate(-50%, -50%);
-            }
-        }
-
-        .modal-content img, .order-modal-content img {
-            width: 100%;
-            border-radius: 15px;
-            animation: glowPulse 2s ease-in-out infinite;
-            border: 3px solid #C83232;
-            box-shadow: 0 0 30px rgba(230, 57, 70, 0.6);
-        }
-
-        @keyframes glowPulse {
-            0%, 100% {
-                box-shadow: 0 0 30px rgba(230, 57, 70, 0.6), inset 0 0 20px rgba(200, 50, 50, 0.2);
-            }
-            50% {
-                box-shadow: 0 0 50px rgba(230, 57, 70, 0.8), inset 0 0 30px rgba(200, 50, 50, 0.4);
-            }
-        }
-
-        .close-modal, .close-order-modal, .close-payment { /* Combined close button styles */
-            color: #C83232;
-            float: right;
-            font-size: 32px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.3s;
-        }
-
-        .close-modal:hover {
-            color: #ff6b6b;
-        }
-
-        .modal-title, .order-modal-title, .payment-title { /* Combined title styles */
-            color: #C83232;
-            font-size: 24px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 900;
-            letter-spacing: 1px;
-        }
-
-        .gaming-text {
-            color: #d0d0d0;
-            text-align: center;
-            margin-top: 20px;
-            font-size: 16px;
-            animation: textGlow 2s ease-in-out infinite;
-        }
-
-        @keyframes textGlow {
-            0%, 100% {
-                color: #d0d0d0;
-                text-shadow: 0 0 5px rgba(200, 50, 50, 0.3);
-            }
-            50% {
-                color: #C83232;
-                text-shadow: 0 0 15px rgba(200, 50, 50, 0.8);
-            }
-        }
-
-        @keyframes slideInImage {
-            from {
-                opacity: 0;
-                transform: scale(0.8);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes gridMove {
-            0% {
-                transform: translate(0, 0);
-            }
-            100% {
-                transform: translate(50px, 50px);
-            }
-        }
-
-        .buy-btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 40px;
-            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
-            color: #fff;
-            border: none;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            letter-spacing: 0.5px;
-        }
-
-        .buy-btn:hover {
-            transform: scale(1.02);
-            box-shadow: 0 15px 35px rgba(200, 50, 50, 0.3);
-        }
-
-        /* Payment Modals */
-        .payment-modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            animation: fadeInModal 0.3s ease-in-out;
-        }
-
-        .payment-step {
-            margin-bottom: 20px;
-        }
-
-        .qr-placeholder {
-            width: 100%;
-            height: 300px;
-            background: #000;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #888;
-            font-size: 14px;
-            margin: 20px 0;
-            border: 2px dashed #C83232;
-        }
-        /* New Order Modal specific styles */
-        .order-modal-step {
-            display: none; /* Hidden by default */
-        }
-        .order-modal-step.active {
-            display: block;
-        }
-        .order-modal-step-indicator {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #d0d0d0;
-            font-size: 14px;
-        }
-        .order-modal-step-indicator span {
-            display: inline-block;
-            width: 25px;
-            height: 25px;
-            line-height: 25px;
-            border-radius: 50%;
-            background: rgba(200, 50, 50, 0.2);
-            color: #C83232;
-            margin: 0 5px;
-            font-weight: bold;
-        }
-        .order-modal-step-indicator span.active {
-            background: #C83232;
-            color: #fff;
-        }
-        .order-summary {
-            background: rgba(80, 50, 50, 0.6);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(200, 50, 50, 0.2);
-        }
-        .order-summary p {
-            margin-bottom: 8px;
-            color: #d0d0d0;
-        }
-        .order-summary strong {
-            color: #C83232;
-        }
-        .order-summary .price {
-            font-size: 28px;
-        }
-        .qr-code-img {
-            width: 100%;
-            max-width: 250px;
-            height: auto;
-            display: block;
-            margin: 20px auto;
-            border: 3px solid #C83232;
-            border-radius: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #d0d0d0;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            background: rgba(60, 40, 40, 0.8);
-            border: 1px solid #C83232;
-            border-radius: 8px;
-            color: #fff;
-            font-family: inherit;
-            transition: all 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            background: rgba(80, 50, 50, 0.9);
-            border-color: #ff6b6b;
-            box-shadow: 0 0 10px rgba(200, 50, 50, 0.3);
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-submit:hover {
-            transform: scale(1.02);
-            box-shadow: 0 10px 25px rgba(200, 50, 50, 0.3);
-        }
-
-        .btn-next, .btn-prev { /* Combined styles for navigation buttons */
-            width: 100%;
-            padding: 12px;
-            margin-top: 15px;
-            background: linear-gradient(135deg, #C83232 0%, #E63946 100%);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-next:hover {
-            transform: scale(1.02);
-            box-shadow: 0 10px 25px rgba(200, 50, 50, 0.3);
-        }
-
-        .status-message {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            text-align: center;
-        }
-
-        .status-pending {
-            background: rgba(200, 100, 50, 0.3);
-            color: #ffb366;
-            border: 1px solid #ff8800;
-        }
-
-        .status-approved {
-            background: rgba(50, 150, 50, 0.3);
-            color: #66ff66;
-            border: 1px solid #00aa00;
-        }
-
-        .file-input-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-            width: 100%;
-        }
-
-        .file-input-wrapper input[type=file] {
-            position: absolute;
-            left: -9999px;
-        }
-
-        .file-label {
-            display: block;
-            padding: 12px;
-            background: rgba(80, 50, 50, 0.6);
-            border: 2px dashed #C83232;
-            border-radius: 8px;
-            text-align: center;
-            cursor: pointer;
-            color: #d0d0d0;
-            transition: all 0.3s;
-        }
-
-        .file-label:hover {
-            background: rgba(100, 60, 60, 0.6);
-            border-color: #ff6b6b;
-        }
-
-        /* Chat Styles */
-        .chat-modal { /* Renamed from .chat-panel for consistency with app.js */
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 380px;
-            max-height: 550px;
-            background: rgba(42, 27, 27, 0.98);
-            border: 2px solid #C83232;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            display: none;
-            flex-direction: column;
-            z-index: 999;
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                transform: translateY(20px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .chat-modal.active { /* Renamed from .chat-panel.active */
-            display: flex;
-        }
-
-        .chat-header {
-            background: rgba(200, 50, 50, 0.2);
-            padding: 15px;
-            border-bottom: 1px solid #C83232;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 10px 10px 0 0;
-        }
-
-        .chat-header-title {
-            color: #C83232;
-            font-weight: 700;
-            font-size: 14px;
-        }
-
-        .chat-close-btn {
-            background: none;
-            border: none;
-            color: #C83232;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .chat-close-btn:hover, .close-order-modal:hover {
-            color: #ff6b6b;
-        }
-
-        #chatMessages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            background: rgba(80, 50, 50, 0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .chat-message {
-            padding: 10px 12px;
-            border-radius: 8px;
-            word-wrap: break-word;
-            max-width: 90%;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(5px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Renamed .chat-message to .message and .chat-message.buyer to .message.me for consistency with app.js */
-        #chatMessages .message {
-            padding: 10px 12px;
-            border-radius: 8px;
-            word-wrap: break-word;
-            max-width: 90%;
-            animation: fadeIn 0.3s ease-in;
-            color: #d0d0d0;
-            font-size: 12px;
-        }
-        #chatMessages .message.me {
-            background: rgba(100, 200, 50, 0.3);
-            border-left: 3px solid #66ff66;
-            align-self: flex-end;
-        }
-
-        .chat-message .text {
-            color: #d0d0d0;
-            font-size: 12px;
-        }
-
-        /* Removed .chat-message .time as app.js doesn't use it */
-        #chatMessages .message strong { /* For 'from' field */
-            font-weight: 700;
-            font-size: 11px;
-            color: #ffb366; /* Highlight sender name */
-            margin-bottom: 4px;
-            display: block;
-        }
-
-        .chat-input-area {
-            display: flex;
-            gap: 8px;
-            padding: 12px;
-            border-top: 1px solid #C83232;
-            background: rgba(42, 27, 27, 0.8);
-            border-radius: 0 0 10px 10px;
-        }
-
-        #messageInput {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #C83232;
-            border-radius: 6px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
-            font-size: 12px;
-        }
-
-        #messageInput::placeholder {
-            color: #888;
-        }
-
-        #messageInput:focus {
-            outline: none;
-            border-color: #ff6b6b;
-            background: rgba(0, 0, 0, 0.5);
-        }
-
-        .chat-send-btn {
-            padding: 8px 15px;
-            background: #C83232;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 700;
-            font-size: 11px;
-            transition: all 0.3s;
-        }
-
-        .chat-send-btn:hover {
-            background: #ff6b6b;
-            transform: translateY(-2px);
-        }
-
-        .chat-btn-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
-            background: #C83232;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 998;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 5px 20px rgba(200, 50, 50, 0.4);
-            transition: all 0.3s;
-        }
-
-        .chat-btn-toggle:hover {
-            background: #ff6b6b;
-            transform: scale(1.1);
-        }
-
-        .chat-btn-toggle.hidden {
-            display: none;
-        }
-
-        @media (max-width: 480px) {
-            .chat-modal { /* Renamed from .chat-panel */
-                width: 100vw;
-                height: 100vh;
-                max-height: 100vh;
-                bottom: 0;
-                right: 0;
-                border-radius: 0;
-            }
-        }
-    </style>
-    <!-- Hidden select and price tag for JS logic, similar to app.js -->
-    <select id="packageSelect" style="display: none;">
-        <option value="PACKAGE 1" data-price="5800">PACKAGE 1</option>
-        <option value="PACKAGE 2" data-price="8500">PACKAGE 2</option>
-        <option value="PACKAGE 3" data-price="12000">PACKAGE 3</option>
-    </select>
-    <span id="priceTag" style="display: none;"></span>
-
-    <!-- Feed for real-time notifications -->
-    <div id="feed" class="feed" style="display: none;">
-        <div class="notice">Welcome to PisoWifi!</div>
-    </div>
-
-    <!-- Placeholder for QR code image -->
-    <img id="gcashQrCode" src="https://via.placeholder.com/250x250?text=GCash+QR+Code" alt="GCash QR Code" style="display: none;">
+    <meta name="description" content="CYNETWORK PISOWIFI offers high-speed and reliable WiFi solutions in the Philippines with flexible packages, secure checkout, and nationwide support.">
+    <meta name="keywords" content="CYNETWORK PISOWIFI, WiFi packages Philippines, piso wifi, internet installation, reliable WiFi, high speed internet">
+    <meta name="author" content="CYNETWORK">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#E63946">
+    
+    <!-- Open Graph Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="CYNETWORK PISOWIFI - Premium WiFi Solutions">
+    <meta property="og:description" content="Get reliable high-speed WiFi packages from CYNETWORK PISOWIFI with flexible plans, secure checkout, and nationwide support.">
+    <meta property="og:url" content="https://cynetwork-pisowifi.onrender.com">
+    <meta property="og:image" content="https://cynetwork-pisowifi.onrender.com/assets/images/cynetwork-url-logo.png">
+    <meta property="og:image:alt" content="CYNETWORK PISOWIFI Logo">
+    <meta property="og:site_name" content="CYNETWORK PISOWIFI">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter/X Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CYNETWORK PISOWIFI - Premium WiFi Solutions">
+    <meta name="twitter:description" content="Get reliable high-speed WiFi packages from CYNETWORK PISOWIFI with flexible plans and secure checkout.">
+    <meta name="twitter:image" content="https://cynetwork-pisowifi.onrender.com/assets/images/cynetwork-url-logo.png">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://cynetwork-pisowifi.onrender.com">
+    
+    <!-- Additional SEO -->
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    <meta name="copyright" content="2026 CYNETWORK. All rights reserved.">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "CYNETWORK PISOWIFI",
+            "url": "https://cynetwork-pisowifi.onrender.com",
+            "logo": "https://cynetwork-pisowifi.onrender.com/assets/images/cynetwork-url-logo.png",
+            "sameAs": [
+                "https://cynetwork-pisowifi.onrender.com"
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "CYNETWORK PISOWIFI",
+            "url": "https://cynetwork-pisowifi.onrender.com",
+            "description": "Premium WiFi solutions with flexible plans and nationwide support."
+        }
+    </script>
+    
+    <title>CYNETWORK PISOWIFI | High-Speed WiFi Packages Philippines</title>
+    <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="apple-touch-icon" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="stylesheet" href="styles.css?v=20260426-1">
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <div class="container">
-            <a href="#" class="logo">🌐 PisoWifi</a>
-            <nav>
-                <a href="#packages">Packages</a>
-                <a href="#features-section">Features</a>
-                <a href="#contact-section">Contact</a>
-                <a href="#" id="trackOrderNavBtn">Track Order</a>
-            </nav>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">??</span>
+                <span class="logo-text">CYNETWORK</span>
+                <span class="logo-subtext">PISOWIFI</span>
+            </div>
+            <button
+                id="mobileMenuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-label="Toggle navigation menu"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+            >
+                ?
+            </button>
+            <ul id="mainNavMenu" class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#packages" class="nav-link">Packages</a></li>
+                <li><a href="#other-offers" class="nav-link">Other Offers</a></li>
+                <li><a href="#tutorials" class="nav-link">Tutorials</a></li>
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#contact" class="nav-link">Contact</a></li>
+                <li><button type="button" class="account-nav-btn" onclick="openAccountModal()">Client Account</button></li>
+            </ul>
         </div>
-    </header>
+    </nav>
 
     <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <h1>Affordable Internet for Everyone</h1>
-            <p>Get high-speed internet access at unbeatable prices. PisoWifi brings connectivity within your reach.</p>
-            <button class="cta-button" data-scroll-to="packages">Get Started Today</button>
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1>Premium WiFi Solutions for Everyone</h1>
+            <p>Experience ultra-fast, reliable internet with CYNETWORK PISOWIFI</p>
+            <button class="cta-button" onclick="scrollToPackages()">Explore Packages</button>
         </div>
     </section>
 
-    <!-- Pricing Section -->
-    <section id="packages">
-        <div class="container">
+    <!-- Packages Section -->
+    <section id="packages" class="packages-section">
+        <div class="section-header">
             <h2>Our Packages</h2>
-            <div class="pricing-container">
-                <!-- Package 1 - Now uses data attributes and opens order modal -->
-                <div class="pricing-card pkg-card" data-package-id="PACKAGE 1" data-price="5800">
-                    <div class="package-name">PACKAGE 1</div>
-                    <div class="price">₱5,800</div>
-                    <div class="price-label">One-time — 1 Year License</div>
-                    <ul class="features-list">
-                        <li>1 year license</li>
-                        <li>Telegram realtime sales monitoring</li>
-                        <li>Pause / Resume / Extend subscriptions</li>
-                        <li>Voucher system for promos</li>
-                        <li>Suitable for 20–25 concurrent clients</li>
-                        <li>Gaming priority with anti-lag optimizations</li>
-                    </ul>
-                    <button class="select-btn">BUY</button> <!-- This button will now open the new order modal -->
+            <p class="section-subtitle">Choose the perfect plan for your needs</p>
+            <p class="shipping-notice">?? Free shipping fee notification: Shipping is FREE nationwide (?0) for all packages.</p>
+        </div>
+        
+        <div class="packages-grid">
+            <!-- Package 1 -->
+            <div class="package-card" data-package="1">
+                <div class="package-image-container">
+                    <img src="assets/images/package1.png" alt="Starter Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(1)">View Package</button>
                 </div>
-
-                <!-- Package 2 - Now uses data attributes and opens order modal -->
-                <div class="pricing-card pkg-card" data-package-id="PACKAGE 2" data-price="8500">
-                    <div class="package-name">PACKAGE 2</div>
-                    <div class="price">₱8,500</div>
-                    <div class="price-label">One-time — 1 Year License</div>
-                    <ul class="features-list">
-                        <li>1 year license</li>
-                        <li>Telegram realtime sales monitoring</li>
-                        <li>Pause / Resume / Extend subscriptions</li>
-                        <li>Voucher system for promos</li>
-                        <li>Suitable for 40–80 concurrent clients</li>
-                        <li>100 meters range signal (eap110 tplink)</li>
-                        <li>Gaming priority with anti-lag optimizations</li>
+                <div class="package-content">
+                    <h3>Starter</h3>
+                    <p class="package-duration">1 Year License | 50 Meters</p>
+                    <div class="package-price-wrap">
+                        <span class="package-sale-badge">SALE</span>
+                        <p class="package-price">
+                            <span class="package-old-price">?7,500</span>
+                            ?5,800
+                        </p>
+                    </div>
+                    <ul class="package-features">
+                        <li>? 1 Year License</li>
+                        <li>? Telegram Sales Monitoring</li>
+                        <li>? Pause Time Feature</li>
+                        <li>? Anti Lag</li>
+                        <li>? Voucher Code Generation</li>
+                        <li>? Own Local Server</li>
+                        <li>? Customized Portal</li>
+                        <li>? Perfect for 20-30 Clients</li>
                     </ul>
-                    <button class="select-btn">BUY</button>
+                    <button class="select-package-btn" onclick="selectPackage(1)">BUY</button>
                 </div>
+            </div>
 
-                <!-- Package 3 - Featured and Recommended -->
-                <div class="pricing-card featured pkg-card" data-package-id="PACKAGE 3" data-price="12000">
-                    <div class="recommended-badge">RECOMMENDED</div> <!-- Added recommended badge -->
-                    <div class="package-name">PACKAGE 3</div>
-                    <div class="price">₱12,000</div>
-                    <div class="price-label">One-time — 1 Year License</div>
-                    <ul class="features-list">
-                        <li>1 year license</li>
-                        <li>Telegram realtime sales monitoring</li>
-                        <li>Pause / Resume / Extend subscriptions</li>
-                        <li>Voucher system for promos</li>
-                        <li>Suitable for 80–150 concurrent clients</li>
-                        <li>200 meters dual AP eap110 tplink</li>
-                        <li>Gaming priority with anti-lag optimizations</li>
+            <!-- Package 2 -->
+            <div class="package-card featured" data-package="2">
+                <div class="package-label">Most Popular</div>
+                <div class="package-image-container">
+                    <img src="assets/images/package2.png" alt="Professional Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(2)">View Package</button>
+                </div>
+                <div class="package-content">
+                    <h3>Professional</h3>
+                    <p class="package-duration">3 Years License | 100 Meters</p>
+                    <div class="package-price-wrap">
+                        <span class="package-sale-badge">SALE</span>
+                        <p class="package-price">
+                            <span class="package-old-price">?10,000</span>
+                            ?8,500
+                        </p>
+                    </div>
+                    <ul class="package-features">
+                        <li>? 3 Year License</li>
+                        <li>? Telegram Sales Monitoring</li>
+                        <li>? Pause Time Feature</li>
+                        <li>? Anti Lag</li>
+                        <li>? Voucher Code Generation</li>
+                        <li>? Own Local Server</li>
+                        <li>? Customized Portal</li>
+                        <li>? Perfect for 40-60 Clients</li>
                     </ul>
-                    <button class="select-btn">BUY</button>
+                    <button class="select-package-btn" onclick="selectPackage(2)">BUY</button>
+                </div>
+            </div>
+
+            <!-- Package 3 -->
+            <div class="package-card" data-package="3">
+                <div class="package-image-container">
+                    <img src="assets/images/package3.png" alt="Enterprise Package Machine" class="package-image">
+                    <button class="view-full-btn" onclick="viewFullPicture(3)">View Package</button>
+                </div>
+                <div class="package-content">
+                    <h3>Enterprise</h3>
+                    <p class="package-duration">LIFETIME LICENSE | 250 Meters</p>
+                    <div class="package-price-wrap">
+                        <span class="package-sale-badge">SALE</span>
+                        <p class="package-price">
+                            <span class="package-old-price">?15,000</span>
+                            ?11,000
+                        </p>
+                    </div>
+                    <ul class="package-features">
+                        <li>? Lifetime License</li>
+                        <li>? Telegram Sales Monitoring</li>
+                        <li>? Pause Time Feature</li>
+                        <li>? Voucher Code Generation</li>
+                        <li>? Own Local Server</li>
+                        <li>? Customized Portal</li>
+                        <li>? Perfect for 80-100 Clients</li>
+                        <li>? Advanced Anti Lag Feature</li>
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage(3)">BUY</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features-section" class="features-section">
-        <div class="container">
-            <h2>Why Choose PisoWifi?</h2>
-            <ul class="features-list-main">
-                <li><strong>💰 Affordable</strong><br>Competitive pricing that doesn't compromise quality</li>
-                <li><strong>⚡ Fast & Reliable</strong><br>High-speed connections you can count on</li>
-                <li><strong>📱 24/7 Support</strong><br>Our team is always ready to help</li>
-                <li><strong>🔒 Secure</strong><br>Protected network with encryption</li>
-                <li><strong>🌍 Wide Coverage</strong><br>Available in many areas</li>
-                <li><strong>📊 Transparent</strong><br>No hidden fees or surprise charges</li>
-            </ul>
+    <!-- Other Offer Packages (moved to separate page) -->
+    <section class="other-offers-cta">
+        <div class="section-header">
+            <h2>Other Offer Packages</h2>
+            <p class="section-subtitle">We moved Other Packages to a dedicated page for better browsing.</p>
+        </div>
+        <div class="other-offers-cta-actions">
+            <a class="cta-button" href="other-packages.html">VIEW OTHER PACKAGES</a>
         </div>
     </section>
 
+    <!-- Installation Tutorials Section -->
+    <section id="tutorials" class="tutorials-section">
+        <div class="section-header">
+            <h2>Installation Tutorials</h2>
+            <p class="section-subtitle">Diagram pictures and setup walkthrough for each package</p>
+        </div>
+
+        <div class="tutorials-grid">
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package1.png" alt="Starter package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Starter Installation Tutorial</h3>
+                    <p class="tutorial-caption">Best for small coverage setup (1 Year License | 50 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Mount the Starter unit near your modem with stable power.</li>
+                        <li>Connect WAN/LAN cable and verify portal access from your phone.</li>
+                        <li>Set SSID, password, and bandwidth limit in setup panel.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(1)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package2.png" alt="Professional package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Professional Installation Tutorial</h3>
+                    <p class="tutorial-caption">Recommended for wider service area (3 Years License | 100 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Install central router point and connect Professional unit.</li>
+                        <li>Enable voucher/telegram monitoring and test payment workflow.</li>
+                        <li>Run signal and speed checks in peak-hour conditions.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(2)">View Diagram</button>
+                </div>
+            </article>
+
+            <article class="tutorial-card">
+                <div class="tutorial-card-media">
+                    <img src="assets/images/package3.png" alt="Enterprise package installation diagram" class="tutorial-image">
+                </div>
+                <div class="tutorial-card-content">
+                    <h3>Enterprise Installation Tutorial</h3>
+                    <p class="tutorial-caption">For high-capacity deployment (Lifetime License | 250 Meters).</p>
+                    <ol class="tutorial-steps">
+                        <li>Deploy main unit plus access points based on coverage map.</li>
+                        <li>Apply anti-lag and user limit profiles before launch.</li>
+                        <li>Perform full activation test: payment, voucher, and portal login.</li>
+                    </ol>
+                    <button type="button" class="tutorial-view-btn" onclick="viewFullPicture(3)">View Diagram</button>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <h2>About CYNETWORK PISOWIFI</h2>
+        <p>We provide premium WiFi solutions for affordable, high-speed internet access. Trust CYNETWORK for reliable connectivity.</p>
+    </section>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Complete Your Payment</h2>
+            
+            <!-- Step 1: QR Code Payment -->
+            <div id="step1" class="payment-step active">
+                <h3>Step 1: Scan QR Code to Pay via GCash</h3>
+                <p class="package-selected">
+                    Package: <span id="selectedPackageText">Starter</span><br>
+                    Unit Price: ?<span id="selectedUnitPrice">5800</span>.00<br>
+                    Quantity: <span id="selectedQuantityText">1</span> piece(s)<br>
+                    Total Payment: ?<span id="selectedPrice">5800</span>.00
+                </p>
+                <p class="shipping-free-note">Shipping Fee: FREE (?0)</p>
+
+                <div class="form-group quantity-group">
+                    <label for="orderQuantity">How many pieces do you want to order?</label>
+                    <input type="number" id="orderQuantity" min="0" max="100" value="1" oninput="handleQuantityChange()">
+                    <p class="quantity-summary">Automatically calculated total: ?<span id="selectedTotalPrice">5800</span>.00</p>
+                </div>
+
+                <div id="checkoutAccountNotice" class="checkout-account-notice" style="display: none;"></div>
+                
+                <!-- Downpayment Notice -->
+                <div class="downpayment-notice">
+                    <div class="downpayment-icon">??</div>
+                    <div class="downpayment-content">
+                        <h4>Important: Downpayment of ?300.00</h4>
+                        <p><strong>Purpose:</strong> This ?300.00 downpayment is required for:</p>
+                        <ul>
+                            <li>? Assurance and preparation labor</li>
+                            <li>? Gasoline transport of PisoWiFi equipment to J&T Shop</li>
+                        </ul>
+                        <p class="downpayment-note">Applicable to: <strong>Starter, Professional, and Enterprise packages</strong></p>
+                    </div>
+                </div>
+                
+                <div class="qr-container">
+                    <div id="qrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay</p>
+                </div>
+                
+                <button class="next-btn" onclick="nextStep()">I've Completed Payment</button>
+            </div>
+
+            <!-- Step 2: Upload Proof of Payment -->
+            <div id="step2" class="payment-step">
+                <h3>Step 2: Upload Proof of Payment</h3>
+                <p>Upload a screenshot showing your successful GCash transaction</p>
+                
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="proofImage" accept="image/*" onchange="handleFileUpload(event)">
+                    <label for="proofImage">
+                        <span class="upload-icon">??</span>
+                        <span class="upload-text">Click to upload or drag and drop</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+                
+                <div id="uploadPreview" class="upload-preview"></div>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validateProof()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Personal Information -->
+            <div id="step3" class="payment-step">
+                <h3>Step 3: Personal Information</h3>
+                <p>Please provide your details for WiFi access</p>
+                
+                <form id="personalForm">
+                    <div class="form-group">
+                        <label for="fullName">Full Name *</label>
+                        <input type="text" id="fullName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contactNumber">Contact Number (Philippine) *</label>
+                        <input type="tel" id="contactNumber" placeholder="+63 9XX XXX XXXX" pattern="^\+?63[0-9]{10}$" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="address">Full Address *</label>
+                        <textarea id="address" placeholder="Street Address, Barangay, City, Province, Postal Code" rows="3" required></textarea>
+                    </div>
+                </form>                
+
+                <div class="saved-details-helper">
+                    <p class="saved-details-note">Your customer details are saved on this device to make your next order faster.</p>
+                    <button type="button" class="saved-details-clear" onclick="clearSavedCustomerDetails()">Clear Saved Details</button>
+                </div>
+
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="next-btn" onclick="validatePersonalInfo()">Next</button>
+                </div>
+            </div>
+
+            <!-- Step 4: WiFi Configuration -->
+            <div id="step4" class="payment-step">
+                <h3>Step 4: WiFi Configuration</h3>
+                <p>Set up your WiFi network details</p>
+                
+                <form id="wifiForm">
+                    <div class="form-group">
+                        <label for="wifiName">WiFi Name (SSID) *</label>
+                        <input type="text" id="wifiName" placeholder="e.g., MyWiFi_Home" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiPassword">WiFi Password *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="wifiPassword" placeholder="Enter a strong password" required>
+                            <button
+                                type="button"
+                                id="wifiPasswordToggle"
+                                class="password-toggle-btn"
+                                onclick="toggleWifiPasswordVisibility()"
+                                aria-label="Show WiFi password"
+                            >
+                                Show
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wifiRate">Data Rate Limit (Mbps - JuanFi) *</label>
+                        <input
+                            type="number"
+                            id="wifiRate"
+                            min="0.1"
+                            step="0.1"
+                            inputmode="decimal"
+                            placeholder="e.g., 10"
+                            required
+                        >
+                        <small class="form-hint">Enter your preferred JuanFi speed limit in Mbps.</small>
+                    </div>
+                </form>
+                
+                <div class="form-actions">
+                    <button class="back-btn" onclick="previousStep()">Back</button>
+                    <button class="submit-btn" onclick="completeTransaction()">Complete & Activate</button>
+                </div>
+            </div>
+
+            <!-- Step 5: Success -->
+            <div id="step5" class="payment-step">
+                <div class="success-container">
+                    <div class="success-icon">?</div>
+                    <h3>Payment Successful!</h3>
+                    <p>Your order has been received and is now pending review.</p>
+                    
+                    <div class="success-details">
+                        <p><strong>Order ID:</strong> <span id="confirmOrderId">--</span></p>
+                        <p><strong>Tracking Number:</strong> <span id="confirmTrackingNumber">--</span></p>
+                        <p><strong>Order Status:</strong> <span id="confirmOrderStatus">PENDING</span></p>
+                        <p><strong>Quantity:</strong> <span id="confirmQuantity">1</span> piece(s)</p>
+                        <p><strong>Total Payment:</strong> ?<span id="confirmTotalPrice">0</span>.00</p>
+                        <p id="confirmReferralRewardWrap" style="display: none;"><strong>Referral Reward:</strong> <span id="confirmReferralRewardText"></span></p>
+                        <p><strong>WiFi Name:</strong> <span id="confirmWifiName"></span></p>
+                        <p><strong>Duration:</strong> <span id="confirmDuration"></span></p>
+                        <p><strong>Name:</strong> <span id="confirmName"></span></p>
+                    </div>
+
+                    <p id="pendingOrderNotice" class="pending-order-notice">Your order is pending. Use tracking to check updates anytime.</p>
+
+                    <div class="success-actions">
+                        <button id="trackPendingOrderBtn" class="next-btn track-order-btn" onclick="trackPendingOrder()">Track Pending Order</button>
+                        <button class="cta-button" onclick="location.reload()">Start New Transaction</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Amazon LEO Reservation Modal -->
+    <div id="amazonLeoModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeAmazonLeoReservationModal()">&times;</span>
+            <h2>Amazon LEO Reservation</h2>
+
+            <div id="amazonLeoStep1" class="payment-step active">
+                <h3>Step 1: Fill Up Shipping Information and Quantity</h3>
+                <p>Complete this reservation form to be listed in line for Amazon LEO release.</p>
+
+                <div class="form-group quantity-group">
+                    <label for="amazonLeoQuantity">How many PCS do you want to reserve?</label>
+                    <input type="number" id="amazonLeoQuantity" min="0" max="100" value="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoFullName">Full Name *</label>
+                    <input type="text" id="amazonLeoFullName" placeholder="Juan Dela Cruz" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoContactNumber">Contact Number (Philippine) *</label>
+                    <input type="tel" id="amazonLeoContactNumber" placeholder="+63 9XX XXX XXXX" pattern="^\+?63[0-9]{10}$" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="amazonLeoAddress">Full Address *</label>
+                    <textarea id="amazonLeoAddress" placeholder="Street Address, Barangay, City, Province, Postal Code" rows="3" required></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="submit-btn" onclick="submitAmazonLeoReservation()">Submit Reservation</button>
+                </div>
+            </div>
+
+            <div id="amazonLeoStep2" class="payment-step">
+                <div class="success-container">
+                    <div class="success-icon">?</div>
+                    <h3>Reservation Submitted!</h3>
+                    <p id="amazonLeoReservationNotice">OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!</p>
+
+                    <div class="success-details">
+                        <p><strong>Order ID:</strong> <span id="amazonLeoConfirmOrderId">--</span></p>
+                        <p><strong>Tracking Number:</strong> <span id="amazonLeoConfirmTrackingNumber">--</span></p>
+                        <p><strong>Status:</strong> <span id="amazonLeoConfirmStatus">PENDING</span></p>
+                        <p><strong>Quantity:</strong> <span id="amazonLeoConfirmQuantity">1</span> piece(s)</p>
+                        <p><strong>Name:</strong> <span id="amazonLeoConfirmName"></span></p>
+                    </div>
+
+                    <div class="success-actions">
+                        <button class="cta-button" onclick="closeAmazonLeoReservationModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADDING EAP Modal -->
+    <div id="addingEapModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeAddingEapModal()">&times;</span>
+            <h2>ADDING EAP Transaction Flow</h2>
+
+            <div id="addingEapStep1" class="payment-step active">
+                <h3>Step 1: Fill MAC Address, Username, Password</h3>
+                <p>Enter your TP-Link EAP details first.</p>
+
+                <div class="form-group">
+                    <label for="addingEapMacAddress">MAC Address *</label>
+                    <input type="text" id="addingEapMacAddress" placeholder="AA:BB:CC:DD:EE:FF" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="addingEapUsername">Username *</label>
+                    <input type="text" id="addingEapUsername" placeholder="Enter username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="addingEapPassword">Password *</label>
+                    <input type="password" id="addingEapPassword" placeholder="Enter password" required>
+                </div>
+
+                <div class="form-actions">
+                    <button class="next-btn" onclick="proceedAddingEapToPayment()">Next</button>
+                </div>
+            </div>
+
+            <div id="addingEapStep2" class="payment-step">
+                <h3>Step 2: Pay PHP 350 and Upload Proof of Payment</h3>
+                <p>Required to pay PHP 350 using the existing GCash QR code on other packages and upload proof.</p>
+
+                <div class="qr-container">
+                    <div id="addingEapQrcode" class="qr-code"></div>
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay PHP 350.</p>
+                </div>
+
+                <div class="file-upload-area">
+                    <input type="file" id="addingEapProofImage" accept="image/*" onchange="handleAddingEapProofUpload(event)">
+                    <label for="addingEapProofImage">
+                        <span class="upload-icon">??</span>
+                        <span class="upload-text">Upload proof of payment</span>
+                        <span class="upload-subtext">PNG, JPG, GIF up to 10MB</span>
+                    </label>
+                </div>
+
+                <div id="addingEapUploadPreview" class="upload-preview"></div>
+
+                <div class="form-actions">
+                    <button class="back-btn" onclick="showAddingEapStep(1)">Back</button>
+                    <button class="submit-btn" onclick="submitAddingEapTransaction()">Submit Transaction</button>
+                </div>
+            </div>
+
+            <div id="addingEapStep3" class="payment-step">
+                <div class="success-container">
+                    <div class="success-icon">?</div>
+                    <h3>Transaction Submitted!</h3>
+                    <p id="addingEapApprovalNotice">approval will be within 24 hours business days</p>
+
+                    <div class="success-details">
+                        <p><strong>Order ID:</strong> <span id="addingEapOrderId">--</span></p>
+                        <p><strong>Tracking Number:</strong> <span id="addingEapTrackingNumber">--</span></p>
+                        <p><strong>Status:</strong> <span id="addingEapStatus">PENDING</span></p>
+                        <p><strong>Package:</strong> ADDING EAP</p>
+                        <p><strong>Total Paid:</strong> ?350.00</p>
+                    </div>
+
+                    <div class="success-actions">
+                        <button class="cta-button" onclick="closeAddingEapModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Track Order Modal -->
+    <div id="trackOrderModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTrackOrderModal()">&times;</span>
+            <h2>Track Your Order</h2>
+            <p>Enter your order ID to check the latest status.</p>
+
+            <div class="form-group">
+                <label for="trackOrderIdInput">Order ID *</label>
+                <input type="text" id="trackOrderIdInput" placeholder="e.g., CYN-20260419-000101 or 101">
+            </div>
+
+            <div class="form-actions">
+                <button class="back-btn" onclick="closeTrackOrderModal()">Close</button>
+                <button class="next-btn" onclick="trackOrder()">Track Order</button>
+            </div>
+
+            <div id="trackOrderResult" class="track-order-result" style="display: none;">
+                <h3>Tracking Result</h3>
+                <p><strong>Order ID:</strong> <span id="trackResultOrderId"></span></p>
+                <p><strong>Tracking Number:</strong> <span id="trackResultTracking"></span></p>
+                <p><strong>Status:</strong> <span id="trackResultStatus" class="track-status-badge">PENDING</span></p>
+                <p><strong>Package:</strong> <span id="trackResultPackage"></span></p>
+                <p><strong>Quantity:</strong> <span id="trackResultQuantity"></span></p>
+                <p><strong>Preorder Total:</strong> ?<span id="trackResultTotal"></span>.00</p>
+                <p><strong>Shipping Fee:</strong> <span id="trackResultShipping"></span></p>
+                <p><strong>Date Submitted:</strong> <span id="trackResultDate"></span></p>
+                <p><strong>Last Updated:</strong> <span id="trackResultUpdated"></span></p>
+                <p id="trackResultReasonWrap" style="display: none;"><strong>Notes:</strong> <span id="trackResultReason"></span></p>
+            </div>
+        </div>
+    </div>
+
     <!-- Contact Section -->
-    <section id="contact-section" class="contact-section">
-        <div class="container">
-            <h2>Ready to Go Online?</h2>
-            <p>Choose your plan and start enjoying fast, affordable internet today!</p>
-            <button class="cta-button" data-scroll-to="packages">Subscribe Now</button>
-            <p style="margin-top: 30px; opacity: 0.9;">📞 Call us: 09505339963 | 📧 Email: support@pisowifi.com</p>
-            <p style="margin-top: 15px; opacity: 0.9;">
-                <a href="https://www.facebook.com/profile.php?id=61584774638218" style="color: #C83232; text-decoration: none; font-weight: 600;" target="_blank">📘 Follow us on Facebook</a>
-            </p>
-            <p style="margin-top: 15px;">
-                <button class="cta-button" onclick="openTrackingModal()" style="background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);">🔍 Track Your Order</button>
-            </p>
+    <section id="contact" class="contact-section">
+        <h2>Get in Touch</h2>
+        <div class="contact-info">
+            <div class="contact-item">
+                <span class="contact-icon">??</span>
+                <div>
+                    <p class="contact-label">Phone</p>
+                    <a href="tel:09505339963" class="contact-link">0950-533-9963</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">??</span>
+                <div>
+                    <p class="contact-label">Email</p>
+                    <a href="mailto:cyrhielmaot@gmail.com" class="contact-link">cyrhielmaot@gmail.com</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">??</span>
+                <div>
+                    <p class="contact-label">Facebook</p>
+                    <a href="https://www.facebook.com/profile.php?id=61584774638218" target="_blank" class="contact-link">Follow Us</a>
+                </div>
+            </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer>
-        <p>&copy; 2026 PisoWifi. All rights reserved. Bringing connectivity to the Philippines.</p>
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>CYNETWORK PISOWIFI</h4>
+                <p>High-speed WiFi solutions for your business</p>
+            </div>
+            <div class="footer-section">
+                <h4>Contact</h4>
+                <p>?? 0950-533-9963</p>
+                <p><a href="mailto:cyrhielmaot@gmail.com" class="social-link">cyrhielmaot@gmail.com</a></p>
+            </div>
+            <div class="footer-section">
+                <h4>Follow Us</h4>
+                <a href="https://www.facebook.com/profile.php?id=61584774638218" target="_blank" class="social-link">Facebook</a>
+            </div>
+        </div>
+        <p class="footer-bottom">&copy; 2026 CYNETWORK PISOWIFI. All rights reserved.</p>
     </footer>
 
-    <!-- New Unified Order Modal -->
-    <div id="orderModal" class="modal">
-        <div class="order-modal-content">
-            <span class="close-order-modal">&times;</span>
-            <div class="order-modal-title">Complete Your Order</div>
+    <!-- Client Account Modal -->
+    <div id="accountModal" class="modal">
+        <div class="modal-content account-modal">
+            <span class="close" onclick="closeAccountModal()">&times;</span>
+            <h2>Client Account & Referral</h2>
+            <p class="account-modal-subtitle">Create a simple account, share your referral code, and earn ?100 for every invite who buys.</p>
 
-            <div class="order-modal-step-indicator">
-                <span id="step1Indicator" class="active">1</span>
-                <span id="step2Indicator">2</span>
-                <span id="step3Indicator">3</span>
-                <span id="step4Indicator">4</span>
+            <div class="account-tabs" role="tablist" aria-label="Client account tabs">
+                <button type="button" id="accountTabLogin" class="account-tab-btn active" onclick="switchAccountTab('login')">Login</button>
+                <button type="button" id="accountTabRegister" class="account-tab-btn" onclick="switchAccountTab('register')">Register</button>
+                <button type="button" id="accountTabRecover" class="account-tab-btn" onclick="switchAccountTab('recover')">Forgot Password</button>
+                <button type="button" id="accountTabDashboard" class="account-tab-btn" onclick="switchAccountTab('dashboard')">My Account</button>
             </div>
 
-            <form id="orderForm" enctype="multipart/form-data">
-                <!-- Step 1: Package Summary & Payment Method (QR) -->
-                <div id="orderStep1" class="order-modal-step active">
-                    <div class="order-summary">
-                        <p>Package: <strong id="orderPkgSummary"></strong></p>
-                        <p>Amount: <strong id="orderPriceSummary" class="price"></strong></p>
+            <div id="accountAuthMessage" class="account-auth-message" style="display: none;"></div>
+
+            <div id="accountLoginPanel" class="account-panel active">
+                <form id="clientLoginForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientLoginEmail">Email *</label>
+                        <input type="email" id="clientLoginEmail" placeholder="you@example.com" required>
                     </div>
-                    <p style="color: #d0d0d0; text-align: center; margin-bottom: 15px; font-size: 14px;">📱 Scan this QR code using GCash app:</p>
-                    <img id="modalQrCode" src="https://via.placeholder.com/250x250?text=GCash+QR+Code" alt="GCash QR Code" class="qr-code-img">
-                    <p style="color: #ffb366; text-align: center; margin-bottom: 20px; font-size: 12px;">⚠️ Keep your GCash receipt for proof of payment</p>
-                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: Upload Proof</button>
+                    <div class="form-group">
+                        <label for="clientLoginPassword">Password *</label>
+                        <input type="password" id="clientLoginPassword" placeholder="Enter password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="next-btn">Login</button>
+                    <button type="button" class="account-inline-action" onclick="switchAccountTab('recover')">Forgot your password?</button>
+                </form>
+            </div>
+
+            <div id="accountRecoverPanel" class="account-panel">
+                <form id="clientRecoverForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientRecoverName">Full Name *</label>
+                        <input type="text" id="clientRecoverName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverEmail">Email *</label>
+                        <input type="email" id="clientRecoverEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverContact">Registered Contact Number *</label>
+                        <input type="tel" id="clientRecoverContact" placeholder="+63 9XX XXX XXXX" required>
+                        <small class="form-hint">Use the same contact number you used during registration.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverPassword">New Password *</label>
+                        <input type="password" id="clientRecoverPassword" placeholder="At least 6 characters" minlength="6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverConfirmPassword">Confirm New Password *</label>
+                        <input type="password" id="clientRecoverConfirmPassword" placeholder="Re-enter new password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="next-btn">Reset Password</button>
+                    <button type="button" class="back-btn" onclick="switchAccountTab('login')">Back to Login</button>
+                </form>
+            </div>
+
+            <div id="accountRegisterPanel" class="account-panel">
+                <form id="clientRegisterForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientRegisterName">Full Name *</label>
+                        <input type="text" id="clientRegisterName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterContact">Contact Number *</label>
+                        <input type="tel" id="clientRegisterContact" placeholder="+63 9XX XXX XXXX" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterEmail">Email *</label>
+                        <input type="email" id="clientRegisterEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterPassword">Password *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="clientRegisterPassword" placeholder="At least 6 characters" minlength="6" required>
+                            <button
+                                type="button"
+                                id="clientRegisterPasswordToggle"
+                                class="password-toggle-btn"
+                                onclick="toggleRegisterPasswordVisibility()"
+                                aria-label="Show register password"
+                            >
+                                Show
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterConfirmPassword">Confirm Password *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="clientRegisterConfirmPassword" placeholder="Re-enter password" minlength="6" required>
+                            <button
+                                type="button"
+                                id="clientRegisterConfirmPasswordToggle"
+                                class="password-toggle-btn"
+                                onclick="toggleRegisterConfirmPasswordVisibility()"
+                                aria-label="Show confirm password"
+                            >
+                                Show
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerReferralCode">Referral Code (optional)</label>
+                        <input type="text" id="registerReferralCode" placeholder="Example: CYNABC123">
+                    </div>
+                    <button type="submit" class="next-btn">Create Account</button>
+                </form>
+            </div>
+
+            <div id="accountDashboardPanel" class="account-panel">
+                <div id="accountDashboardLoggedOut" class="account-dashboard-logged-out">
+                    <p>Please login or register to access your account and referral dashboard.</p>
                 </div>
 
-                <!-- Step 2: Proof of Payment -->
-                <div id="orderStep2" class="order-modal-step">
-                    <div class="status-message status-pending">
-                        ⏳ Status: <strong>PENDING</strong><br>
-                        <small>Your order will be confirmed after payment verification.</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Upload Receipt/Screenshot:</label>
-                        <div class="file-input-wrapper">
-                            <input type="file" id="proofInput" name="proof" accept="image/*,.pdf" />
-                            <label for="proofInput" class="file-label">📤 Click to upload or drag and drop</label>
+                <div id="accountDashboardLoggedIn" class="account-dashboard-logged-in" style="display: none;">
+                    <div class="account-summary-grid">
+                        <div class="account-summary-item">
+                            <span class="summary-label">Name</span>
+                            <span id="clientAccountName" class="summary-value">--</span>
                         </div>
-                        <small style="color: #888; display: block; margin-top: 8px;">Accepted formats: JPG, PNG, PDF</small>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Email</span>
+                            <span id="clientAccountEmail" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Code</span>
+                            <span id="clientReferralCode" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Balance</span>
+                            <span id="clientReferralBalance" class="summary-value">?0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Total Invites</span>
+                            <span id="clientInviteCount" class="summary-value">0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Converted Invites</span>
+                            <span id="clientConvertedInviteCount" class="summary-value">0</span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Reference Number:</label>
-                        <input type="text" id="refNumber" name="refNumber" placeholder="GCash Reference Number" />
-                    </div>
-                    <button type="button" class="btn-prev" onclick="prevOrderStep()">⬅️ Back</button>
-                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: Shipping Info</button>
-                </div>
 
-                <!-- Step 3: Shipping Information -->
-                <div id="orderStep3" class="order-modal-step">
-                    <div class="form-group">
-                        <label>Full Name:</label>
-                        <input type="text" id="fullName" name="fullName" placeholder="Enter your full name" required />
+                    <div class="referral-link-wrap">
+                        <label for="clientReferralLink">Referral Link</label>
+                        <input type="text" id="clientReferralLink" readonly>
+                        <button type="button" class="back-btn" onclick="copyReferralLink()">Copy Referral Link</button>
                     </div>
-                    <div class="form-group">
-                        <label>Contact Number:</label>
-                        <input type="text" id="contactNumber" name="contactNumber" placeholder="09XXXXXXXXX" required />
-                    </div>
-                    <div class="form-group">
-                        <label>Full Address:</label>
-                        <textarea id="fullAddress" name="fullAddress" placeholder="Street, Barangay, City, Province, ZIP Code" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Email Address:</label>
-                        <input type="email" id="contactEmail" name="contactEmail" placeholder="your-email@example.com" required />
-                    </div>
-                    <p style="color: #888; font-size: 12px; margin-bottom: 15px;">📍 Shipping via J&T Express | 📧 We'll send updates to your email</p>
-                    <button type="button" class="btn-prev" onclick="prevOrderStep()">⬅️ Back</button>
-                    <button type="button" class="btn-next" onclick="nextOrderStep()">Next: WiFi Setup</button>
-                </div>
 
-                <!-- Step 4: WiFi Configuration -->
-                <div id="orderStep4" class="order-modal-step">
-                    <div class="form-group">
-                        <label>Preferred WiFi Name (SSID):</label>
-                        <input type="text" id="wifiName" name="wifiName" placeholder="e.g. PisoWifi-YourName" required />
+                    <div class="redeem-reward-wrap">
+                        <h4>Redeem Referral Award</h4>
+                        <p class="redeem-note">Deduction per redemption: 10% of available rewards.</p>
+
+                        <div class="redeem-breakdown">
+                            <p><strong>Available Rewards:</strong> ?<span id="redeemGrossAmount">0</span>.00</p>
+                            <p><strong>Less 10%:</strong> ?<span id="redeemVatAmount">0</span>.00</p>
+                            <p><strong>Estimated Payout:</strong> ?<span id="redeemNetAmount">0</span>.00</p>
+                        </div>
+
+                        <form id="referralRedeemForm" class="account-form redeem-form">
+                            <div class="form-group">
+                                <label for="redeemGcashName">GCash Name *</label>
+                                <input type="text" id="redeemGcashName" placeholder="Enter your GCash account name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="redeemGcashNumber">GCash Number *</label>
+                                <input type="tel" id="redeemGcashNumber" placeholder="09XXXXXXXXX or +639XXXXXXXXX" required>
+                            </div>
+
+                            <button type="submit" id="redeemReferralBtn" class="next-btn">Redeem Referral Award</button>
+                        </form>
+
+                        <p id="redeemReferralNotice" class="redeem-referral-notice" style="display: none;"></p>
                     </div>
-                    <div class="form-group">
-                        <label>WiFi Rates Configuration:</label>
-                        <p style="font-size: 12px; color: #888; margin-bottom: 5px;">Set your time rates (e.g. 10mins, 1 hour)</p>
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-                            <span style="min-width: 40px; font-weight: bold;">?1:</span>
-                            <input type="text" id="rate1" name="rate1" placeholder="e.g. 10mins" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
-                        </div>
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-                            <span style="min-width: 40px; font-weight: bold;">?5:</span>
-                            <input type="text" id="rate5" name="rate5" placeholder="e.g. 1 hour" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
-                        </div>
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-                            <span style="min-width: 40px; font-weight: bold;">?10:</span>
-                            <input type="text" id="rate10" name="rate10" placeholder="e.g. 3 hours" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
-                        </div>
-                        <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-                            <span style="min-width: 40px; font-weight: bold;">?20:</span>
-                            <input type="text" id="rate20" name="rate20" placeholder="e.g. 8 hours" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid rgba(200, 50, 50, 0.3); background: rgba(0, 0, 0, 0.2); color: white;" required />
-                        </div>
+
+                    <div class="account-dashboard-actions">
+                        <button type="button" class="next-btn" onclick="refreshClientAccountSummary()">Refresh Account</button>
+                        <button type="button" class="back-btn" onclick="logoutClientAccount()">Logout</button>
                     </div>
-                    <button type="button" class="btn-prev" onclick="prevOrderStep()">Back</button>
-                    <button type="submit" class="btn-submit">Complete Order</button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
-    <!-- Success Modal -->
-    <!-- Order Tracking Modal -->
-    <div id="trackingModal" class="payment-modal">
-        <div class="payment-modal-content">
-            <span class="close-modal" onclick="closeTrackingModal()">&times;</span>
-            <div class="payment-title">🔍 Track Your Order</div>
-            <div class="form-group">
-                <label>Enter Order ID:</label>
-                <input type="text" id="trackingOrderId" placeholder="e.g., ORDER-1234567890" />
+    <!-- AI Customer Support Chat -->
+    <button id="supportChatToggle" class="support-chat-toggle" aria-label="Open AI customer support">
+        <span class="support-chat-toggle-icon">AI</span>
+        <span id="supportUnreadBadge" class="support-unread-badge" style="display: none;">0</span>
+    </button>
+
+    <div id="supportChatPanel" class="support-chat-panel" aria-live="polite" aria-label="AI customer support chat">
+        <div class="support-chat-header">
+            <div>
+                <h4>PisoWiFi AI Support</h4>
+                <p id="supportChatStatusText">AI Chat Status: AI Assistant</p>
             </div>
-            <button class="btn-next" onclick="searchOrder()">🔎 Search Order</button>
-            
-            <div id="recentOrders" style="margin-top: 15px; display: none;">
-                <p style="color: #888; font-size: 12px; margin-bottom: 5px;">Recent Searches:</p>
-                <div id="recentOrdersList" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-            </div>
-            
-            <div id="trackingResult" style="margin-top: 30px; display: none;">
-                <div class="status-message" id="trackingStatus"></div>
-                <div style="background: rgba(80, 50, 50, 0.6); padding: 20px; border-radius: 12px; margin-top: 15px;">
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📦 Package:</strong> <span id="trackPkg"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>💰 Amount:</strong> <span id="trackAmt"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>👤 Name:</strong> <span id="trackName"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📍 Address:</strong> <span id="trackAddr"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📱 Contact:</strong> <span id="trackContact"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📧 Email:</strong> <span id="trackEmail"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>#️⃣ Ref. No.:</strong> <span id="trackRefNumber"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📸 Proof:</strong> <span id="trackProof"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>📶 WiFi Name:</strong> <span id="trackWifiName"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong>⏱️ Rates:</strong> <span id="trackRates"></span></p>
-                    <p style="color: #d0d0d0; margin: 10px 0;"><strong> Order Date:</strong> <span id="trackDate"></span></p>
-                    <p style="color: #C83232; margin: 10px 0; font-size: 16px;"><strong>Status: <span id="trackStatusText"></span></strong></p>
+            <button id="supportChatClose" class="support-chat-close" aria-label="Close support chat">&times;</button>
+        </div>
+
+        <div id="supportMessages" class="support-chat-messages"></div>
+
+        <div class="support-quick-actions">
+            <button type="button" class="support-quick-btn" data-query="What are your package prices?">Package Prices</button>
+            <button type="button" class="support-quick-btn" data-query="How do I submit a preorder?">Preorder Steps</button>
+            <button type="button" class="support-quick-btn" data-query="Track my pending order status">Track Order</button>
+            <button type="button" class="support-quick-btn" data-query="My internet is slow, what should I do?">Speed Help</button>
+            <button type="button" class="support-quick-btn" data-query="How long is installation and activation?">Activation Time</button>
+            <button type="button" class="support-quick-btn" data-query="I need live customer support">Live Support</button>
+        </div>
+
+        <div class="support-chat-input-wrap">
+            <input id="supportInput" type="text" placeholder="Ask about pricing, setup, speed, vouchers..." autocomplete="off">
+            <button id="supportSendBtn" type="button">Send</button>
+        </div>
+    </div>
+
+    <!-- Voucher Only Modal -->
+    <div id="voucherOnlyModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeVoucherOnlyModal()">&times;</span>
+            <h2>VOUCHER ONLY PACKAGE</h2>
+            <div id="voucherOnlyStep1" class="payment-step active">
+                <h3>Step 1: Select Voucher Amount</h3>
+                <p>Choose the voucher credits amount you want to purchase.</p>
+                <div class="form-group quantity-group">
+                    <label for="voucherAmount">Voucher Amount (PHP) *</label>
+                    <input type="number" id="voucherAmount" min="100" max="50000" value="500" step="100" required>
+                    <p class="quantity-summary">Total: PHP <span id="voucherTotalDisplay">500</span>.00</p>
                 </div>
-                <div id="trackingActions" style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button class="btn-next" style="flex: 1;" onclick="openChatModal()">💬 Chat with Seller</button>
-                    <button class="btn-next" style="flex: 1; background: #222;" onclick="printReceipt()">🖨️ Receipt</button>
-                    <button id="cancelOrderBtn" class="btn-submit" style="flex: 1; background: #555; display: none;" onclick="cancelOrder()">❌ Cancel Order</button>
+                <div class="form-actions">
+                    <button class="next-btn" onclick="proceedVoucherToPayment()">Next</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="successModal" class="payment-modal">
-        <div class="payment-modal-content" style="text-align: center;">
-            <div class="payment-title">🎉 Order Placed!</div>
-            <p style="color: #66ff66; font-size: 18px; margin: 20px 0; font-weight: 700;">Your order has been placed and is awaiting verification!</p>
-            <p style="color: #d0d0d0; margin-bottom: 15px;">We'll notify you once the admin verifies your payment and confirms the order.</p>
-            <p style="color: #888; font-size: 12px;">Order ID: <strong id="orderID" style="color: #C83232;"></strong></p>
-            <p style="color: #d0d0d0; margin-bottom: 15px; font-size: 12px;">💡 Use this Order ID to track your order status anytime</p>
-            <button class="btn-next" onclick="closeSuccessModal()">✅ Close</button>
+    <!-- Starlink Modal -->
+    <div id="starlinkModal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeStarlinkModal()">&times;</span>
+            <h2>STARLINK INQUIRY</h2>
+            <div id="starlinkStep1" class="payment-step active">
+                <h3>Step 1: Fill Inquiry Details</h3>
+                <p>Provide your details for Starlink satellite internet inquiry.</p>
+                <div class="form-group">
+                    <label for="starlinkFullName">Full Name *</label>
+                    <input type="text" id="starlinkFullName" placeholder="Juan Dela Cruz" required>
+                </div>
+                <div class="form-group">
+                    <label for="starlinkContactNumber">Contact Number (Philippine) *</label>
+                    <input type="tel" id="starlinkContactNumber" placeholder="+63 9XX XXX XXXX" required>
+                </div>
+                <div class="form-group">
+                    <label for="starlinkAddress">Full Address *</label>
+                    <textarea id="starlinkAddress" placeholder="Street Address, Barangay, City, Province" rows="3" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="next-btn" onclick="proceedStarlinkToPayment()">Next</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Chat Modal (Renamed from Chat Panel) -->
-    <div id="chatModal" class="chat-modal">
-        <div class="chat-header">
-            <div class="chat-header-title">💬 Chat with PisoWifi</div>
-            <button class="chat-close-btn" onclick="closeChatModal()">✕</button>
-        </div>
-        <div id="chatMessages"></div>
-        <div class="chat-input-area">
-            <input type="text" id="messageInput" placeholder="Type a message..." />
-            <button class="chat-send-btn" onclick="sendChatMessage()">Send</button>
+    <!-- EAP110 Modal -->
+    <div id="eap110Modal" class="modal">
+        <div class="modal-content payment-modal">
+            <span class="close" onclick="closeEap110Modal()">&times;</span>
+            <h2>EAP110 HARDWARE ORDER</h2>
+            <div id="eap110Step1" class="payment-step active">
+                <h3>Step 1: Select Quantity and Details</h3>
+                <p>Choose how many EAP110 units you want to order.</p>
+                <div class="form-group quantity-group">
+                    <label for="eap110Quantity">How many units? *</label>
+                    <input type="number" id="eap110Quantity" min="1" max="100" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="eap110FullName">Full Name *</label>
+                    <input type="text" id="eap110FullName" placeholder="Juan Dela Cruz" required>
+                </div>
+                <div class="form-group">
+                    <label for="eap110ContactNumber">Contact Number (Philippine) *</label>
+                    <input type="tel" id="eap110ContactNumber" placeholder="+63 9XX XXX XXXX" required>
+                </div>
+                <div class="form-group">
+                    <label for="eap110Address">Full Address *</label>
+                    <textarea id="eap110Address" placeholder="Street Address, Barangay, City, Province" rows="3" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="next-btn" onclick="proceedEap110ToPayment()">Next</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <button id="chatToggleBtn" class="chat-btn-toggle" style="display: none;" onclick="openChatModal()" title="Chat with seller">💬</button>
+    <!-- Picture Viewer Modal -->
+    <div id="pictureModal" class="picture-modal">
+        <div class="picture-modal-content">
+            <button class="picture-modal-close" onclick="closePictureModal()">&times;</button>
+            <div class="picture-modal-viewer" id="pictureModalViewer" aria-label="3D package viewer">
+                <div class="package-3d-shell" id="package3dShell">
+                    <span class="package-3d-glint" aria-hidden="true"></span>
+                    <img id="pictureModalImg" src="" alt="Package Preview" class="picture-modal-img">
+                </div>
+                <span class="package-3d-shadow" aria-hidden="true"></span>
+            </div>
+            <p class="picture-modal-hint">Move your cursor or swipe to rotate the package preview.</p>
+        </div>
+    </div>
 
-    <script src="app.js"></script>
+    <script src=\"https://js.puter.com/v2/\"></script>`r`n    <script src=\"script.js?v=20260428-1\"></script>
 </body>
 </html>
+
+
+

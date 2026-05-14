@@ -1,0 +1,3618 @@
+// =====================================================
+// GLOBAL VARIABLES
+// =====================================================
+
+let currentStep = 1;
+let selectedPackage = null;
+let uploadedProofImage = null;
+let uploadedAddingEapProofImage = null;
+let latestOrderId = null;
+let latestOrderStatus = 'pending';
+let latestTrackingNumber = null;
+let selectedQuantity = 1;
+let selectedUnitPrice = 0;
+let selectedTotalPrice = 0;
+
+let clientAuthToken = null;
+let clientAccount = null;
+
+let supportClientId = null;
+let supportChatSessionId = null;
+let supportChatStatus = 'ai';
+let supportChatPollTimer = null;
+let supportLastMessageId = 0;
+const renderedSupportMessageIds = new Set();
+
+const DEFAULT_API_ORIGIN = 'https://cynetwork-pisowifi.onrender.com';
+
+function normalizeApiBase(base) {
+    const trimmed = String(base || '').trim().replace(/\s+/g, '');
+    if (!trimmed) {
+        return '';
+    }
+
+    const normalized = trimmed.endsWith('/api')
+        ? trimmed
+        : `${trimmed.replace(/\/$/, '')}/api`;
+
+    return normalized;
+}
+
+function resolveApiBase() {
+    const queryOverride = new URLSearchParams(window.location.search).get('api');
+    const globalOverride = window.CYNETWORK_API_BASE || window.CYNETWORK_API_URL || '';
+    const metaOverride = document.querySelector('meta[name="cynetwork-api-base"]')?.content || '';
+    const override = normalizeApiBase(queryOverride || globalOverride || metaOverride);
+
+    if (override) {
+        return override;
+    }
+
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const isRenderHost = hostname.endsWith('.onrender.com');
+    const isVercelHost = hostname.endsWith('.vercel.app');
+
+    if (isLocalhost || isRenderHost || isVercelHost) {
+        return '/api';
+    }
+
+    return '/api'; // Default to relative since it's hosted statically on Vercel
+}
+
+const API_URL = resolveApiBase();
+const API_HEALTH_URL = API_URL.endsWith('/api')
+    ? `${API_URL.slice(0, -4) || ''}/health`
+    : `${API_URL}/health`;
+const FREE_SHIPPING_FEE = 0;
+const REFERRAL_REDEEM_DEDUCTION_RATE = 0.10;
+const REFERRAL_REDEEM_DEDUCTION_PERCENT = Math.round(REFERRAL_REDEEM_DEDUCTION_RATE * 100);
+const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
+const AMAZON_LEO_RESERVATION_NOTICE = 'OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!';
+const ADDING_EAP_APPROVAL_NOTICE = 'approval will be within 24 hours business days';
+const AMAZON_LEO_PACKAGE = {
+    id: 4,
+    name: 'AMAZON LEO',
+    duration: 'OFFICIAL PRICE TO BE ANNOUNCED',
+    price: 0
+};
+const ADDING_EAP_PACKAGE = {
+    id: 5,
+    name: 'ADDING EAP',
+    duration: 'ADD TPLINK PRODUCT',
+    price: 350
+};
+
+// Packages will be fetched from API on page load
+let packages = {
+    1: { name: 'Starter', price: 5800, originalPrice: 7500, duration: '1 Year License | 50 Meters' },
+    2: { name: 'Professional', price: 8500, originalPrice: 10000, duration: '3 Years License | 100 Meters' },
+    3: { name: 'Enterprise', price: 11000, originalPrice: 15000, duration: 'LIFETIME LICENSE | 250 Meters' }
+};
+
+const CUSTOMER_DETAILS_STORAGE_KEY = 'cynetworkCustomerDetails';
+const CLIENT_AUTH_STORAGE_KEY = 'cynetworkClientAuth';
+const EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS = 60;
+const EMAIL_CODE_REGEX = /^\d{6}$/;
+const emailCodeCooldownIntervals = {};
+let isEmailOtpRequired = true;
+
+function formatMoney(value) {
+    const numeric = Number(value || 0);
+    if (!Number.isFinite(numeric)) {
+        return '0';
+    }
+    return numeric.toLocaleString('en-PH');
+}
+
+function normalizeQuantity(value) {
+    // Allow the user to clear the quantity field (empty string)
+    // and accept zero as a valid editable state. Clamp between 0 and 100.
+    if (value === '' || value === null || typeof value === 'undefined') {
+        return 0;
+    }
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return 0;
+    }
+    return Math.min(100, Math.max(0, parsed));
+}
+
+function normalizeClientContactNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return digits;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `0${digits.slice(2)}`;
+    }
+
+    if (digits.length === 10 && digits.startsWith('9')) {
+        return `0${digits}`;
+    }
+
+    return '';
+}
+
+function normalizeWifiRateMbps(value) {
+    const numeric = Number(String(value || '').trim());
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '';
+    }
+
+    const rounded = Math.round(numeric * 100) / 100;
+    const normalized = Number.isInteger(rounded)
+        ? String(rounded)
+        : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+
+    return `${normalized} Mbps`;
+}
+
+function loadSavedCustomerDetails() {
+    try {
+        const raw = localStorage.getItem(CUSTOMER_DETAILS_STORAGE_KEY);
+        if (!raw) {
+            return null;
+        }
+        return JSON.parse(raw);
+    } catch (error) {
+        console.warn('Unable to read saved customer details:', error.message);
+        return null;
+    }
+}
+
+function saveCustomerDetails(details) {
+    const normalized = {
+        fullName: String(details?.fullName || '').trim(),
+        contactNumber: String(details?.contactNumber || '').trim(),
+        address: String(details?.address || '').trim()
+    };
+
+    if (!normalized.fullName && !normalized.contactNumber && !normalized.address) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(CUSTOMER_DETAILS_STORAGE_KEY, JSON.stringify(normalized));
+    } catch (error) {
+        console.warn('Unable to save customer details:', error.message);
+    }
+}
+
+function applySavedCustomerDetailsToForm() {
+    const saved = loadSavedCustomerDetails();
+    if (!saved) {
+        return;
+    }
+
+    const fullNameInput = document.getElementById('fullName');
+    const contactNumberInput = document.getElementById('contactNumber');
+    const addressInput = document.getElementById('address');
+
+    if (fullNameInput) {
+        fullNameInput.value = saved.fullName || '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = saved.contactNumber || '';
+    }
+    if (addressInput) {
+        addressInput.value = saved.address || '';
+    }
+}
+
+function clearSavedCustomerDetails() {
+    localStorage.removeItem(CUSTOMER_DETAILS_STORAGE_KEY);
+
+    const fullNameInput = document.getElementById('fullName');
+    const contactNumberInput = document.getElementById('contactNumber');
+    const addressInput = document.getElementById('address');
+
+    if (fullNameInput) {
+        fullNameInput.value = '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = '';
+    }
+    if (addressInput) {
+        addressInput.value = '';
+    }
+
+    alert('Saved customer details were cleared from this device.');
+}
+
+function setClientAuthMessage(message, type = '') {
+    const messageEl = document.getElementById('accountAuthMessage');
+    if (!messageEl) {
+        return;
+    }
+
+    if (!message) {
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+        messageEl.className = 'account-auth-message';
+        return;
+    }
+
+    messageEl.style.display = 'block';
+    messageEl.textContent = message;
+    messageEl.className = `account-auth-message ${type}`.trim();
+}
+
+function setRedeemNotice(message, type = '') {
+    const noticeEl = document.getElementById('redeemReferralNotice');
+    if (!noticeEl) {
+        return;
+    }
+
+    if (!message) {
+        noticeEl.style.display = 'none';
+        noticeEl.textContent = '';
+        noticeEl.className = 'redeem-referral-notice';
+        return;
+    }
+
+    noticeEl.style.display = 'block';
+    noticeEl.textContent = message;
+    noticeEl.className = `redeem-referral-notice ${type}`.trim();
+}
+
+function normalizeGcashNumber(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+        return '';
+    }
+
+    if (digits.length === 11 && digits.startsWith('09')) {
+        return `+63${digits.slice(1)}`;
+    }
+
+    if (digits.length === 12 && digits.startsWith('639')) {
+        return `+${digits}`;
+    }
+
+    return '';
+}
+
+function getRedeemComputation() {
+    const gross = Number(clientAccount?.referralBalance || 0);
+    const vat = Math.max(0, Math.round(gross * REFERRAL_REDEEM_DEDUCTION_RATE));
+    const net = Math.max(0, gross - vat);
+    const canRedeem = Boolean(clientAccount && clientAuthToken && net > 0);
+
+    return { gross, vat, net, canRedeem };
+}
+
+function updateRedeemSummaryUi() {
+    const grossEl = document.getElementById('redeemGrossAmount');
+    const vatEl = document.getElementById('redeemVatAmount');
+    const netEl = document.getElementById('redeemNetAmount');
+    const redeemBtn = document.getElementById('redeemReferralBtn');
+
+    if (!grossEl || !vatEl || !netEl || !redeemBtn) {
+        return;
+    }
+
+    const { gross, vat, net, canRedeem } = getRedeemComputation();
+    grossEl.textContent = formatMoney(gross);
+    vatEl.textContent = formatMoney(vat);
+    netEl.textContent = formatMoney(net);
+
+    redeemBtn.disabled = !canRedeem;
+    redeemBtn.style.opacity = canRedeem ? '1' : '0.65';
+    redeemBtn.style.cursor = canRedeem ? 'pointer' : 'not-allowed';
+}
+
+function updateCheckoutAccountNotice() {
+    const notice = document.getElementById('checkoutAccountNotice');
+    if (!notice) {
+        return;
+    }
+
+    if (clientAccount) {
+        notice.style.display = 'block';
+        notice.textContent = `Logged in as ${clientAccount.fullName || clientAccount.email}. Referral balance: PHP ${formatMoney(clientAccount.referralBalance || 0)}.`;
+        return;
+    }
+
+    notice.style.display = 'block';
+    notice.textContent = 'Account required: Please register or login to your client account before placing any order.';
+}
+
+function hasAuthenticatedClientAccount() {
+    return Boolean(clientAuthToken && clientAccount && (clientAccount.id || clientAccount.email));
+}
+
+function requireClientAccountForPurchase(actionLabel = 'place an order') {
+    if (hasAuthenticatedClientAccount()) {
+        return true;
+    }
+
+    setClientAuthMessage(`Please register or login first to ${actionLabel}.`, 'error');
+    openAccountModal('register');
+    return false;
+}
+
+function closeMobileNavigationMenu() {
+    const navMenu = document.getElementById('mainNavMenu');
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+
+    if (navMenu) {
+        navMenu.classList.remove('open');
+    }
+
+    if (mobileToggle) {
+        mobileToggle.setAttribute('aria-expanded', 'false');
+        mobileToggle.textContent = '☰';
+    }
+}
+
+function initMobileNavigation() {
+    const navMenu = document.getElementById('mainNavMenu');
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+
+    if (!navMenu || !mobileToggle || mobileToggle.dataset.bound === 'true') {
+        return;
+    }
+
+    mobileToggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isOpen = navMenu.classList.toggle('open');
+        mobileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        mobileToggle.textContent = isOpen ? '✕' : '☰';
+    });
+
+    navMenu.querySelectorAll('a, button').forEach((item) => {
+        item.addEventListener('click', () => {
+            closeMobileNavigationMenu();
+        });
+    });
+
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            closeMobileNavigationMenu();
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!navMenu.classList.contains('open')) {
+            return;
+        }
+
+        if (navMenu.contains(event.target) || mobileToggle.contains(event.target)) {
+            return;
+        }
+
+        closeMobileNavigationMenu();
+    });
+
+    mobileToggle.dataset.bound = 'true';
+}
+
+function saveClientSession(token, account) {
+    clientAuthToken = token || null;
+    clientAccount = account || null;
+
+    if (!clientAuthToken || !clientAccount) {
+        localStorage.removeItem(CLIENT_AUTH_STORAGE_KEY);
+        return;
+    }
+
+    localStorage.setItem(
+        CLIENT_AUTH_STORAGE_KEY,
+        JSON.stringify({
+            token: clientAuthToken,
+            account: clientAccount
+        })
+    );
+}
+
+function loadClientSession() {
+    try {
+        const raw = localStorage.getItem(CLIENT_AUTH_STORAGE_KEY);
+        if (!raw) {
+            clientAuthToken = null;
+            clientAccount = null;
+            return;
+        }
+
+        const parsed = JSON.parse(raw);
+        clientAuthToken = parsed?.token || null;
+        clientAccount = parsed?.account || null;
+    } catch (error) {
+        console.warn('Unable to load client session:', error.message);
+        clientAuthToken = null;
+        clientAccount = null;
+    }
+}
+
+function clearClientSession() {
+    clientAuthToken = null;
+    clientAccount = null;
+    localStorage.removeItem(CLIENT_AUTH_STORAGE_KEY);
+}
+
+function buildReferralLink(code) {
+    if (!code) {
+        return '';
+    }
+
+    const cleanCode = String(code).trim().toUpperCase();
+    const url = new URL(`${window.location.origin}${window.location.pathname}`);
+    url.searchParams.set('ref', cleanCode);
+    return url.toString();
+}
+
+function getReferralCodeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get('ref') || params.get('referral') || '').trim().toUpperCase();
+}
+
+function applyReferralCodeFromUrl() {
+    const referralCode = getReferralCodeFromUrl();
+    if (!referralCode) {
+        return;
+    }
+
+    const registerReferralInput = document.getElementById('registerReferralCode');
+    if (registerReferralInput && !registerReferralInput.value.trim()) {
+        registerReferralInput.value = referralCode;
+    }
+
+    if (!clientAccount) {
+        setClientAuthMessage(`Referral code detected: ${referralCode}. Register now to link this account.`, 'success');
+    }
+}
+
+function updateClientAccountUi() {
+    const navAccountButton = document.querySelector('.account-nav-btn');
+    const dashboardLoggedOut = document.getElementById('accountDashboardLoggedOut');
+    const dashboardLoggedIn = document.getElementById('accountDashboardLoggedIn');
+
+    if (clientAccount && clientAuthToken) {
+        const displayName = String(clientAccount.fullName || clientAccount.email || 'Client').trim();
+        const firstName = displayName.split(' ')[0] || 'Client';
+
+        if (navAccountButton) {
+            navAccountButton.textContent = `Account: ${firstName}`;
+        }
+
+        if (dashboardLoggedOut) {
+            dashboardLoggedOut.style.display = 'none';
+        }
+
+        if (dashboardLoggedIn) {
+            dashboardLoggedIn.style.display = 'block';
+        }
+
+        const nameEl = document.getElementById('clientAccountName');
+        if (nameEl) {
+            nameEl.textContent = clientAccount.fullName || '--';
+        }
+
+        const emailEl = document.getElementById('clientAccountEmail');
+        if (emailEl) {
+            emailEl.textContent = clientAccount.email || '--';
+        }
+
+        const codeEl = document.getElementById('clientReferralCode');
+        if (codeEl) {
+            codeEl.textContent = clientAccount.referralCode || '--';
+        }
+
+        const balanceEl = document.getElementById('clientReferralBalance');
+        if (balanceEl) {
+            balanceEl.textContent = `PHP ${formatMoney(clientAccount.referralBalance || 0)}`;
+        }
+
+        const inviteEl = document.getElementById('clientInviteCount');
+        if (inviteEl) {
+            inviteEl.textContent = String(clientAccount.inviteCount || 0);
+        }
+
+        const convertedInviteEl = document.getElementById('clientConvertedInviteCount');
+        if (convertedInviteEl) {
+            convertedInviteEl.textContent = String(clientAccount.convertedInviteCount || 0);
+        }
+
+        const linkEl = document.getElementById('clientReferralLink');
+        if (linkEl) {
+            linkEl.value = buildReferralLink(clientAccount.referralCode || '');
+        }
+
+        const fullNameInput = document.getElementById('fullName');
+        if (fullNameInput && !fullNameInput.value.trim() && clientAccount.fullName) {
+            fullNameInput.value = clientAccount.fullName;
+        }
+
+        const contactNumberInput = document.getElementById('contactNumber');
+        if (contactNumberInput && !contactNumberInput.value.trim() && clientAccount.contactNumber) {
+            contactNumberInput.value = clientAccount.contactNumber;
+        }
+
+        setRedeemNotice('');
+    } else {
+        if (navAccountButton) {
+            navAccountButton.textContent = 'Client Account';
+        }
+
+        if (dashboardLoggedOut) {
+            dashboardLoggedOut.style.display = 'block';
+        }
+
+        if (dashboardLoggedIn) {
+            dashboardLoggedIn.style.display = 'none';
+        }
+
+        const redeemForm = document.getElementById('referralRedeemForm');
+        if (redeemForm) {
+            redeemForm.reset();
+        }
+
+        setRedeemNotice('');
+    }
+
+    updateRedeemSummaryUi();
+    updateCheckoutAccountNotice();
+}
+
+function switchAccountTab(tabName) {
+    const validTabs = ['login', 'register', 'recover', 'dashboard'];
+    const safeTab = validTabs.includes(tabName) ? tabName : 'login';
+
+    validTabs.forEach((tab) => {
+        const button = document.getElementById(`accountTab${tab.charAt(0).toUpperCase()}${tab.slice(1)}`);
+        const panel = document.getElementById(`account${tab.charAt(0).toUpperCase()}${tab.slice(1)}Panel`);
+
+        if (button) {
+            button.classList.toggle('active', tab === safeTab);
+        }
+
+        if (panel) {
+            panel.classList.toggle('active', tab === safeTab);
+        }
+    });
+}
+
+function openAccountModal(preferredTab = '') {
+    const modal = document.getElementById('accountModal');
+    if (!modal) {
+        return;
+    }
+
+    closeMobileNavigationMenu();
+
+    modal.classList.add('show');
+
+    if (preferredTab) {
+        switchAccountTab(preferredTab);
+        return;
+    }
+
+    if (clientAccount && clientAuthToken) {
+        switchAccountTab('dashboard');
+    } else {
+        switchAccountTab('login');
+    }
+}
+
+function closeAccountModal() {
+    const modal = document.getElementById('accountModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+async function refreshClientAccountSummary(silent = false) {
+    if (!clientAuthToken) {
+        clearClientSession();
+        updateClientAccountUi();
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/me`, {
+            headers: {
+                Authorization: `Bearer ${clientAuthToken}`
+            }
+        });
+
+        if (!response.ok) {
+            clearClientSession();
+            updateClientAccountUi();
+            if (!silent) {
+                setClientAuthMessage('Session expired. Please login again.', 'error');
+                switchAccountTab('login');
+            }
+            return;
+        }
+
+        const result = await response.json();
+        saveClientSession(clientAuthToken, result.account || null);
+        updateClientAccountUi();
+
+        if (!silent) {
+            setClientAuthMessage('Account details refreshed.', 'success');
+            switchAccountTab('dashboard');
+        }
+    } catch (error) {
+        if (!silent) {
+            setClientAuthMessage('Unable to refresh account right now. Please try again.', 'error');
+        }
+    }
+}
+
+function toggleAccountPasswordVisibility(inputId, toggleButtonId, ariaLabelPrefix) {
+    const passwordInput = document.getElementById(inputId);
+    const toggleButton = document.getElementById(toggleButtonId);
+
+    if (!passwordInput || !toggleButton) {
+        return;
+    }
+
+    const shouldShowPassword = passwordInput.type === 'password';
+    passwordInput.type = shouldShowPassword ? 'text' : 'password';
+    toggleButton.textContent = shouldShowPassword ? 'Hide' : 'Show';
+    toggleButton.setAttribute(
+        'aria-label',
+        `${shouldShowPassword ? 'Hide' : 'Show'} ${ariaLabelPrefix}`
+    );
+}
+
+function toggleRegisterPasswordVisibility() {
+    toggleAccountPasswordVisibility(
+        'clientRegisterPassword',
+        'clientRegisterPasswordToggle',
+        'register password'
+    );
+}
+
+function toggleRegisterConfirmPasswordVisibility() {
+    toggleAccountPasswordVisibility(
+        'clientRegisterConfirmPassword',
+        'clientRegisterConfirmPasswordToggle',
+        'confirm password'
+    );
+}
+
+function resetRegisterPasswordToggles() {
+    const registerPasswordInput = document.getElementById('clientRegisterPassword');
+    const registerPasswordToggle = document.getElementById('clientRegisterPasswordToggle');
+    const registerConfirmPasswordInput = document.getElementById('clientRegisterConfirmPassword');
+    const registerConfirmPasswordToggle = document.getElementById('clientRegisterConfirmPasswordToggle');
+
+    if (registerPasswordInput) {
+        registerPasswordInput.type = 'password';
+    }
+    if (registerPasswordToggle) {
+        registerPasswordToggle.textContent = 'Show';
+        registerPasswordToggle.setAttribute('aria-label', 'Show register password');
+    }
+
+    if (registerConfirmPasswordInput) {
+        registerConfirmPasswordInput.type = 'password';
+    }
+    if (registerConfirmPasswordToggle) {
+        registerConfirmPasswordToggle.textContent = 'Show';
+        registerConfirmPasswordToggle.setAttribute('aria-label', 'Show confirm password');
+    }
+}
+
+function resetEmailCodeButton(buttonId) {
+    const button = document.getElementById(buttonId);
+    if (!button) {
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    button.disabled = false;
+    button.textContent = 'Send OTP';
+}
+
+function startEmailCodeCooldown(buttonId, cooldownSeconds) {
+    const button = document.getElementById(buttonId);
+    if (!button) {
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    let remainingSeconds = Math.max(
+        1,
+        Number.isFinite(Number(cooldownSeconds))
+            ? Math.round(Number(cooldownSeconds))
+            : EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS
+    );
+
+    button.disabled = true;
+    button.textContent = `Resend OTP (${remainingSeconds}s)`;
+
+    emailCodeCooldownIntervals[buttonId] = window.setInterval(() => {
+        remainingSeconds -= 1;
+
+        if (remainingSeconds <= 0) {
+            resetEmailCodeButton(buttonId);
+            return;
+        }
+
+        button.textContent = `Resend OTP (${remainingSeconds}s)`;
+    }, 1000);
+}
+
+function setEmailOtpFieldState({ inputId, buttonId, required, disabledHint }) {
+    const codeInput = document.getElementById(inputId);
+    const button = document.getElementById(buttonId);
+    if (!codeInput || !button) {
+        return;
+    }
+
+    const formGroup = codeInput.closest('.form-group');
+    const hint = formGroup?.querySelector('.form-hint') || null;
+
+    if (hint && !hint.dataset.defaultText) {
+        hint.dataset.defaultText = hint.textContent || '';
+    }
+
+    if (required) {
+        codeInput.disabled = false;
+        codeInput.required = true;
+        if (!emailCodeCooldownIntervals[buttonId]) {
+            button.disabled = false;
+            button.textContent = 'Send OTP';
+        }
+
+        if (hint && hint.dataset.defaultText) {
+            hint.textContent = hint.dataset.defaultText;
+        }
+        return;
+    }
+
+    if (emailCodeCooldownIntervals[buttonId]) {
+        clearInterval(emailCodeCooldownIntervals[buttonId]);
+        delete emailCodeCooldownIntervals[buttonId];
+    }
+
+    codeInput.value = '';
+    codeInput.required = false;
+    codeInput.disabled = true;
+    button.disabled = true;
+    button.textContent = 'OTP Disabled';
+
+    if (hint) {
+        hint.textContent = disabledHint;
+    }
+}
+
+function setEmailOtpRequirement(required) {
+    isEmailOtpRequired = Boolean(required);
+    const disabledHint = 'OTP is currently disabled by server settings. You can continue without OTP.';
+
+    setEmailOtpFieldState({
+        inputId: 'clientRegisterVerificationCode',
+        buttonId: 'sendRegisterCodeBtn',
+        required: isEmailOtpRequired,
+        disabledHint
+    });
+
+    setEmailOtpFieldState({
+        inputId: 'clientRecoverVerificationCode',
+        buttonId: 'sendRecoverCodeBtn',
+        required: isEmailOtpRequired,
+        disabledHint
+    });
+}
+
+async function syncEmailOtpRequirementFromHealth() {
+    try {
+        const response = await fetch(API_HEALTH_URL, { cache: 'no-store' });
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        setEmailOtpRequirement(Boolean(result?.emailVerification?.enabled));
+    } catch (error) {
+        // Keep OTP enabled by default when health check is unavailable.
+    }
+}
+
+async function sendClientEmailVerificationCode({ purpose, email, fullName = '', buttonId }) {
+    if (!isEmailOtpRequired) {
+        setClientAuthMessage('OTP is currently disabled by server settings.', 'error');
+        return;
+    }
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+        setClientAuthMessage('Please enter your email address first.', 'error');
+        return;
+    }
+
+    const button = document.getElementById(buttonId);
+    const previousButtonLabel = button?.textContent || 'Send OTP';
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Sending OTP...';
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/send-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                purpose,
+                email: normalizedEmail,
+                fullName
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            if (button) {
+                button.disabled = false;
+                button.textContent = previousButtonLabel;
+            }
+
+            setClientAuthMessage(result.error || 'Unable to send OTP right now.', 'error');
+            return;
+        }
+
+        if (result.previewCode && EMAIL_CODE_REGEX.test(String(result.previewCode))) {
+            const codeInputId = purpose === 'register'
+                ? 'clientRegisterVerificationCode'
+                : 'clientRecoverVerificationCode';
+            const codeInput = document.getElementById(codeInputId);
+            if (codeInput && !codeInput.value.trim()) {
+                codeInput.value = String(result.previewCode);
+            }
+        }
+
+        const cooldownSeconds = Number(result.cooldownSeconds || EMAIL_CODE_DEFAULT_COOLDOWN_SECONDS);
+        startEmailCodeCooldown(buttonId, cooldownSeconds);
+        setClientAuthMessage(result.message || 'OTP sent successfully.', 'success');
+    } catch (error) {
+        if (button) {
+            button.disabled = false;
+            button.textContent = previousButtonLabel;
+        }
+
+        setClientAuthMessage('Unable to send OTP right now. Please try again later.', 'error');
+    }
+}
+
+function sendRegisterVerificationCode() {
+    const fullName = document.getElementById('clientRegisterName')?.value?.trim() || '';
+    const email = document.getElementById('clientRegisterEmail')?.value?.trim()?.toLowerCase() || '';
+
+    return sendClientEmailVerificationCode({
+        purpose: 'register',
+        email,
+        fullName,
+        buttonId: 'sendRegisterCodeBtn'
+    });
+}
+
+function sendRecoverVerificationCode() {
+    const fullName = document.getElementById('clientRecoverName')?.value?.trim() || '';
+    const email = document.getElementById('clientRecoverEmail')?.value?.trim()?.toLowerCase() || '';
+
+    return sendClientEmailVerificationCode({
+        purpose: 'forgot_password',
+        email,
+        fullName,
+        buttonId: 'sendRecoverCodeBtn'
+    });
+}
+
+async function handleClientLogin(event) {
+    event.preventDefault();
+
+    const emailInput = document.getElementById('clientLoginEmail') || document.getElementById('loginEmail');
+    const passwordInput = document.getElementById('clientLoginPassword') || document.getElementById('loginPassword');
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+    const password = passwordInput ? passwordInput.value : '';
+
+    if (!email || !password) {
+        setClientAuthMessage('Email and password are required.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Login failed. Please try again.', 'error');
+            return;
+        }
+
+        saveClientSession(result.token, result.account || null);
+        updateClientAccountUi();
+        switchAccountTab('dashboard');
+        setClientAuthMessage('Login successful. You can now use your referral dashboard.', 'success');
+
+        const loginForm = document.getElementById('clientLoginForm') || document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.reset();
+        }
+    } catch (error) {
+        setClientAuthMessage('Unable to login right now. Please try again later.', 'error');
+    }
+}
+
+async function handleClientRegister(event) {
+    event.preventDefault();
+
+    const fullName = document.getElementById('clientRegisterName').value.trim();
+    const contactNumber = document.getElementById('clientRegisterContact').value.trim();
+    const normalizedContactNumber = normalizeClientContactNumber(contactNumber);
+    const email = document.getElementById('clientRegisterEmail').value.trim().toLowerCase();
+    const password = document.getElementById('clientRegisterPassword').value;
+    const confirmPassword = document.getElementById('clientRegisterConfirmPassword').value;
+    const referralCode = document.getElementById('registerReferralCode').value.trim().toUpperCase();
+
+    if (!fullName || !contactNumber || !email || !password) {
+        setClientAuthMessage('Full name, contact number, email, and password are required.', 'error');
+        return;
+    }
+
+    if (!normalizedContactNumber) {
+        setClientAuthMessage('Please enter a valid Philippine contact number.', 'error');
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        setClientAuthMessage('Password and confirm password do not match.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fullName,
+                contactNumber: normalizedContactNumber,
+                email,
+                password,
+                confirmPassword,
+                referralCode: referralCode || null
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Registration failed. Please try again.', 'error');
+            return;
+        }
+
+        saveClientSession(result.token, result.account || null);
+        updateClientAccountUi();
+        switchAccountTab('dashboard');
+        setClientAuthMessage('Account created successfully. Share your referral link to earn PHP 100 per successful invite.', 'success');
+
+        document.getElementById('clientRegisterForm').reset();
+        resetRegisterPasswordToggles();
+    } catch (error) {
+        setClientAuthMessage('Unable to register right now. Please try again later.', 'error');
+    }
+}
+
+async function handleClientRecoverPassword(event) {
+    event.preventDefault();
+
+    const fullName = document.getElementById('clientRecoverName').value.trim();
+    const email = document.getElementById('clientRecoverEmail').value.trim().toLowerCase();
+    const contactNumber = document.getElementById('clientRecoverContact').value.trim();
+    const normalizedContactNumber = normalizeClientContactNumber(contactNumber);
+    const newPassword = document.getElementById('clientRecoverPassword').value;
+    const confirmNewPassword = document.getElementById('clientRecoverConfirmPassword').value;
+
+    if (!fullName || !email || !contactNumber || !newPassword || !confirmNewPassword) {
+        setClientAuthMessage('Please complete all reset password fields.', 'error');
+        return;
+    }
+
+    if (!normalizedContactNumber) {
+        setClientAuthMessage('Please enter the same valid Philippine contact number used during registration.', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        setClientAuthMessage('New password must be at least 6 characters.', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+        setClientAuthMessage('New password and confirm password do not match.', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fullName,
+                email,
+                contactNumber: normalizedContactNumber,
+                newPassword,
+                confirmPassword: confirmNewPassword
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setClientAuthMessage(result.error || 'Password reset failed. Please try again.', 'error');
+            return;
+        }
+
+        document.getElementById('clientRecoverForm').reset();
+        setClientAuthMessage(result.message || 'Password reset successful. You can now login.', 'success');
+        switchAccountTab('login');
+    } catch (error) {
+        setClientAuthMessage('Unable to reset password right now. Please try again later.', 'error');
+    }
+}
+
+async function handleReferralRedeem(event) {
+    event.preventDefault();
+
+    if (!clientAuthToken || !clientAccount) {
+        setRedeemNotice('Please login to redeem your referral rewards.', 'error');
+        switchAccountTab('login');
+        return;
+    }
+
+    const { canRedeem } = getRedeemComputation();
+    if (!canRedeem) {
+        setRedeemNotice(`Your current referral balance is not enough to redeem after the ${REFERRAL_REDEEM_DEDUCTION_PERCENT}% deduction.`, 'error');
+        return;
+    }
+
+    const gcashName = document.getElementById('redeemGcashName')?.value?.trim() || '';
+    const gcashNumberRaw = document.getElementById('redeemGcashNumber')?.value?.trim() || '';
+    const gcashNumber = normalizeGcashNumber(gcashNumberRaw);
+
+    if (!gcashName) {
+        setRedeemNotice('GCash name is required.', 'error');
+        return;
+    }
+
+    if (!gcashNumber) {
+        setRedeemNotice('Please enter a valid GCash number (09XXXXXXXXX or +639XXXXXXXXX).', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/client/redeem-referral`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${clientAuthToken}`
+            },
+            body: JSON.stringify({
+                gcashName,
+                gcashNumber
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            setRedeemNotice(result.error || 'Redeem request failed. Please try again.', 'error');
+            return;
+        }
+
+        if (result.account) {
+            saveClientSession(clientAuthToken, result.account);
+        }
+
+        updateClientAccountUi();
+        const redeemForm = document.getElementById('referralRedeemForm');
+        if (redeemForm) {
+            redeemForm.reset();
+        }
+
+        const successMessage = result.message || 'Redemption request submitted. Redemption of rewards will be given within 2 business days.';
+        setRedeemNotice(successMessage, 'success');
+        setClientAuthMessage(successMessage, 'success');
+        refreshClientAccountSummary(true);
+    } catch (error) {
+        setRedeemNotice('Unable to submit redeem request right now. Please try again later.', 'error');
+    }
+}
+
+function logoutClientAccount() {
+    clearClientSession();
+    updateClientAccountUi();
+    switchAccountTab('login');
+    setClientAuthMessage('You are logged out from your client account.', 'success');
+}
+
+async function copyReferralLink() {
+    const referralInput = document.getElementById('clientReferralLink');
+    if (!referralInput || !referralInput.value.trim()) {
+        setClientAuthMessage('No referral link found yet.', 'error');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(referralInput.value.trim());
+        setClientAuthMessage('Referral link copied to clipboard.', 'success');
+    } catch (error) {
+        referralInput.select();
+        document.execCommand('copy');
+        setClientAuthMessage('Referral link copied.', 'success');
+    }
+}
+
+function initClientAccountFeatures() {
+    loadClientSession();
+    updateClientAccountUi();
+
+    const loginForm = document.getElementById('clientLoginForm');
+    const registerForm = document.getElementById('clientRegisterForm');
+    const recoverForm = document.getElementById('clientRecoverForm');
+    const redeemForm = document.getElementById('referralRedeemForm');
+
+    resetRegisterPasswordToggles();
+
+    if (loginForm && loginForm.dataset.bound !== 'true') {
+        loginForm.addEventListener('submit', handleClientLogin);
+        loginForm.dataset.bound = 'true';
+    }
+
+    if (registerForm && registerForm.dataset.bound !== 'true') {
+        registerForm.addEventListener('submit', handleClientRegister);
+        registerForm.dataset.bound = 'true';
+    }
+
+    if (recoverForm && recoverForm.dataset.bound !== 'true') {
+        recoverForm.addEventListener('submit', handleClientRecoverPassword);
+        recoverForm.dataset.bound = 'true';
+    }
+
+    if (redeemForm && redeemForm.dataset.bound !== 'true') {
+        redeemForm.addEventListener('submit', handleReferralRedeem);
+        redeemForm.dataset.bound = 'true';
+    }
+
+    applyReferralCodeFromUrl();
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+}
+
+// =====================================================
+// PACKAGE SELECTION
+// =====================================================
+
+function selectPackage(packageNum) {
+    if (!requireClientAccountForPurchase('buy a package')) {
+        return;
+    }
+
+    selectedPackage = packageNum;
+    const packageData = packages[packageNum];
+    selectedUnitPrice = Number(packageData?.price || 0);
+    selectedQuantity = 1;
+    selectedTotalPrice = selectedUnitPrice;
+    
+    // Show modal
+    document.getElementById('paymentModal').classList.add('show');
+    
+    // Set package info in step 1
+    document.getElementById('selectedPackageText').textContent = packageData.name;
+
+    const quantityInput = document.getElementById('orderQuantity');
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+
+    recalculateSelectedTotal({ refreshQr: false });
+    updateCheckoutAccountNotice();
+    
+    // Generate QR code
+    generateQRCode({ ...packageData, price: selectedTotalPrice });
+    
+    // Reset steps
+    currentStep = 1;
+    showStep(1);
+    resetForm();
+    applySavedCustomerDetailsToForm();
+}
+
+function recalculateSelectedTotal({ refreshQr = true } = {}) {
+    if (!selectedPackage || !packages[selectedPackage]) {
+        return;
+    }
+
+    const packageData = packages[selectedPackage];
+    selectedUnitPrice = Number(packageData.price || 0);
+
+    const quantityInput = document.getElementById('orderQuantity');
+    const normalizedQuantity = normalizeQuantity(quantityInput?.value || selectedQuantity);
+    selectedQuantity = normalizedQuantity;
+
+    if (quantityInput) {
+        quantityInput.value = String(normalizedQuantity);
+    }
+
+    selectedTotalPrice = selectedUnitPrice * selectedQuantity + FREE_SHIPPING_FEE;
+
+    const unitPriceEl = document.getElementById('selectedUnitPrice');
+    const quantityTextEl = document.getElementById('selectedQuantityText');
+    const totalPriceEl = document.getElementById('selectedPrice');
+    const totalSummaryEl = document.getElementById('selectedTotalPrice');
+
+    if (unitPriceEl) {
+        unitPriceEl.textContent = formatMoney(selectedUnitPrice);
+    }
+
+    if (quantityTextEl) {
+        quantityTextEl.textContent = String(selectedQuantity);
+    }
+
+    if (totalPriceEl) {
+        totalPriceEl.textContent = formatMoney(selectedTotalPrice);
+    }
+
+    if (totalSummaryEl) {
+        totalSummaryEl.textContent = formatMoney(selectedTotalPrice);
+    }
+
+    if (refreshQr) {
+        generateQRCode({ ...packageData, price: selectedTotalPrice });
+    }
+}
+
+function handleQuantityChange() {
+    recalculateSelectedTotal({ refreshQr: true });
+}
+
+function toggleWifiPasswordVisibility() {
+    const passwordInput = document.getElementById('wifiPassword');
+    const toggleButton = document.getElementById('wifiPasswordToggle');
+
+    if (!passwordInput || !toggleButton) {
+        return;
+    }
+
+    const shouldShowPassword = passwordInput.type === 'password';
+    passwordInput.type = shouldShowPassword ? 'text' : 'password';
+    toggleButton.textContent = shouldShowPassword ? 'Hide' : 'Show';
+    toggleButton.setAttribute(
+        'aria-label',
+        shouldShowPassword ? 'Hide WiFi password' : 'Show WiFi password'
+    );
+}
+
+// Simple handlers for newly added offer buttons (placeholders).
+// Modal handlers for new packages
+function openVoucherOnlyModal() {
+    if (!requireClientAccountForPurchase('purchase voucher')) {
+        return;
+    }
+    document.getElementById('voucherOnlyModal').classList.add('show');
+}
+
+function closeVoucherOnlyModal() {
+    document.getElementById('voucherOnlyModal').classList.remove('show');
+}
+
+function openStarlinkModal() {
+    if (!requireClientAccountForPurchase('inquire about Starlink')) {
+        return;
+    }
+    document.getElementById('starlinkModal').classList.add('show');
+}
+
+function closeStarlinkModal() {
+    document.getElementById('starlinkModal').classList.remove('show');
+}
+
+function openEap110Modal() {
+    if (!requireClientAccountForPurchase('order EAP110')) {
+        return;
+    }
+    document.getElementById('eap110Modal').classList.add('show');
+}
+
+function closeEap110Modal() {
+    document.getElementById('eap110Modal').classList.remove('show');
+}
+
+// Voucher transaction handler
+async function proceedVoucherToPayment() {
+    const voucherAmount = parseFloat(document.getElementById('voucherAmount')?.value || 0);
+    if (!voucherAmount || voucherAmount < 100) {
+        alert('Please enter a voucher amount of PHP 100 or more.');
+        return;
+    }
+    const { account, token } = getClientSession();
+    if (!account || !token) {
+        alert('Please login first.');
+        return;
+    }
+    const transactionData = {
+        packageId: 7,
+        packageName: `VOUCHER ONLY PACKAGE - PHP ${formatMoney(voucherAmount)}`,
+        price: voucherAmount,
+        unitPrice: voucherAmount,
+        totalPrice: voucherAmount,
+        shippingFee: 0,
+        quantity: 1,
+        duration: 'Voucher Credits',
+        fullName: account.fullName || '',
+        contactNumber: account.email || '',
+        address: 'N/A - VOUCHER ONLY',
+        wifiName: 'VOUCHER_CREDIT',
+        wifiPassword: 'N/A',
+        wifiRate: `Voucher Amount: PHP ${formatMoney(voucherAmount)}`
+    };
+    await submitNewPackageTransaction(transactionData, 'voucherOnlyModal');
+}
+
+// Starlink transaction handler
+async function proceedStarlinkToPayment() {
+    const fullName = document.getElementById('starlinkFullName')?.value?.trim() || '';
+    const contactNumber = document.getElementById('starlinkContactNumber')?.value?.trim() || '';
+    const address = document.getElementById('starlinkAddress')?.value?.trim() || '';
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+    const { account, token } = getClientSession();
+    if (!account || !token) {
+        alert('Please login first.');
+        return;
+    }
+    const transactionData = {
+        packageId: 8,
+        packageName: 'STARLINK INQUIRY',
+        price: 0,
+        unitPrice: 0,
+        totalPrice: 0,
+        shippingFee: 0,
+        quantity: 1,
+        duration: 'Inquiry Processing',
+        fullName: fullName,
+        contactNumber: contactNumber,
+        address: address,
+        wifiName: 'STARLINK_INQUIRY',
+        wifiPassword: 'N/A',
+        wifiRate: 'Inquiry - Await Admin Contact'
+    };
+    await submitNewPackageTransaction(transactionData, 'starlinkModal', true);
+}
+
+// EAP110 transaction handler
+async function proceedEap110ToPayment() {
+    const quantity = parseInt(document.getElementById('eap110Quantity')?.value || 1);
+    const fullName = document.getElementById('eap110FullName')?.value?.trim() || '';
+    const contactNumber = document.getElementById('eap110ContactNumber')?.value?.trim() || '';
+    const address = document.getElementById('eap110Address')?.value?.trim() || '';
+    if (!fullName || !contactNumber || !address || quantity < 1) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+    const { account, token } = getClientSession();
+    if (!account || !token) {
+        alert('Please login first.');
+        return;
+    }
+    const unitPrice = 2500;
+    const totalPrice = unitPrice * quantity;
+    const transactionData = {
+        packageId: 9,
+        packageName: `EAP110 - ${quantity} unit(s)`,
+        price: totalPrice,
+        unitPrice: unitPrice,
+        totalPrice: totalPrice,
+        shippingFee: 0,
+        quantity: quantity,
+        duration: 'EAP110 Hardware',
+        fullName: fullName,
+        contactNumber: contactNumber,
+        address: address,
+        wifiName: `EAP110_${quantity}`,
+        wifiPassword: 'N/A',
+        wifiRate: `EAP110 Units x${quantity} @ PHP ${formatMoney(unitPrice)} each`
+    };
+    await submitNewPackageTransaction(transactionData, 'eap110Modal');
+}
+
+// Generic submit for new packages
+async function submitNewPackageTransaction(transactionData, modalId, skipPayment = false) {
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedStatus = 'pending';
+    try {
+        const { account, token } = getClientSession();
+        if (!account || !token) {
+            alert('Please login first.');
+            return;
+        }
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (token) {
+            requestHeaders.Authorization = `Bearer ${token}`;
+        }
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || 'Server error');
+        }
+        const result = await response.json();
+        resolvedOrderId = result?.orderId ? String(result.orderId) : `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = result?.trackingNumber ? String(result.trackingNumber) : `TRACK-${Date.now()}`;
+        resolvedStatus = String(result?.status || 'pending');
+    } catch (error) {
+        alert('Transaction submission failed. Please try again.');
+        console.error('Error:', error.message);
+        return;
+    }
+    try {
+        let transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId,
+            trackingNumber: resolvedTrackingNumber,
+            status: resolvedStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (e) {
+        console.warn('Local storage save failed:', e.message);
+    }
+    latestOrderId = resolvedOrderId;
+    latestTrackingNumber = resolvedTrackingNumber;
+    latestOrderStatus = resolvedStatus;
+    alert(`Order ${resolvedOrderId} submitted successfully! Your tracking number is ${resolvedTrackingNumber}.`);
+    document.getElementById(modalId)?.classList.remove('show');
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+}
+
+function getClientSession() {
+    try {
+        const raw = localStorage.getItem(CLIENT_AUTH_STORAGE_KEY);
+        if (!raw) {
+            return { token: null, account: null };
+        }
+        const parsed = JSON.parse(raw);
+        return {
+            token: parsed?.token || null,
+            account: parsed?.account || null
+        };
+    } catch (error) {
+        return { token: null, account: null };
+    }
+}
+
+// =====================================================
+// QR CODE GENERATION
+// =====================================================
+
+function generateQRCode() {
+    const qrWrap = document.getElementById('qrcode');
+    if (!qrWrap) {
+        return;
+    }
+
+    qrWrap.innerHTML = '';
+
+    const qrImage = document.createElement('img');
+    qrImage.src = STATIC_GCASH_QR_IMAGE;
+    qrImage.alt = 'Official GCash payment QR code';
+    qrImage.className = 'static-gcash-qr-image';
+    qrWrap.appendChild(qrImage);
+}
+
+// =====================================================
+// PAYMENT FLOW
+// =====================================================
+
+function showStep(stepNum) {
+    for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`step${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+    document.getElementById(`step${stepNum}`).classList.add('active');
+}
+
+function nextStep() {
+    if (currentStep < 5) {
+        currentStep++;
+        showStep(currentStep);
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+    }
+}
+
+// =====================================================
+// FILE UPLOAD HANDLING
+// =====================================================
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            uploadedProofImage = e.target.result;
+            const preview = document.getElementById('uploadPreview');
+            preview.innerHTML = `<img src="${e.target.result}" alt="Proof Preview">`;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        alert('Please select a valid image file');
+    }
+}
+
+function validateProof() {
+    if (!uploadedProofImage) {
+        alert('Please upload a proof image');
+        return;
+    }
+    nextStep();
+}
+
+// =====================================================
+// FORM VALIDATION
+// =====================================================
+
+function validatePersonalInfo() {
+    const fullName = document.getElementById('fullName').value.trim();
+    const contactNumber = document.getElementById('contactNumber').value.trim();
+    const address = document.getElementById('address').value.trim();
+    
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields');
+        return null;
+    }
+    
+    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+        alert('Please enter a valid Philippine phone number');
+        return;
+    }
+
+    saveCustomerDetails({ fullName, contactNumber, address });
+    
+    nextStep();
+}
+
+// =====================================================
+// TRANSACTION COMPLETION
+// =====================================================
+
+async function completeTransaction() {
+    if (!requireClientAccountForPurchase('place a package order')) {
+        return;
+    }
+
+    if (!selectedPackage || !packages[selectedPackage]) {
+        alert('Please select a package first.');
+        return;
+    }
+
+    const wifiName = document.getElementById('wifiName').value.trim();
+    const wifiPassword = document.getElementById('wifiPassword').value.trim();
+    const wifiRateInput = document.getElementById('wifiRate').value;
+    const normalizedWifiRate = normalizeWifiRateMbps(wifiRateInput);
+
+    recalculateSelectedTotal({ refreshQr: false });
+    const orderQuantity = normalizeQuantity(selectedQuantity);
+    const selectedPackageData = packages[selectedPackage];
+    
+    if (!wifiName || !wifiPassword || !wifiRateInput) {
+        alert('Please fill in all WiFi configuration fields');
+        return;
+    }
+
+    if (!normalizedWifiRate) {
+        alert('Please enter a valid WiFi data rate limit in Mbps.');
+        return;
+    }
+
+    const fullName = document.getElementById('fullName').value.trim();
+    const contactNumber = document.getElementById('contactNumber').value.trim();
+    const address = document.getElementById('address').value.trim();
+
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+        alert('Please enter a valid Philippine phone number');
+        return;
+    }
+
+    const isOfflineFileMode = window.location.protocol === 'file:';
+
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let resolvedTotalPrice = selectedTotalPrice;
+    let resolvedUnitPrice = selectedUnitPrice;
+    let resolvedShippingFee = FREE_SHIPPING_FEE;
+    let referralRewardApplied = false;
+    let referralRewardAmount = 0;
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    let finalProofImageUrl = uploadedProofImage;
+    
+    // Upload image to Vercel Blob first if it's a data URL
+    if (uploadedProofImage && uploadedProofImage.startsWith('data:image')) {
+        try {
+            const response = await fetch(uploadedProofImage);
+            const blob = await response.blob();
+            const uploadRes = await fetch(`/api/upload?filename=proof-${Date.now()}.png`, {
+                method: 'POST',
+                body: blob
+            });
+            
+            if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                finalProofImageUrl = uploadData.url;
+            } else {
+                throw new Error('Image upload failed');
+            }
+        } catch (error) {
+            console.warn('Failed to upload proof image via Vercel Blob, falling back to base64.', error);
+        }
+    }
+
+    // Prepare transaction data
+    const transactionData = {
+        packageId: selectedPackage,
+        packageName: selectedPackageData.name,
+        price: selectedTotalPrice,
+        unitPrice: selectedUnitPrice,
+        totalPrice: selectedTotalPrice,
+        shippingFee: FREE_SHIPPING_FEE,
+        quantity: orderQuantity,
+        duration: selectedPackageData.duration,
+        fullName: fullName,
+        contactNumber: contactNumber,
+        address: address,
+        wifiName: wifiName,
+        wifiPassword: wifiPassword,
+        wifiRate: normalizedWifiRate,
+        proofImage: finalProofImageUrl
+    };
+
+    saveCustomerDetails({
+        fullName: transactionData.fullName,
+        contactNumber: transactionData.contactNumber,
+        address: transactionData.address
+    });
+    
+    // Try to submit to backend
+    try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('Order submitted to backend:', result);
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                resolvedTotalPrice = Number(result.totalPrice ?? selectedTotalPrice);
+                resolvedUnitPrice = Number(result.unitPrice ?? selectedUnitPrice);
+                resolvedShippingFee = Number(result.shippingFee ?? FREE_SHIPPING_FEE);
+                referralRewardApplied = Boolean(result.referralRewardApplied);
+                referralRewardAmount = Number(result.referralRewardAmount || 0);
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the order request.';
+            console.warn('Backend submission failed:', backendFailureMessage);
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+        console.warn('Backend not available:', error.message);
+    }
+
+    // Public mode should only finish transaction after real server save.
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Order was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('Submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    // Local fallback is allowed only in offline file mode.
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+    
+    // Also save to localStorage as backup
+    try {
+        let transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            quantity: orderQuantity,
+            unitPrice: resolvedUnitPrice,
+            totalPrice: resolvedTotalPrice,
+            shippingFee: resolvedShippingFee,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving to localStorage:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    // Show success screen
+    document.getElementById('confirmOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('confirmTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('confirmOrderStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('confirmQuantity').textContent = String(orderQuantity);
+    document.getElementById('confirmTotalPrice').textContent = formatMoney(resolvedTotalPrice);
+    document.getElementById('confirmWifiName').textContent = wifiName;
+    document.getElementById('confirmDuration').textContent = selectedPackageData.duration;
+    document.getElementById('confirmName').textContent = fullName;
+
+    const rewardWrap = document.getElementById('confirmReferralRewardWrap');
+    const rewardText = document.getElementById('confirmReferralRewardText');
+    if (rewardWrap && rewardText) {
+        if (referralRewardApplied && referralRewardAmount > 0) {
+            rewardWrap.style.display = 'block';
+            rewardText.textContent = `A referral reward of PHP ${formatMoney(referralRewardAmount)} has been credited to your inviter account.`;
+        } else {
+            rewardWrap.style.display = 'none';
+            rewardText.textContent = '';
+        }
+    }
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+
+    syncSupportSessionWithLatestOrder();
+
+    const trackBtn = document.getElementById('trackPendingOrderBtn');
+    const pendingNotice = document.getElementById('pendingOrderNotice');
+    const isPending = resolvedOrderStatus === 'pending' && Boolean(resolvedOrderId);
+    if (trackBtn) {
+        trackBtn.style.display = isPending ? 'inline-block' : 'none';
+    }
+    if (pendingNotice) {
+        pendingNotice.style.display = isPending ? 'block' : 'none';
+    }
+    
+    currentStep = 5;
+    showStep(5);
+}
+
+// =====================================================
+// MODAL FUNCTIONS
+// =====================================================
+
+function closeModal() {
+    document.getElementById('paymentModal').classList.remove('show');
+    resetForm();
+}
+
+function resetForm() {
+    document.getElementById('fullName').value = '';
+    document.getElementById('contactNumber').value = '';
+    document.getElementById('address').value = '';
+    document.getElementById('wifiName').value = '';
+    document.getElementById('wifiPassword').value = '';
+
+    const wifiPasswordInput = document.getElementById('wifiPassword');
+    if (wifiPasswordInput) {
+        wifiPasswordInput.type = 'password';
+    }
+
+    const wifiPasswordToggle = document.getElementById('wifiPasswordToggle');
+    if (wifiPasswordToggle) {
+        wifiPasswordToggle.textContent = 'Show';
+        wifiPasswordToggle.setAttribute('aria-label', 'Show WiFi password');
+    }
+
+    document.getElementById('wifiRate').value = '';
+    document.getElementById('proofImage').value = '';
+    document.getElementById('uploadPreview').innerHTML = '';
+
+    const quantityInput = document.getElementById('orderQuantity');
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+
+    selectedQuantity = 1;
+    if (selectedPackage && packages[selectedPackage]) {
+        selectedUnitPrice = Number(packages[selectedPackage].price || 0);
+    }
+    selectedTotalPrice = selectedUnitPrice;
+    recalculateSelectedTotal({ refreshQr: false });
+
+    uploadedProofImage = null;
+}
+
+function showAmazonLeoStep(stepNum) {
+    for (let i = 1; i <= 2; i++) {
+        const step = document.getElementById(`amazonLeoStep${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+
+    const activeStep = document.getElementById(`amazonLeoStep${stepNum}`);
+    if (activeStep) {
+        activeStep.classList.add('active');
+    }
+}
+
+function applySavedCustomerDetailsToAmazonLeoForm() {
+    const saved = loadSavedCustomerDetails();
+    if (!saved) {
+        return;
+    }
+
+    const fullNameInput = document.getElementById('amazonLeoFullName');
+    const contactNumberInput = document.getElementById('amazonLeoContactNumber');
+    const addressInput = document.getElementById('amazonLeoAddress');
+
+    if (fullNameInput) {
+        fullNameInput.value = saved.fullName || '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = saved.contactNumber || '';
+    }
+    if (addressInput) {
+        addressInput.value = saved.address || '';
+    }
+}
+
+function resetAmazonLeoReservationForm() {
+    const quantityInput = document.getElementById('amazonLeoQuantity');
+    const fullNameInput = document.getElementById('amazonLeoFullName');
+    const contactNumberInput = document.getElementById('amazonLeoContactNumber');
+    const addressInput = document.getElementById('amazonLeoAddress');
+
+    if (quantityInput) {
+        quantityInput.value = '1';
+    }
+    if (fullNameInput) {
+        fullNameInput.value = '';
+    }
+    if (contactNumberInput) {
+        contactNumberInput.value = '';
+    }
+    if (addressInput) {
+        addressInput.value = '';
+    }
+
+    const orderIdEl = document.getElementById('amazonLeoConfirmOrderId');
+    const trackingEl = document.getElementById('amazonLeoConfirmTrackingNumber');
+    const statusEl = document.getElementById('amazonLeoConfirmStatus');
+    const quantityEl = document.getElementById('amazonLeoConfirmQuantity');
+    const nameEl = document.getElementById('amazonLeoConfirmName');
+    const noticeEl = document.getElementById('amazonLeoReservationNotice');
+
+    if (orderIdEl) {
+        orderIdEl.textContent = '--';
+    }
+    if (trackingEl) {
+        trackingEl.textContent = '--';
+    }
+    if (statusEl) {
+        statusEl.textContent = 'PENDING';
+    }
+    if (quantityEl) {
+        quantityEl.textContent = '1';
+    }
+    if (nameEl) {
+        nameEl.textContent = '';
+    }
+    if (noticeEl) {
+        noticeEl.textContent = AMAZON_LEO_RESERVATION_NOTICE;
+    }
+}
+
+function openAmazonLeoReservationModal() {
+    if (!requireClientAccountForPurchase('reserve Amazon LEO')) {
+        return;
+    }
+
+    const modal = document.getElementById('amazonLeoModal');
+    if (!modal) {
+        return;
+    }
+
+    resetAmazonLeoReservationForm();
+    applySavedCustomerDetailsToAmazonLeoForm();
+    showAmazonLeoStep(1);
+    modal.classList.add('show');
+}
+
+function closeAmazonLeoReservationModal() {
+    const modal = document.getElementById('amazonLeoModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('show');
+    resetAmazonLeoReservationForm();
+    showAmazonLeoStep(1);
+}
+
+async function submitAmazonLeoReservation() {
+    if (!requireClientAccountForPurchase('submit Amazon LEO reservation')) {
+        return;
+    }
+
+    const quantity = normalizeQuantity(document.getElementById('amazonLeoQuantity')?.value || 1);
+    const fullName = document.getElementById('amazonLeoFullName')?.value?.trim() || '';
+    const contactNumber = document.getElementById('amazonLeoContactNumber')?.value?.trim() || '';
+    const address = document.getElementById('amazonLeoAddress')?.value?.trim() || '';
+
+    if (!fullName || !contactNumber || !address) {
+        alert('Please fill in all required fields');
+        return;
+    }
+
+    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+        alert('Please enter a valid Philippine phone number');
+        return;
+    }
+
+    saveCustomerDetails({ fullName, contactNumber, address });
+
+    const transactionData = {
+        packageId: AMAZON_LEO_PACKAGE.id,
+        packageName: AMAZON_LEO_PACKAGE.name,
+        price: AMAZON_LEO_PACKAGE.price,
+        unitPrice: AMAZON_LEO_PACKAGE.price,
+        totalPrice: AMAZON_LEO_PACKAGE.price,
+        shippingFee: FREE_SHIPPING_FEE,
+        quantity,
+        duration: AMAZON_LEO_PACKAGE.duration,
+        fullName,
+        contactNumber,
+        address,
+        wifiName: 'PREORDER',
+        wifiPassword: 'PREORDER',
+        wifiRate: 'N/A',
+        proofImage: null
+    };
+
+    const isOfflineFileMode = window.location.protocol === 'file:';
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the reservation request.';
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+    }
+
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Reservation was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('Amazon LEO reservation submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving Amazon LEO reservation locally:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    document.getElementById('amazonLeoConfirmOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('amazonLeoConfirmTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('amazonLeoConfirmStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('amazonLeoConfirmQuantity').textContent = String(quantity);
+    document.getElementById('amazonLeoConfirmName').textContent = fullName;
+    document.getElementById('amazonLeoReservationNotice').textContent = AMAZON_LEO_RESERVATION_NOTICE;
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+
+    syncSupportSessionWithLatestOrder();
+    showAmazonLeoStep(2);
+}
+
+function showAddingEapStep(stepNum) {
+    for (let i = 1; i <= 3; i++) {
+        const step = document.getElementById(`addingEapStep${i}`);
+        if (step) {
+            step.classList.remove('active');
+        }
+    }
+
+    const activeStep = document.getElementById(`addingEapStep${stepNum}`);
+    if (activeStep) {
+        activeStep.classList.add('active');
+    }
+}
+
+function renderAddingEapQrCode() {
+    const qrWrap = document.getElementById('addingEapQrcode');
+    if (!qrWrap) {
+        return;
+    }
+
+    qrWrap.innerHTML = '';
+    const qrImage = document.createElement('img');
+    qrImage.src = STATIC_GCASH_QR_IMAGE;
+    qrImage.alt = 'GCash payment QR code for ADDING EAP';
+    qrImage.className = 'static-gcash-qr-image';
+    qrWrap.appendChild(qrImage);
+}
+
+function resetAddingEapForm() {
+    const macInput = document.getElementById('addingEapMacAddress');
+    const usernameInput = document.getElementById('addingEapUsername');
+    const passwordInput = document.getElementById('addingEapPassword');
+    const proofInput = document.getElementById('addingEapProofImage');
+    const proofPreview = document.getElementById('addingEapUploadPreview');
+    const orderIdEl = document.getElementById('addingEapOrderId');
+    const trackingEl = document.getElementById('addingEapTrackingNumber');
+    const statusEl = document.getElementById('addingEapStatus');
+    const noticeEl = document.getElementById('addingEapApprovalNotice');
+
+    if (macInput) {
+        macInput.value = '';
+    }
+    if (usernameInput) {
+        usernameInput.value = '';
+    }
+    if (passwordInput) {
+        passwordInput.value = '';
+    }
+    if (proofInput) {
+        proofInput.value = '';
+    }
+    if (proofPreview) {
+        proofPreview.innerHTML = '';
+    }
+    if (orderIdEl) {
+        orderIdEl.textContent = '--';
+    }
+    if (trackingEl) {
+        trackingEl.textContent = '--';
+    }
+    if (statusEl) {
+        statusEl.textContent = 'PENDING';
+    }
+    if (noticeEl) {
+        noticeEl.textContent = ADDING_EAP_APPROVAL_NOTICE;
+    }
+
+    uploadedAddingEapProofImage = null;
+}
+
+function openAddingEapModal() {
+    if (!requireClientAccountForPurchase('buy ADDING EAP')) {
+        return;
+    }
+
+    const modal = document.getElementById('addingEapModal');
+    if (!modal) {
+        return;
+    }
+
+    resetAddingEapForm();
+    renderAddingEapQrCode();
+    showAddingEapStep(1);
+    modal.classList.add('show');
+}
+
+function closeAddingEapModal() {
+    const modal = document.getElementById('addingEapModal');
+    if (!modal) {
+        return;
+    }
+
+    modal.classList.remove('show');
+    resetAddingEapForm();
+    showAddingEapStep(1);
+}
+
+function proceedAddingEapToPayment() {
+    const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
+    const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
+    const eapPassword = document.getElementById('addingEapPassword')?.value?.trim() || '';
+
+    if (!macAddress || !eapUsername || !eapPassword) {
+        alert('Please fill MAC address, username, and password.');
+        return;
+    }
+
+    const macPattern = /^(?:[0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$/;
+    if (!macPattern.test(macAddress)) {
+        alert('Please enter a valid MAC address format (e.g., AA:BB:CC:DD:EE:FF).');
+        return;
+    }
+
+    showAddingEapStep(2);
+}
+
+function handleAddingEapProofUpload(event) {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            uploadedAddingEapProofImage = e.target.result;
+            const preview = document.getElementById('addingEapUploadPreview');
+            if (preview) {
+                preview.innerHTML = `<img src="${e.target.result}" alt="Adding EAP Proof Preview">`;
+            }
+        };
+        reader.readAsDataURL(file);
+    } else {
+        uploadedAddingEapProofImage = null;
+        alert('Please select a valid image file');
+    }
+}
+
+async function submitAddingEapTransaction() {
+    if (!requireClientAccountForPurchase('submit ADDING EAP transaction')) {
+        return;
+    }
+
+    const macAddress = document.getElementById('addingEapMacAddress')?.value?.trim() || '';
+    const eapUsername = document.getElementById('addingEapUsername')?.value?.trim() || '';
+    const eapPassword = document.getElementById('addingEapPassword')?.value?.trim() || '';
+
+    if (!macAddress || !eapUsername || !eapPassword) {
+        alert('Please fill MAC address, username, and password.');
+        return;
+    }
+
+    const macPattern = /^(?:[0-9A-Fa-f]{2}[:.-]){5}[0-9A-Fa-f]{2}$/;
+    if (!macPattern.test(macAddress)) {
+        alert('Please enter a valid MAC address format (e.g., AA:BB:CC:DD:EE:FF).');
+        return;
+    }
+
+    if (!uploadedAddingEapProofImage) {
+        alert('Please upload proof of payment.');
+        return;
+    }
+
+    const transactionData = {
+        packageId: ADDING_EAP_PACKAGE.id,
+        packageName: ADDING_EAP_PACKAGE.name,
+        price: ADDING_EAP_PACKAGE.price,
+        unitPrice: ADDING_EAP_PACKAGE.price,
+        totalPrice: ADDING_EAP_PACKAGE.price,
+        shippingFee: 0,
+        quantity: 1,
+        duration: ADDING_EAP_PACKAGE.duration,
+        fullName: `ADDING EAP - ${eapUsername}`,
+        contactNumber: 'N/A',
+        address: 'N/A',
+        wifiName: macAddress,
+        wifiPassword: eapUsername,
+        wifiRate: eapPassword,
+        proofImage: uploadedAddingEapProofImage
+    };
+
+    const isOfflineFileMode = window.location.protocol === 'file:';
+    let resolvedOrderId = null;
+    let resolvedTrackingNumber = null;
+    let resolvedOrderStatus = 'pending';
+    let submittedToServer = false;
+    let backendFailureMessage = '';
+
+    try {
+        const requestHeaders = { 'Content-Type': 'application/json' };
+        if (clientAuthToken) {
+            requestHeaders.Authorization = `Bearer ${clientAuthToken}`;
+        }
+
+        const response = await fetch(`${API_URL}/submit-order`, {
+            method: 'POST',
+            headers: requestHeaders,
+            body: JSON.stringify(transactionData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result && result.orderId) {
+                resolvedOrderId = String(result.orderId);
+                resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
+                resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
+                submittedToServer = true;
+            }
+        } else {
+            const errorText = await response.text();
+            backendFailureMessage = errorText || 'Server rejected the ADDING EAP request.';
+        }
+    } catch (error) {
+        backendFailureMessage = error.message;
+    }
+
+    if (!submittedToServer && !isOfflineFileMode) {
+        alert('Transaction was not submitted to the server. Please check your internet and try again.');
+        if (backendFailureMessage) {
+            console.warn('ADDING EAP submission details:', backendFailureMessage);
+        }
+        return;
+    }
+
+    if (!submittedToServer && isOfflineFileMode) {
+        resolvedOrderId = `LOCAL-${Date.now()}`;
+        resolvedTrackingNumber = `LOCAL-TRACK-${Date.now()}`;
+    }
+
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        transactions.push({
+            ...transactionData,
+            orderId: resolvedOrderId || `LOCAL-${Date.now()}`,
+            trackingNumber: resolvedTrackingNumber || '',
+            status: resolvedOrderStatus,
+            timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('cynetworkTransactions', JSON.stringify(transactions));
+    } catch (error) {
+        console.error('Error saving ADDING EAP transaction locally:', error);
+    }
+
+    latestOrderId = resolvedOrderId || '';
+    latestOrderStatus = resolvedOrderStatus;
+    latestTrackingNumber = resolvedTrackingNumber || '';
+
+    document.getElementById('addingEapOrderId').textContent = resolvedOrderId || '--';
+    document.getElementById('addingEapTrackingNumber').textContent = resolvedTrackingNumber || '--';
+    document.getElementById('addingEapStatus').textContent = resolvedOrderStatus.toUpperCase();
+    document.getElementById('addingEapApprovalNotice').textContent = ADDING_EAP_APPROVAL_NOTICE;
+
+    if (clientAuthToken) {
+        refreshClientAccountSummary(true);
+    }
+
+    syncSupportSessionWithLatestOrder();
+    showAddingEapStep(3);
+}
+
+function scrollToPackages() {
+    document.getElementById('packages').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+    const paymentModal = document.getElementById('paymentModal');
+    const amazonLeoModal = document.getElementById('amazonLeoModal');
+    const addingEapModal = document.getElementById('addingEapModal');
+    const trackingModal = document.getElementById('trackOrderModal');
+    const accountModal = document.getElementById('accountModal');
+
+    if (event.target === paymentModal) {
+        closeModal();
+    }
+
+    if (event.target === amazonLeoModal) {
+        closeAmazonLeoReservationModal();
+    }
+
+    if (event.target === addingEapModal) {
+        closeAddingEapModal();
+    }
+
+    if (event.target === trackingModal) {
+        closeTrackOrderModal();
+    }
+
+    if (event.target === accountModal) {
+        closeAccountModal();
+    }
+});
+
+function openTrackOrderModal(prefillOrderId = '') {
+    const modal = document.getElementById('trackOrderModal');
+    const input = document.getElementById('trackOrderIdInput');
+    const result = document.getElementById('trackOrderResult');
+
+    if (!modal || !input || !result) {
+        return;
+    }
+
+    input.value = prefillOrderId || '';
+    result.style.display = 'none';
+    modal.classList.add('show');
+    input.focus();
+}
+
+function closeTrackOrderModal() {
+    const modal = document.getElementById('trackOrderModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function trackPendingOrder() {
+    const lookupToTrack = latestTrackingNumber
+        || latestOrderId
+        || document.getElementById('confirmTrackingNumber')?.textContent?.trim()
+        || document.getElementById('confirmOrderId')?.textContent?.trim()
+        || '';
+    openTrackOrderModal(lookupToTrack);
+    if (lookupToTrack) {
+        trackOrder();
+    }
+}
+
+function getLocalTrackedOrder(orderLookup) {
+    try {
+        const transactions = JSON.parse(localStorage.getItem('cynetworkTransactions') || '[]');
+        return transactions.find((item) => {
+            const orderIdMatch = String(item.orderId || '') === String(orderLookup);
+            const trackingMatch = String(item.trackingNumber || '') === String(orderLookup);
+            return orderIdMatch || trackingMatch;
+        }) || null;
+    } catch (error) {
+        console.error('Error reading local transactions:', error);
+        return null;
+    }
+}
+
+function setTrackStatusBadge(status) {
+    const statusEl = document.getElementById('trackResultStatus');
+    if (!statusEl) {
+        return;
+    }
+
+    const normalized = String(status || 'pending').toLowerCase();
+    statusEl.textContent = normalized.toUpperCase();
+    statusEl.className = `track-status-badge ${normalized}`;
+}
+
+function formatTrackDate(dateValue) {
+    if (!dateValue) {
+        return '--';
+    }
+    const date = new Date(dateValue);
+    return Number.isNaN(date.getTime()) ? String(dateValue) : date.toLocaleString();
+}
+
+function renderTrackOrderResult(orderData) {
+    const resultWrap = document.getElementById('trackOrderResult');
+    if (!resultWrap) {
+        return;
+    }
+
+    document.getElementById('trackResultOrderId').textContent = orderData.orderId || '--';
+    document.getElementById('trackResultTracking').textContent = orderData.trackingNumber || '--';
+    document.getElementById('trackResultPackage').textContent = orderData.packageName || '--';
+    document.getElementById('trackResultQuantity').textContent = String(orderData.quantity || 1);
+    document.getElementById('trackResultTotal').textContent = formatMoney(orderData.totalPrice || orderData.price || 0);
+    document.getElementById('trackResultShipping').textContent = Number(orderData.shippingFee || 0) === 0
+        ? 'FREE (PHP 0)'
+        : `PHP ${formatMoney(orderData.shippingFee)}`;
+    document.getElementById('trackResultDate').textContent = formatTrackDate(orderData.createdAt || orderData.timestamp);
+    document.getElementById('trackResultUpdated').textContent = formatTrackDate(orderData.updatedAt || orderData.timestamp);
+    setTrackStatusBadge(orderData.status || 'pending');
+
+    const reasonWrap = document.getElementById('trackResultReasonWrap');
+    const reasonText = document.getElementById('trackResultReason');
+    const normalizedStatus = String(orderData.status || 'pending').toLowerCase();
+
+    let notes = '';
+    if (orderData.rejectionReason) {
+        notes = orderData.rejectionReason;
+    } else if (normalizedStatus === 'pending') {
+        notes = 'Your order is pending review. Please check back later for updates.';
+    } else if (normalizedStatus === 'approved') {
+        notes = 'Your order is approved. Please prepare for setup and activation instructions.';
+    } else if (normalizedStatus === 'delivery') {
+        notes = 'Wait for the tracking number of the order that will be sent to you on Facebook. It will be shipped within 7 days ASAP.';
+    } else if (normalizedStatus === 'completed') {
+        notes = 'Your order is completed. Thank you for choosing CYNETWORK PISOWIFI.';
+    }
+
+    if (notes) {
+        reasonWrap.style.display = 'block';
+        reasonText.textContent = notes;
+    } else {
+        reasonWrap.style.display = 'none';
+        reasonText.textContent = '';
+    }
+
+    resultWrap.style.display = 'block';
+}
+
+async function trackOrder() {
+    const orderIdInput = document.getElementById('trackOrderIdInput');
+    if (!orderIdInput) {
+        return;
+    }
+
+    const orderId = orderIdInput.value.trim();
+    if (!orderId) {
+        alert('Please enter your order ID');
+        return;
+    }
+
+    const localOrder = getLocalTrackedOrder(orderId);
+    if (String(orderId).startsWith('LOCAL-') && localOrder) {
+        renderTrackOrderResult({
+            orderId: localOrder.orderId,
+            trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+            packageName: localOrder.packageName,
+            quantity: localOrder.quantity || 1,
+            totalPrice: localOrder.totalPrice || localOrder.price || 0,
+            shippingFee: localOrder.shippingFee || 0,
+            status: localOrder.status || 'pending',
+            createdAt: localOrder.timestamp,
+            updatedAt: localOrder.timestamp
+        });
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/track-order/${encodeURIComponent(orderId)}`);
+        if (response.ok) {
+            const result = await response.json();
+            renderTrackOrderResult(result);
+            return;
+        }
+
+        if (localOrder) {
+            renderTrackOrderResult({
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp
+            });
+            return;
+        }
+
+        alert('Order not found. Please check your order ID and try again.');
+    } catch (error) {
+        if (localOrder) {
+            renderTrackOrderResult({
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp
+            });
+            return;
+        }
+        alert('Unable to track order right now. Please try again later.');
+    }
+}
+
+// =====================================================
+// PICTURE VIEWER MODAL
+// =====================================================
+
+const packageImages = {
+    1: ['assets/images/package1.png'],
+    2: ['assets/images/package2.png'],
+    3: ['assets/images/package3.png']
+};
+
+const packageImageFallbacks = {
+    1: 'assets/images/package1.png',
+    2: 'assets/images/package2.png',
+    3: 'assets/images/package3.png'
+};
+
+function initPackageImagesFromServer() {
+    [1, 2, 3].forEach((packageNum) => {
+        const remoteImageSrc = `${API_URL}/images/package/${packageNum}?t=${Date.now()}`;
+        packageImages[packageNum] = [remoteImageSrc];
+
+        const packageCardImage = document.querySelector(`.package-card[data-package="${packageNum}"] .package-image`);
+        if (packageCardImage) {
+            packageCardImage.onerror = () => {
+                packageCardImage.onerror = null;
+                packageCardImage.src = packageImageFallbacks[packageNum];
+            };
+            packageCardImage.src = remoteImageSrc;
+        }
+    });
+}
+
+async function loadPackagesFromAPI() {
+    try {
+        const response = await fetch(`${API_URL}/packages`);
+        if (!response.ok) {
+            console.warn('Failed to load packages from API, using default packages');
+            return;
+        }
+        
+        const apiPackages = await response.json();
+        if (!Array.isArray(apiPackages) || apiPackages.length === 0) {
+            console.warn('No packages returned from API');
+            return;
+        }
+        
+        // Convert API response to the expected format
+        const newPackages = {};
+        apiPackages.forEach(pkg => {
+            newPackages[pkg.id] = {
+                name: pkg.name,
+                price: pkg.price,
+                originalPrice: pkg.original_price,
+                duration: pkg.duration,
+                description: pkg.description,
+                features: pkg.features
+            };
+        });
+        
+        // Update global packages object
+        packages = newPackages;
+        
+        // Update the page to reflect the new package prices
+        updatePackageDisplayOnPage();
+        
+    } catch (error) {
+        console.warn('Error loading packages from API:', error);
+        // Continue using default packages
+    }
+}
+
+function updatePackageDisplayOnPage() {
+    [1, 2, 3].forEach((packageNum) => {
+        const packageData = packages[packageNum];
+        if (!packageData) return;
+        
+        const packageCard = document.querySelector(`.package-card[data-package="${packageNum}"]`);
+        if (!packageCard) return;
+        
+        // Update price
+        const priceEl = packageCard.querySelector('.package-price');
+        if (priceEl) {
+            const oldPrice = packageData.originalPrice ? `<span class="package-old-price">₱${formatMoney(packageData.originalPrice)}</span>` : '';
+            priceEl.innerHTML = oldPrice + `\n                            ₱${formatMoney(packageData.price)}`;
+        }
+        
+        // Update name
+        const titleEl = packageCard.querySelector('.package-title');
+        if (titleEl) {
+            titleEl.textContent = packageData.name;
+        }
+        
+        // Update duration
+        const durationEl = packageCard.querySelector('.package-duration');
+        if (durationEl) {
+            durationEl.textContent = packageData.duration;
+        }
+    });
+}
+
+let currentImageIndex = 0;
+let activeModalPackageNum = 1;
+
+function applyPackage3dTransform(clientX, clientY) {
+    const shell = document.getElementById('package3dShell');
+    const glint = shell ? shell.querySelector('.package-3d-glint') : null;
+    if (!shell) {
+        return;
+    }
+
+    const rect = shell.getBoundingClientRect();
+    const relativeX = (clientX - rect.left) / rect.width;
+    const relativeY = (clientY - rect.top) / rect.height;
+
+    const rotateY = (relativeX - 0.5) * 20;
+    const rotateX = (0.5 - relativeY) * 16;
+
+    shell.style.transform = `rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+
+    if (glint) {
+        const glintX = (relativeX - 0.5) * 42;
+        const glintY = (relativeY - 0.5) * 22;
+        glint.style.transform = `translate3d(${glintX.toFixed(2)}%, ${glintY.toFixed(2)}%, 30px) rotate(-6deg)`;
+    }
+}
+
+function resetPackage3dTransform() {
+    const shell = document.getElementById('package3dShell');
+    const glint = shell ? shell.querySelector('.package-3d-glint') : null;
+    if (!shell) {
+        return;
+    }
+
+    shell.style.transform = 'rotateX(0deg) rotateY(0deg)';
+    if (glint) {
+        glint.style.transform = 'translate3d(-18%, -6%, 30px) rotate(-6deg)';
+    }
+}
+
+function initPackage3dViewer() {
+    const viewer = document.getElementById('pictureModalViewer');
+    const shell = document.getElementById('package3dShell');
+    if (!viewer || !shell || viewer.dataset.bound === 'true') {
+        return;
+    }
+
+    viewer.addEventListener('mousemove', (event) => {
+        applyPackage3dTransform(event.clientX, event.clientY);
+    });
+
+    viewer.addEventListener('mouseleave', () => {
+        resetPackage3dTransform();
+    });
+
+    viewer.addEventListener('touchmove', (event) => {
+        const touch = event.touches && event.touches[0];
+        if (!touch) {
+            return;
+        }
+        applyPackage3dTransform(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    viewer.addEventListener('touchend', () => {
+        resetPackage3dTransform();
+    });
+
+    viewer.dataset.bound = 'true';
+}
+
+function viewFullPicture(packageNum) {
+    const images = packageImages[packageNum];
+    if (images && images.length > 0) {
+        activeModalPackageNum = packageNum;
+        currentImageIndex = 0;
+        const modal = document.getElementById('pictureModal');
+        const imgElement = document.getElementById('pictureModalImg');
+        const shell = document.getElementById('package3dShell');
+        if (shell) {
+            shell.setAttribute('data-package', String(packageNum));
+        }
+        imgElement.onerror = () => {
+            imgElement.onerror = null;
+            imgElement.src = packageImageFallbacks[activeModalPackageNum] || images[0];
+        };
+        imgElement.src = images[0];
+        modal.classList.add('active');
+        resetPackage3dTransform();
+    }
+}
+
+function closePictureModal() {
+    const modal = document.getElementById('pictureModal');
+    modal.classList.remove('active');
+    currentImageIndex = 0;
+    resetPackage3dTransform();
+}
+
+function setupHomepageReferralExplanation() {
+    const toggleBtn = document.getElementById('toggleHomepageReferralBtn');
+    const panel = document.getElementById('homepageReferralPanel');
+
+    if (!toggleBtn || !panel) {
+        return;
+    }
+
+    toggleBtn.addEventListener('click', () => {
+        const isHidden = panel.hasAttribute('hidden');
+        if (isHidden) {
+            panel.removeAttribute('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            return;
+        }
+
+        panel.setAttribute('hidden', '');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+    });
+}
+
+// =====================================================
+// AI CUSTOMER SUPPORT CHAT
+// =====================================================
+
+function getOrCreateSupportClientId() {
+    let clientId = localStorage.getItem('cynetworkSupportClientId');
+    if (!clientId) {
+        clientId = `client-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+        localStorage.setItem('cynetworkSupportClientId', clientId);
+    }
+    return clientId;
+}
+
+function setSupportUnreadBadge(count) {
+    const badge = document.getElementById('supportUnreadBadge');
+    if (!badge) {
+        return;
+    }
+
+    if (count > 0) {
+        badge.style.display = 'inline-flex';
+        badge.textContent = String(count > 99 ? '99+' : count);
+    } else {
+        badge.style.display = 'none';
+        badge.textContent = '0';
+    }
+}
+
+function updateSupportChatStatus(status) {
+    const normalized = String(status || 'ai').toLowerCase();
+    supportChatStatus = normalized;
+
+    const statusText = document.getElementById('supportChatStatusText');
+    if (!statusText) {
+        return;
+    }
+
+    if (normalized === 'live') {
+        statusText.textContent = 'AI Chat Status: Live Customer Support Active';
+        return;
+    }
+
+    if (normalized === 'closed') {
+        statusText.textContent = 'AI Chat Status: Closed by Admin';
+        return;
+    }
+
+    statusText.textContent = 'AI Chat Status: AI Assistant';
+}
+
+async function ensureSupportSession() {
+    if (!supportClientId) {
+        supportClientId = getOrCreateSupportClientId();
+    }
+
+    const payload = {
+        clientId: supportClientId,
+        orderId: latestOrderId && /^\d+$/.test(String(latestOrderId)) ? Number(latestOrderId) : null,
+        trackingNumber: latestTrackingNumber || null,
+        customerName: document.getElementById('fullName')?.value?.trim() || null,
+        customerContact: document.getElementById('contactNumber')?.value?.trim() || null
+    };
+
+    const response = await fetch(`${API_URL}/chat/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error('Unable to initialize support chat session');
+    }
+
+    const result = await response.json();
+    supportChatSessionId = result?.session?.id || supportChatSessionId;
+    updateSupportChatStatus(result?.session?.status || 'ai');
+    return result?.session || null;
+}
+
+function syncSupportSessionWithLatestOrder() {
+    if (!supportClientId) {
+        return;
+    }
+
+    ensureSupportSession().catch((error) => {
+        console.warn('Unable to sync support session metadata:', error.message);
+    });
+}
+
+async function sendSupportMessageToServer(senderType, text) {
+    if (!supportChatSessionId) {
+        await ensureSupportSession();
+    }
+
+    const response = await fetch(`${API_URL}/chat/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: supportChatSessionId,
+            clientId: supportClientId,
+            senderType,
+            message: text
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to send support message');
+    }
+
+    const result = await response.json();
+    return result?.message || null;
+}
+
+async function requestLiveSupport() {
+    if (!supportChatSessionId) {
+        await ensureSupportSession();
+    }
+
+    const response = await fetch(`${API_URL}/chat/live-support-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sessionId: supportChatSessionId,
+            clientId: supportClientId
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to request live support');
+    }
+
+    const result = await response.json();
+    updateSupportChatStatus(result?.status || 'live');
+}
+
+function mapSupportSenderToUiType(senderType) {
+    if (senderType === 'client') {
+        return 'user';
+    }
+    if (senderType === 'admin') {
+        return 'agent';
+    }
+    if (senderType === 'system') {
+        return 'status';
+    }
+    return 'bot';
+}
+
+async function fetchSupportMessages({ markRead = null } = {}) {
+    if (!supportChatSessionId || !supportClientId) {
+        return;
+    }
+
+    const chatPanel = document.getElementById('supportChatPanel');
+    const isOpen = chatPanel?.classList.contains('open');
+    const shouldMarkRead = typeof markRead === 'boolean' ? markRead : isOpen;
+    const startingAfterId = supportLastMessageId;
+
+    try {
+        const response = await fetch(
+            `${API_URL}/chat/messages/${supportChatSessionId}?clientId=${encodeURIComponent(supportClientId)}&afterId=${supportLastMessageId}&markRead=${shouldMarkRead ? '1' : '0'}`
+        );
+
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        updateSupportChatStatus(result?.session?.status || supportChatStatus);
+
+        const incomingMessages = result?.messages || [];
+        incomingMessages.forEach((message) => {
+            supportLastMessageId = Math.max(supportLastMessageId, Number(message.id || 0));
+
+            if (!isOpen && message.senderType === 'admin' && startingAfterId > 0) {
+                const badge = document.getElementById('supportUnreadBadge');
+                const existing = parseInt(badge?.textContent || '0', 10) || 0;
+                setSupportUnreadBadge(existing + 1);
+            }
+
+            addSupportMessage(mapSupportSenderToUiType(message.senderType), message.message, message.id);
+        });
+    } catch (error) {
+        console.warn('Support message polling failed:', error.message);
+    }
+}
+
+function startSupportPolling() {
+    if (supportChatPollTimer) {
+        return;
+    }
+
+    supportChatPollTimer = setInterval(() => {
+        fetchSupportMessages();
+    }, 4000);
+}
+
+function isLiveSupportRequest(text) {
+    return hasKeyword(text, ['live support', 'live agent', 'human agent', 'talk to admin', 'talk to support', 'customer support']);
+}
+
+function isTrackingIntent(text) {
+    return hasKeyword(text, [
+        'track',
+        'tracking',
+        'order status',
+        'status',
+        'pending order',
+        'pending status',
+        'follow up',
+        'follow-up',
+        'followup',
+        'nasaan order',
+        'status ng order',
+        'check order'
+    ]);
+}
+
+function isWebsiteCreationIntent(text) {
+    return false;
+}
+
+function resetWebsiteCreationFlow() {
+    return;
+}
+
+async function generateWebsiteCreationFlowReply(userMessage) {
+    return null;
+}
+
+function extractTrackingLookupFromText(message) {
+    const raw = String(message || '').trim();
+    if (!raw) {
+        return '';
+    }
+
+    const trackingMatch = raw.toUpperCase().match(/CYN-\d{8}-\d{6}/);
+    if (trackingMatch) {
+        return trackingMatch[0];
+    }
+
+    const orderMatch = raw.match(/(?:order(?:\s*id)?|\bid\b|#)\s*[:#-]?\s*(\d{1,9})/i);
+    if (orderMatch && orderMatch[1]) {
+        return orderMatch[1];
+    }
+
+    if (/^\d{1,9}$/.test(raw)) {
+        return raw;
+    }
+
+    return '';
+}
+
+function getLatestKnownOrderLookup() {
+    const candidates = [
+        latestTrackingNumber,
+        latestOrderId,
+        document.getElementById('confirmTrackingNumber')?.textContent?.trim(),
+        document.getElementById('confirmOrderId')?.textContent?.trim()
+    ];
+
+    return candidates.find((item) => item && item !== '--') || '';
+}
+
+function getStatusNoteForOrder(orderData) {
+    const normalizedStatus = String(orderData?.status || 'pending').toLowerCase();
+
+    if (orderData?.rejectionReason) {
+        return `Notes: ${orderData.rejectionReason}`;
+    }
+
+    if (normalizedStatus === 'pending') {
+        return 'Your order is still pending review. Please keep this tracking number and check again later.';
+    }
+
+    if (normalizedStatus === 'approved') {
+        return 'Your order is approved. Our team will proceed with activation and setup instructions.';
+    }
+
+    if (normalizedStatus === 'delivery') {
+        return 'Wait for the tracking number of the order that will be sent to you on Facebook. It will be shipped within 7 days ASAP.';
+    }
+
+    if (normalizedStatus === 'completed') {
+        return 'Your order is completed. Thank you for choosing CYNETWORK PISOWIFI.';
+    }
+
+    if (normalizedStatus === 'cancelled') {
+        return 'Your order is currently marked as cancelled. Contact support if you need assistance.';
+    }
+
+    return 'Please keep your tracking number for your next follow-up.';
+}
+
+async function getTrackedOrderFromLookup(lookup) {
+    const normalizedLookup = String(lookup || '').trim();
+    if (!normalizedLookup) {
+        return { error: 'missing_lookup' };
+    }
+
+    const localOrder = getLocalTrackedOrder(normalizedLookup);
+    if (String(normalizedLookup).startsWith('LOCAL-') && localOrder) {
+        return {
+            orderId: localOrder.orderId,
+            trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+            packageName: localOrder.packageName,
+            quantity: localOrder.quantity || 1,
+            totalPrice: localOrder.totalPrice || localOrder.price || 0,
+            shippingFee: localOrder.shippingFee || 0,
+            status: localOrder.status || 'pending',
+            createdAt: localOrder.timestamp,
+            updatedAt: localOrder.timestamp,
+            isLocal: true
+        };
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/track-order/${encodeURIComponent(normalizedLookup)}`);
+
+        if (response.ok) {
+            const result = await response.json();
+            latestOrderId = result?.orderId ? String(result.orderId) : latestOrderId;
+            latestTrackingNumber = result?.trackingNumber ? String(result.trackingNumber) : latestTrackingNumber;
+            latestOrderStatus = String(result?.status || latestOrderStatus || 'pending').toLowerCase();
+            return result;
+        }
+
+        if (localOrder) {
+            return {
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp,
+                isLocal: true
+            };
+        }
+
+        if (response.status === 404) {
+            return { error: 'not_found' };
+        }
+
+        return { error: 'server_error' };
+    } catch (error) {
+        if (localOrder) {
+            return {
+                orderId: localOrder.orderId,
+                trackingNumber: localOrder.trackingNumber || localOrder.orderId,
+                packageName: localOrder.packageName,
+                quantity: localOrder.quantity || 1,
+                totalPrice: localOrder.totalPrice || localOrder.price || 0,
+                shippingFee: localOrder.shippingFee || 0,
+                status: localOrder.status || 'pending',
+                createdAt: localOrder.timestamp,
+                updatedAt: localOrder.timestamp,
+                isLocal: true
+            };
+        }
+
+        return { error: 'network_error' };
+    }
+}
+
+async function generateTrackingSupportReply(lowerText, rawMessage) {
+    if (!isTrackingIntent(lowerText)) {
+        return null;
+    }
+
+    let lookup = extractTrackingLookupFromText(rawMessage);
+    if (!lookup && hasKeyword(lowerText, ['my', 'current', 'latest', 'pending', 'order'])) {
+        lookup = getLatestKnownOrderLookup();
+    }
+
+    if (!lookup) {
+        return 'I can track your pending order right now.\nPlease send your Tracking Number (example: CYN-20260419-000123) or Order ID (example: 123).';
+    }
+
+    const trackedOrder = await getTrackedOrderFromLookup(lookup);
+    if (trackedOrder?.error === 'not_found') {
+        return `I could not find an order for "${lookup}". Please verify your Tracking Number or Order ID and try again.`;
+    }
+
+    if (trackedOrder?.error) {
+        return 'I cannot check your order status right now due to a connection issue. Please try again in a few moments.';
+    }
+
+    const trackingNumberText = trackedOrder.trackingNumber || '--';
+    const orderIdText = trackedOrder.orderId || '--';
+    const statusText = String(trackedOrder.status || 'pending').toUpperCase();
+    const quantityText = String(trackedOrder.quantity || 1);
+    const totalText = formatMoney(trackedOrder.totalPrice || trackedOrder.price || 0);
+    const submittedText = formatTrackDate(trackedOrder.createdAt || trackedOrder.timestamp);
+    const updatedText = formatTrackDate(trackedOrder.updatedAt || trackedOrder.timestamp);
+
+    return `Order Tracking Update:\nTracking Number: ${trackingNumberText}\nOrder ID: ${orderIdText}\nStatus: ${statusText}\nPackage: ${trackedOrder.packageName || '--'}\nQuantity: ${quantityText}\nTotal Paid: PHP ${totalText}\nDate Submitted: ${submittedText}\nLast Updated: ${updatedText}\n\n${getStatusNoteForOrder(trackedOrder)}`;
+}
+
+function initSupportChat() {
+    const chatToggle = document.getElementById('supportChatToggle');
+    const chatPanel = document.getElementById('supportChatPanel');
+    const chatClose = document.getElementById('supportChatClose');
+    const chatMessages = document.getElementById('supportMessages');
+    const chatInput = document.getElementById('supportInput');
+    const chatSend = document.getElementById('supportSendBtn');
+    const quickButtons = document.querySelectorAll('.support-quick-btn');
+
+    if (!chatToggle || !chatPanel || !chatMessages || !chatInput || !chatSend) {
+        return;
+    }
+
+    supportClientId = getOrCreateSupportClientId();
+    setSupportUnreadBadge(0);
+
+    ensureSupportSession()
+        .then(() => {
+            if (chatMessages.children.length === 0) {
+                addSupportMessage(
+                    'bot',
+                    'Hello! I am your PisoWiFi AI support bot.\nI can help with package pricing, preorder steps, shipping details, installation tips, and speed concerns.\n\nType "I need live customer support" anytime to connect with admin.',
+                    'welcome-bot'
+                );
+            }
+            fetchSupportMessages({ markRead: false });
+            startSupportPolling();
+        })
+        .catch((error) => {
+            console.warn('Support session initialization failed:', error.message);
+        });
+
+    const openChat = () => {
+        chatPanel.classList.add('open');
+        chatToggle.classList.add('active');
+        setSupportUnreadBadge(0);
+        fetchSupportMessages({ markRead: true });
+        chatInput.focus();
+    };
+
+    const closeChat = () => {
+        chatPanel.classList.remove('open');
+        chatToggle.classList.remove('active');
+    };
+
+    const sendUserMessage = async () => {
+        const message = chatInput.value.trim();
+        if (!message) {
+            return;
+        }
+
+        chatInput.value = '';
+
+        try {
+            const userMessage = await sendSupportMessageToServer('client', message);
+            if (userMessage) {
+                supportLastMessageId = Math.max(supportLastMessageId, Number(userMessage.id || 0));
+                addSupportMessage('user', message, userMessage.id);
+            } else {
+                addSupportMessage('user', message);
+            }
+        } catch (error) {
+            addSupportMessage('user', message);
+            addSupportMessage('status', 'Message saved locally. Support server is temporarily unreachable.');
+            return;
+        }
+
+        if (isLiveSupportRequest(message) && supportChatStatus !== 'live') {
+            resetWebsiteCreationFlow();
+            try {
+                await requestLiveSupport();
+                addSupportMessage('status', 'Live support requested. Admin has been notified and can now reply here.');
+            } catch (error) {
+                addSupportMessage('status', 'Unable to request live support right now. Please try again in a moment.');
+            }
+            return;
+        }
+
+        const normalizedMessage = message.toLowerCase();
+        const messageIsTrackingIntent = isTrackingIntent(normalizedMessage);
+
+        if (supportChatStatus === 'live' && !messageIsTrackingIntent) {
+            addSupportMessage('status', 'Your message has been forwarded to live support. Please wait for admin reply.');
+            return;
+        }
+
+        showSupportTyping();
+        setTimeout(async () => {
+            const aiReply = await generateSupportReply(message);
+            removeSupportTyping();
+
+            try {
+                const aiMessage = await sendSupportMessageToServer('ai', aiReply);
+                if (aiMessage) {
+                    supportLastMessageId = Math.max(supportLastMessageId, Number(aiMessage.id || 0));
+                    addSupportMessage('bot', aiReply, aiMessage.id);
+                } else {
+                    addSupportMessage('bot', aiReply);
+                }
+            } catch (error) {
+                addSupportMessage('bot', aiReply);
+            }
+        }, 450);
+    };
+
+    chatToggle.addEventListener('click', () => {
+        if (chatPanel.classList.contains('open')) {
+            closeChat();
+        } else {
+            openChat();
+        }
+    });
+
+    chatClose.addEventListener('click', closeChat);
+    chatSend.addEventListener('click', () => {
+        sendUserMessage();
+    });
+
+    chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            sendUserMessage();
+        }
+    });
+
+    quickButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            chatInput.value = button.dataset.query || '';
+            sendUserMessage();
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && chatPanel.classList.contains('open')) {
+            closeChat();
+        }
+    });
+}
+
+function addSupportMessage(type, text, messageId = null) {
+    const chatMessages = document.getElementById('supportMessages');
+    if (!chatMessages) {
+        return;
+    }
+
+    const normalizedId = messageId ? String(messageId) : '';
+    if (normalizedId && renderedSupportMessageIds.has(normalizedId)) {
+        return;
+    }
+
+    if (normalizedId) {
+        renderedSupportMessageIds.add(normalizedId);
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `support-message ${type}`;
+    messageEl.textContent = text;
+    if (normalizedId) {
+        messageEl.dataset.messageId = normalizedId;
+    }
+
+    chatMessages.appendChild(messageEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showSupportTyping() {
+    const chatMessages = document.getElementById('supportMessages');
+    if (!chatMessages || document.getElementById('supportTyping')) {
+        return;
+    }
+
+    const typingEl = document.createElement('div');
+    typingEl.id = 'supportTyping';
+    typingEl.className = 'support-typing';
+    typingEl.textContent = 'AI Support is typing...';
+    chatMessages.appendChild(typingEl);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeSupportTyping() {
+    const typingEl = document.getElementById('supportTyping');
+    if (typingEl) {
+        typingEl.remove();
+    }
+}
+
+function hasKeyword(text, keywords) {
+    return keywords.some((keyword) => text.includes(keyword));
+}
+
+async function generateSupportReply(userMessage) {
+    const text = userMessage.toLowerCase();
+
+    const websiteCreationFlowReply = await generateWebsiteCreationFlowReply(userMessage);
+    if (websiteCreationFlowReply) {
+        return websiteCreationFlowReply;
+    }
+
+    if (isWebsiteCreationIntent(text)) {
+        return startWebsiteCreationQuestionFlow();
+    }
+
+    const trackingReply = await generateTrackingSupportReply(text, userMessage);
+    if (trackingReply) {
+        return trackingReply;
+    }
+
+    // Puter AI Integration
+    try {
+        const systemPrompt = `You are a smart AI support assistant for CYNETWORK PISOWIFI. 
+        Creator: Cyrhiel Moralla. 
+        If anyone asks "who created this website", always answer "Cyrhiel Moralla".
+        Website Content Summary:
+        - We offer high-speed WiFi packages in the Philippines.
+        - Starter Package: PHP 5,800 (1 Year License, 50 Meters).
+        - Professional Package: PHP 8,500 (3 Years License, 100 Meters).
+        - Enterprise Package: PHP 11,000 (Lifetime License, 250 Meters).
+        - Other services: Starlink Inquiry, Adding TP-Link EAP (PHP 350), Voucher Credits.
+        - Payment via GCash QR code.
+        - Shipping is FREE.
+        - Installation and activation time depends on location and queue.
+        - Troubleshooting: Reboot modem/router, check user count, open area for router.
+        - Contact: 0950-533-9963, cyrhielmaot@gmail.com.
+        - Facebook: https://www.facebook.com/profile.php?id=61584774638218
+        Be polite, concise, and helpful. Answer based on this information.`;
+
+        const response = await puter.ai.chat(userMessage, { system_prompt: systemPrompt });
+        return response.toString();
+    } catch (error) {
+        console.error('Puter AI error:', error);
+        // Fallback to existing logic if Puter fails
+    }
+
+    if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
+// ... rest of the function
+        return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about package pricing, preorder, setup, or troubleshooting.';
+    }
+
+    if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
+        return `Here are our SALE package prices (per piece):\n\n1) Starter - from PHP ${formatMoney(packages[1].originalPrice)} to PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - from PHP ${formatMoney(packages[2].originalPrice)} to PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - from PHP ${formatMoney(packages[3].originalPrice)} to PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
+    }
+
+    if (hasKeyword(text, ['amazon leo', 'leo package'])) {
+        return `Amazon LEO transaction flow:\n1) Click PREORDER AMAZON LEO button\n2) Fill up shipping information and how many PCS order\n3) After transaction, this notice is shown:\n"${AMAZON_LEO_RESERVATION_NOTICE}"`;
+    }
+
+    if (hasKeyword(text, ['adding eap', 'eap', 'tplink', 'tp link', 'add tplink'])) {
+        return `ADDING EAP transaction flow:\n1) Click ADD TPLINK PRODUCT button\n2) Fill up MAC address, username, password\n3) Pay PHP 350 using the existing GCash QR code and upload proof of payment\n4) After transaction, this notice is shown:\n"${ADDING_EAP_APPROVAL_NOTICE}"`;
+    }
+
+    if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
+        return 'Payment steps:\n1) Click BUY on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
+    }
+
+    if (hasKeyword(text, ['proof', 'screenshot', 'receipt', 'resibo'])) {
+        return 'Please upload a clear screenshot of successful GCash payment showing amount, reference, and date/time.\n\nAccepted format: image file (PNG or JPG) with readable details.';
+    }
+
+    if (hasKeyword(text, ['activation', 'activate', 'install', 'installation', 'setup', 'gaano katagal'])) {
+        return 'Typical flow:\n- Preorder form submission: a few minutes\n- Order review and shipping update: depends on queue and location\n\nFor urgent follow-up, type: I need live customer support.';
+    }
+
+    if (hasKeyword(text, ['wifi', 'juanfi', 'ssid', 'password', 'voucher', 'portal'])) {
+        return 'On checkout, set your WiFi Name (SSID), Password, and JuanFi data rate limit in Mbps.\n\nTip: Use a strong password and avoid special characters unsupported by your router.';
+    }
+
+    if (hasKeyword(text, ['slow', 'lag', 'mabagal', 'buffer', 'speed', 'internet'])) {
+        return 'Troubleshooting tips for slow PisoWiFi:\n1) Reboot modem/router and PisoWiFi unit\n2) Check number of active users vs package capacity\n3) Place router in open area for better signal\n4) Set proper user speed limits\n\nIf issue continues, type: I need live customer support.';
+    }
+
+    if (hasKeyword(text, ['refund', 'cancel', 'cancellation'])) {
+        return 'For cancellation or refund concerns, request live support so admin can review your preorder status in real-time.';
+    }
+
+    if (hasKeyword(text, ['contact', 'agent', 'human', 'support', 'facebook'])) {
+        return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
+    }
+
+    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, ADDING EAP flow, proof upload, JuanFi WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
+}
+
+// Close picture modal when clicking outside
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileNavigation();
+    loadPackagesFromAPI();
+    initPackageImagesFromServer();
+    applySavedCustomerDetailsToForm();
+    initClientAccountFeatures();
+    setupHomepageReferralExplanation();
+    initPackage3dViewer();
+
+    const modal = document.getElementById('pictureModal');
+    if (modal) {
+        modal.addEventListener('click', function(event) {
+            if (event.target === modal) {
+                closePictureModal();
+            }
+        });
+    }
+
+    initSupportChat();
+
+    // =====================================================
+    // PARTICLE TRAIL CURSOR EFFECT
+    // =====================================================
+    const particleContainer = document.createElement('div');
+    particleContainer.id = 'particle-container';
+    particleContainer.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+    `;
+    document.body.appendChild(particleContainer);
+
+    const particles = [];
+    const particleColors = ['#FFD700', '#FFC700', '#FFB700', '#FFA700', '#FF9700'];
+
+    function createParticle(x, y) {
+        const particle = document.createElement('div');
+        const size = Math.random() * 8 + 4;
+        const color = particleColors[Math.floor(Math.random() * particleColors.length)];
+        const duration = Math.random() * 0.6 + 0.4;
+
+        particle.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            width: ${size}px;
+            height: ${size}px;
+            background: ${color};
+            border-radius: 50%;
+            pointer-events: none;
+            box-shadow: 0 0 ${size * 1.5}px ${color};
+            animation: particle-fade ${duration}s ease-out forwards;
+        `;
+
+        particleContainer.appendChild(particle);
+
+        setTimeout(() => {
+            particle.remove();
+        }, duration * 1000);
+    }
+
+    // Add animation keyframes
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes particle-fade {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--tx, ${Math.random() * 40 - 20}px), var(--ty, ${Math.random() * 40 - 20}px)) scale(0);
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    let lastParticleTime = 0;
+    const particleDelay = 30;
+
+    document.addEventListener('mousemove', (e) => {
+        const now = Date.now();
+        if (now - lastParticleTime > particleDelay) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            const offsetY = (Math.random() - 0.5) * 20;
+            createParticle(e.clientX + offsetX, e.clientY + offsetY);
+            lastParticleTime = now;
+        }
+    });
+
+    // Create particles on click for extra effect
+    document.addEventListener('click', (e) => {
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                const angle = (i / 5) * Math.PI * 2;
+                const distance = 15;
+                const x = e.clientX + Math.cos(angle) * distance;
+                const y = e.clientY + Math.sin(angle) * distance;
+                createParticle(x, y);
+            }, i * 20);
+        }
+    });
+});
+
+// Additional particle animation styles
+(function() {
+    const styles = document.createElement('style');
+    styles.textContent = `
+        @keyframes particle-float {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translate(calc(var(--vx) * 60px), calc(var(--vy) * 60px)) scale(0) rotate(360deg);
+            }
+        }
+
+        body {
+            cursor: none;
+        }
+    `;
+    document.head.appendChild(styles);
+})();
