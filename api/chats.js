@@ -1,4 +1,4 @@
-const { supabase } = require('../_lib/supabase');
+const { supabase } = require('./_lib/supabase');
 
 module.exports = async function handler(req, res) {
   const { orderId } = req.query;
