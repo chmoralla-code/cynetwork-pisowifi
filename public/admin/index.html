@@ -8,12 +8,17 @@
     <link rel="stylesheet" href="/admin/admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        (async () => {
-            const SUPABASE_URL = 'https://ppfelwqvolaxismdpjjc.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwZmVsd3F2b2xheGlzbWRwampjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MDY4NTUsImV4cCI6MjA5MzI4Mjg1NX0.zT6SyMaEoMQaOSOmkFX_OfwZ4wkOfb__rRIjVtUoFGg';
-            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
+        (function() {
+            const ADMIN_SESSION_KEY = 'cynetwork_admin_session';
+            try {
+                const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+                if (!raw) { window.location.href = '/admin/login.html'; return; }
+                const session = JSON.parse(raw);
+                if (!session || session.expires <= Date.now()) {
+                    localStorage.removeItem(ADMIN_SESSION_KEY);
+                    window.location.href = '/admin/login.html';
+                }
+            } catch (e) {
                 window.location.href = '/admin/login.html';
             }
         })();

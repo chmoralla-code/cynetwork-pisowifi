@@ -6,12 +6,20 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentTab = 'dashboard';
 
 async function checkAuth() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
+    try {
+        const raw = localStorage.getItem('cynetwork_admin_session');
+        if (!raw) { window.location.href = '/admin/login.html'; return false; }
+        const session = JSON.parse(raw);
+        if (!session || session.expires <= Date.now()) {
+            localStorage.removeItem('cynetwork_admin_session');
+            window.location.href = '/admin/login.html';
+            return false;
+        }
+        return true;
+    } catch (e) {
         window.location.href = '/admin/login.html';
         return false;
     }
-    return true;
 }
 
 async function initAdmin() {
@@ -310,7 +318,7 @@ function viewOrder(id) {
 
 async function logout() {
     if (confirm('Are you sure you want to logout?')) {
-        await supabaseClient.auth.signOut();
+        localStorage.removeItem('cynetwork_admin_session');
         window.location.href = '/admin/login.html';
     }
 }
