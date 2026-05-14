@@ -1,13 +1,21 @@
 {
   "version": 2,
-  "buildCommand": "",
-  "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/submit-order", "destination": "/api/orders" },
     { "source": "/api/track-order", "destination": "/api/orders" },
-    { "source": "/admin", "destination": "/public/admin/index.html" },
-    { "source": "/admin/login", "destination": "/public/admin/login.html" },
+    { "source": "/api/admin/stats", "destination": "/api/admin" },
+    { "source": "/api/admin/juanfi", "destination": "/api/admin" },
+    { "source": "/api/admin/clients", "destination": "/api/admin" },
+    { "source": "/api/client/login", "destination": "/api/client" },
+    { "source": "/api/client/register", "destination": "/api/client" },
+    { "source": "/api/client/me", "destination": "/api/client" },
+    { "source": "/api/client/account-summary", "destination": "/api/client" },
+    { "source": "/api/client/forgot-password", "destination": "/api/client" },
+    { "source": "/api/client/send-otp", "destination": "/api/client" },
+    { "source": "/api/client/redeem-referral", "destination": "/api/client" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/admin/(.*)", "destination": "/public/admin/$1" },
+    { "source": "/admin", "destination": "/public/admin/index.html" },
     { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
