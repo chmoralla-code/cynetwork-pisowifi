@@ -1,12 +1,6 @@
-import { put } from '@vercel/blob';
+const { put } = require('@vercel/blob');
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
@@ -20,6 +14,12 @@ export default async function handler(req, res) {
     return res.status(200).json(blob);
   } catch (error) {
     console.error('Upload Error:', error);
-    return res.status(500).json({ error: 'Failed to upload image' });
+    return res.status(500).json({ error: 'Failed to upload image. Make sure BLOB_READ_WRITE_TOKEN is set.' });
   }
-}
+};
+
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+};

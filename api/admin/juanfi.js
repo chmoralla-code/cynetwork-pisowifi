@@ -1,6 +1,6 @@
-import { supabase } from '../_lib/supabase';
+const { supabase } = require('../_lib/supabase');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('piso_harvests')
@@ -36,4 +36,4 @@ export default async function handler(req, res) {
 
   res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
   res.status(405).end(`Method ${req.method} Not Allowed`);
-}
+};

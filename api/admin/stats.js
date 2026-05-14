@@ -1,6 +1,6 @@
-import { supabase } from '../_lib/supabase';
+const { supabase } = require('../_lib/supabase');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     const avgOrderValue = unitsSold > 0 ? revenue / unitsSold : 0;
 
     return res.json({
-      revenue: `₱${revenue.toLocaleString()}`,
+      revenue: `\u20b1${revenue.toLocaleString()}`,
       totalOrders,
       pending,
       approved,
@@ -49,14 +49,14 @@ export default async function handler(req, res) {
       rejected,
       completed,
       cancelled,
-      todaySales: `₱${todaySales.toLocaleString()}`,
-      monthSales: `₱${monthSales.toLocaleString()}`,
+      todaySales: `\u20b1${todaySales.toLocaleString()}`,
+      monthSales: `\u20b1${monthSales.toLocaleString()}`,
       unitsSold,
-      avgOrderValue: `₱${Math.round(avgOrderValue).toLocaleString()}`,
-      weeklySales: [], // To be implemented properly if needed
+      avgOrderValue: `\u20b1${Math.round(avgOrderValue).toLocaleString()}`,
+      weeklySales: [],
       labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
-}
+};

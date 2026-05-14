@@ -1,6 +1,23 @@
-import { supabase } from '../_lib/supabase';
+const { supabase } = require('../_lib/supabase');
 
-export default async function handler(req, res) {
+function normalizeAccount(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    fullName: row.full_name,
+    email: row.email,
+    contactNumber: row.contact_number,
+    balance: Number(row.balance) || 0,
+    referralCode: row.referral_code || '',
+    referralBalance: Number(row.referral_balance) || 0,
+    inviteCount: Number(row.invite_count) || 0,
+    convertedInviteCount: Number(row.converted_invite_count) || 0,
+    createdAt: row.created_at
+  };
+}
+
+module.exports = async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -25,9 +42,9 @@ export default async function handler(req, res) {
     if (profileError) throw profileError;
 
     return res.json({
-      account: profileData
+      account: normalizeAccount(profileData)
     });
   } catch (error) {
     return res.status(401).json({ error: error.message });
   }
-}
+};
