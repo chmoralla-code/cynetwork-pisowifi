@@ -3446,12 +3446,19 @@ YOUR INSTRUCTIONS:
 - If they ask for human support, tell them they can type "I need live customer support" to connect with an admin.
 - Never mention that you are an AI reading from a prompt.`;
 
-        const response = await puter.ai.chat(userMessage, { 
-            model: 'claude-3-5-sonnet',
-            system_prompt: systemPrompt 
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage }
+        ];
+
+        const response = await puter.ai.chat(messages, { 
+            model: 'claude-3.5-sonnet'
         });
         
         if (typeof response === 'string') return response;
+        if (response?.message?.content && Array.isArray(response.message.content)) {
+            return response.message.content[0]?.text || response.message.content.join('');
+        }
         return response?.message?.content || response?.text || response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
