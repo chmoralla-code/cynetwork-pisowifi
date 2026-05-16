@@ -3449,7 +3449,7 @@ YOUR INSTRUCTIONS:
         const fullPrompt = `System instructions: ${systemPrompt}\n\nUser query: ${userMessage}`;
 
         const response = await puter.ai.chat(fullPrompt, { 
-            model: 'claude-3.5-sonnet'
+            model: 'meta-llama/llama-3.3-70b-instruct:free'
         });
         
         if (typeof response === 'string') return response;
