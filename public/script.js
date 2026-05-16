@@ -3448,19 +3448,26 @@ YOUR INSTRUCTIONS:
 
         const fullPrompt = `System instructions: ${systemPrompt}\n\nUser query: ${userMessage}`;
 
-        const response = await puter.ai.chat(fullPrompt, { 
-            model: 'meta-llama/llama-3.3-70b-instruct:free'
-        });
-        
-        if (typeof response === 'string') return response;
-        if (response?.message?.content && Array.isArray(response.message.content)) {
-            return response.message.content[0]?.text || response.message.content.join('');
+        try {
+            const ollamaResponse = await fetch('http://localhost:11434/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama3.2:3b',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userMessage }
+                    ],
+                    stream: false
+                })
+            });
+            
+            const data = await ollamaResponse.json();
+            return data?.message?.content || 'No response from AI.';
+        } catch (error) {
+            console.error('Ollama AI error:', error);
+            return `I apologize, but my AI system is currently experiencing a connection hiccup. Error details: ${error.message || error}`;
         }
-        return response?.message?.content || response?.text || response.toString();
-    } catch (error) {
-        console.error('Puter AI error:', error);
-        return `I apologize, but my AI system is currently experiencing a connection hiccup. Error details: ${error.message || error}`;
-    }
 }
 
 // Close picture modal when clicking outside
