@@ -123,6 +123,14 @@ ALTER TABLE piso_harvests ENABLE ROW LEVEL SECURITY;
 
 -- 5. CREATE POLICIES (Allow all access for now to ensure site works)
 -- Note: You can tighten these later.
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_orders;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_chats;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_clients;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_harvests;
+END $$;
+
 CREATE POLICY "Enable all for all" ON piso_orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all for all" ON piso_chats FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all for all" ON piso_clients FOR ALL USING (true) WITH CHECK (true);
