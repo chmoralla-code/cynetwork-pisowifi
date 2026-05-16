@@ -3265,8 +3265,7 @@ function initSupportChat() {
             }
         } catch (error) {
             addSupportMessage('user', message);
-            addSupportMessage('status', 'Message saved locally. Support server is temporarily unreachable.');
-            return;
+            // We removed the 'return' and error message here so the AI can still answer locally.
         }
 
         if (isLiveSupportRequest(message) && supportChatStatus !== 'live') {
@@ -3428,8 +3427,11 @@ async function generateSupportReply(userMessage) {
         - Facebook: https://www.facebook.com/profile.php?id=61584774638218
         Be polite, concise, and helpful. Answer based on this information.`;
 
-        const response = await puter.ai.chat(userMessage, { system_prompt: systemPrompt });
-        return response.toString();
+        const response = await puter.ai.chat(
+            `System: ${systemPrompt}\n\nUser: ${userMessage}`,
+            { model: 'claude-3-5-sonnet' }
+        );
+        return response?.message?.content || response?.text || response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
         // Fallback to existing logic if Puter fails
