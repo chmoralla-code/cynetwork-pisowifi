@@ -50,8 +50,29 @@ CREATE TABLE IF NOT EXISTS piso_clients (
   email TEXT UNIQUE,
   contact_number TEXT,
   balance NUMERIC DEFAULT 0,
+  referral_code TEXT,
+  referral_balance NUMERIC DEFAULT 0,
+  invite_count INTEGER DEFAULT 0,
+  converted_invite_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Idempotent column additions in case the table was already created without them
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='referral_code') THEN
+        ALTER TABLE piso_clients ADD COLUMN referral_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='referral_balance') THEN
+        ALTER TABLE piso_clients ADD COLUMN referral_balance NUMERIC DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='invite_count') THEN
+        ALTER TABLE piso_clients ADD COLUMN invite_count INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='converted_invite_count') THEN
+        ALTER TABLE piso_clients ADD COLUMN converted_invite_count INTEGER DEFAULT 0;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS piso_harvests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
