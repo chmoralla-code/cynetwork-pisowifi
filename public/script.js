@@ -3408,24 +3408,43 @@ async function generateSupportReply(userMessage) {
         return trackingReply;
     }
 
-    // Puter AI Integration
+    // Puter AI Integration (100% Claude 3.5 Sonnet)
     try {
-        const systemPrompt = `You are a smart AI support assistant for CYNETWORK PISOWIFI. 
-        Creator: Cyrhiel Moralla. 
-        If anyone asks "who created this website", always answer "Cyrhiel Moralla".
-        Website Content Summary:
-        - We offer high-speed WiFi packages in the Philippines.
-        - Starter Package: PHP 5,800 (1 Year License, 50 Meters).
-        - Professional Package: PHP 8,500 (3 Years License, 100 Meters).
-        - Enterprise Package: PHP 11,000 (Lifetime License, 250 Meters).
-        - Other services: Starlink Inquiry, Adding TP-Link EAP (PHP 350), Voucher Credits.
-        - Payment via GCash QR code.
-        - Shipping is FREE.
-        - Installation and activation time depends on location and queue.
-        - Troubleshooting: Reboot modem/router, check user count, open area for router.
-        - Contact: 0950-533-9963, cyrhielmaot@gmail.com.
-        - Facebook: https://www.facebook.com/profile.php?id=61584774638218
-        Be polite, concise, and helpful. Answer based on this information.`;
+        const systemPrompt = `You are the friendly, professional, and highly knowledgeable AI customer support agent for CYNETWORK PISOWIFI, based in the Philippines. You converse naturally and politely, like a real human.
+Creator: Cyrhiel Moralla.
+
+KNOWLEDGE BASE:
+1. WIFI PACKAGES (All include FREE shipping nationwide):
+   - Starter: PHP 5,800 (1 Year License, 50 Meters range). Good for 20-30 clients.
+   - Professional: PHP 8,500 (3 Years License, 100 Meters range). Good for 40-60 clients. Most popular.
+   - Enterprise: PHP 11,000 (Lifetime License, 250 Meters range). Good for 80-100 clients. Includes advanced anti-lag.
+   - NOTE: ALL packages require a PHP 300 downpayment for assurance and gasoline to J&T shop.
+
+2. OTHER SERVICES:
+   - Amazon LEO Reservation: Preorder online, fill up shipping info, wait for official pricing.
+   - Adding TP-Link EAP: PHP 350 service fee. Fill MAC address, username, password.
+   - Voucher Only Package: Buy digital credits for clients.
+   - Facebook Boost: Starts at PHP 100 for 1,000 followers.
+
+3. LOGISTICS & PAYMENT:
+   - Payment method: GCash via QR Code on the website. A screenshot of the receipt is required.
+   - Delivery/Activation: Depends on your location and the current queue. Typical preorder submission takes a few minutes.
+
+4. TROUBLESHOOTING:
+   - If slow/lagging: Reboot the modem and PisoWiFi machine. Check if active users exceed the package limit. Place the router in an open area. Set proper user speed limits.
+
+5. CONTACT & SOCIALS:
+   - Phone: 0950-533-9963
+   - Email: cyrhielmaot@gmail.com
+   - Facebook: https://www.facebook.com/profile.php?id=61584774638218
+   - Referral Program: Create a client account, share your code, earn PHP 100 per successful invite who buys.
+
+YOUR INSTRUCTIONS:
+- You must ONLY answer questions based on the Knowledge Base above. If asked about something completely unrelated to CYNETWORK PISOWIFI or general knowledge outside this scope, politely decline and steer the conversation back to our services.
+- Keep answers concise unless the user asks for detailed steps.
+- Sound human, empathetic, and accommodating. Use conversational language. You may occasionally use respectful Filipino terms like "po" or "sir/ma'am" if appropriate.
+- If they ask for human support, tell them they can type "I need live customer support" to connect with an admin.
+- Never mention that you are an AI reading from a prompt.`;
 
         const response = await puter.ai.chat(
             `System: ${systemPrompt}\n\nUser: ${userMessage}`,
@@ -3434,55 +3453,8 @@ async function generateSupportReply(userMessage) {
         return response?.message?.content || response?.text || response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
-        // Fallback to existing logic if Puter fails
+        return "I apologize, but my AI system is currently experiencing a connection hiccup. Please try again in a few moments, or type 'I need live customer support' to talk to an admin.";
     }
-
-    if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
-// ... rest of the function
-        return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about package pricing, preorder, setup, or troubleshooting.';
-    }
-
-    if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our SALE package prices (per piece):\n\n1) Starter - from PHP ${formatMoney(packages[1].originalPrice)} to PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - from PHP ${formatMoney(packages[2].originalPrice)} to PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - from PHP ${formatMoney(packages[3].originalPrice)} to PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
-    }
-
-    if (hasKeyword(text, ['amazon leo', 'leo package'])) {
-        return `Amazon LEO transaction flow:\n1) Click PREORDER AMAZON LEO button\n2) Fill up shipping information and how many PCS order\n3) After transaction, this notice is shown:\n"${AMAZON_LEO_RESERVATION_NOTICE}"`;
-    }
-
-    if (hasKeyword(text, ['adding eap', 'eap', 'tplink', 'tp link', 'add tplink'])) {
-        return `ADDING EAP transaction flow:\n1) Click ADD TPLINK PRODUCT button\n2) Fill up MAC address, username, password\n3) Pay PHP 350 using the existing GCash QR code and upload proof of payment\n4) After transaction, this notice is shown:\n"${ADDING_EAP_APPROVAL_NOTICE}"`;
-    }
-
-    if (hasKeyword(text, ['gcash', 'pay', 'payment', 'bayad', 'qr'])) {
-        return 'Payment steps:\n1) Click BUY on your selected package\n2) Scan the QR code using GCash\n3) Upload proof of payment screenshot\n4) Fill in your personal info and WiFi settings\n5) Complete activation\n\nIf payment is successful but not reflected, ask for live support.';
-    }
-
-    if (hasKeyword(text, ['proof', 'screenshot', 'receipt', 'resibo'])) {
-        return 'Please upload a clear screenshot of successful GCash payment showing amount, reference, and date/time.\n\nAccepted format: image file (PNG or JPG) with readable details.';
-    }
-
-    if (hasKeyword(text, ['activation', 'activate', 'install', 'installation', 'setup', 'gaano katagal'])) {
-        return 'Typical flow:\n- Preorder form submission: a few minutes\n- Order review and shipping update: depends on queue and location\n\nFor urgent follow-up, type: I need live customer support.';
-    }
-
-    if (hasKeyword(text, ['wifi', 'juanfi', 'ssid', 'password', 'voucher', 'portal'])) {
-        return 'On checkout, set your WiFi Name (SSID), Password, and JuanFi data rate limit in Mbps.\n\nTip: Use a strong password and avoid special characters unsupported by your router.';
-    }
-
-    if (hasKeyword(text, ['slow', 'lag', 'mabagal', 'buffer', 'speed', 'internet'])) {
-        return 'Troubleshooting tips for slow PisoWiFi:\n1) Reboot modem/router and PisoWiFi unit\n2) Check number of active users vs package capacity\n3) Place router in open area for better signal\n4) Set proper user speed limits\n\nIf issue continues, type: I need live customer support.';
-    }
-
-    if (hasKeyword(text, ['refund', 'cancel', 'cancellation'])) {
-        return 'For cancellation or refund concerns, request live support so admin can review your preorder status in real-time.';
-    }
-
-    if (hasKeyword(text, ['contact', 'agent', 'human', 'support', 'facebook'])) {
-        return 'You can still contact us directly:\nPhone: 0950-533-9963\nEmail: cyrhielmaot@gmail.com\nFacebook: https://www.facebook.com/profile.php?id=61584774638218\n\nOr type: I need live customer support.';
-    }
-
-    return 'I can help with package pricing, payment steps, Amazon LEO reservation flow, ADDING EAP flow, proof upload, JuanFi WiFi setup, activation, and speed troubleshooting.\n\nTo chat with admin directly, type: I need live customer support.';
 }
 
 // Close picture modal when clicking outside
