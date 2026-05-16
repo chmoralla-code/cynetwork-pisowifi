@@ -13,6 +13,7 @@
     { "source": "/api/client/forgot-password", "destination": "/api/client" },
     { "source": "/api/client/send-otp", "destination": "/api/client" },
     { "source": "/api/client/redeem-referral", "destination": "/api/client" },
+    { "source": "/api/chat/messages/(.*)", "destination": "/api/chat/messages?sessionId=$1" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/admin/(.*)", "destination": "/public/admin/$1" },
     { "source": "/admin", "destination": "/public/admin/index.html" },
