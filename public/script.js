@@ -3446,12 +3446,9 @@ YOUR INSTRUCTIONS:
 - If they ask for human support, tell them they can type "I need live customer support" to connect with an admin.
 - Never mention that you are an AI reading from a prompt.`;
 
-        const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage }
-        ];
+        const fullPrompt = `System instructions: ${systemPrompt}\n\nUser query: ${userMessage}`;
 
-        const response = await puter.ai.chat(messages, { 
+        const response = await puter.ai.chat(fullPrompt, { 
             model: 'claude-3.5-sonnet'
         });
         
@@ -3462,7 +3459,7 @@ YOUR INSTRUCTIONS:
         return response?.message?.content || response?.text || response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
-        return "I apologize, but my AI system is currently experiencing a connection hiccup. Please try again in a few moments, or type 'I need live customer support' to talk to an admin.";
+        return `I apologize, but my AI system is currently experiencing a connection hiccup. Error details: ${error.message || error}`;
     }
 }
 
