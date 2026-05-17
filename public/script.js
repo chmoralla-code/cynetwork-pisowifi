@@ -3460,7 +3460,7 @@ async function generateSupportReply(userMessage) {
             messages.push({ role: 'user', content: userMessage });
         }
 
-        const response = await puter.ai.chat(messages);
+        const response = await puter.ai.chat(messages, { model: 'meta-llama/llama-3.3-70b-instruct:free' });
         return response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
@@ -3724,7 +3724,7 @@ We also offer ADDING EAP for PHP 350. Shipping is FREE nationwide.`;
             // Call Puter.js AI chat
             const response = await puter.ai.chat(
                 systemPrompt + "\n\nUser: " + message,
-                { model: 'claude-3-5-sonnet' }
+                { model: 'meta-llama/llama-3.3-70b-instruct:free' }
             );
 
             // Remove loading indicator
