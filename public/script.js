@@ -67,7 +67,7 @@ const API_HEALTH_URL = API_URL.endsWith('/api')
 const FREE_SHIPPING_FEE = 0;
 const REFERRAL_REDEEM_DEDUCTION_RATE = 0.10;
 const REFERRAL_REDEEM_DEDUCTION_PERCENT = Math.round(REFERRAL_REDEEM_DEDUCTION_RATE * 100);
-const STATIC_GCASH_QR_IMAGE = 'assets/images/gcash-static-qr.jpg?v=20260419-2';
+const STATIC_GCASH_QR_IMAGE = '/assets/images/gcash-static-qr.jpg?v=20260419-2';
 const AMAZON_LEO_RESERVATION_NOTICE = 'OFFICIAL PRICE WILL BE DECLARED WHEN AMAZON RELEASED THE PRODUCT OFFICIALLY. YOUR RESERVATION IS NOW LISTED ON THE LINE!';
 const ADDING_EAP_APPROVAL_NOTICE = 'approval will be within 24 hours business days';
 const AMAZON_LEO_PACKAGE = {
@@ -136,7 +136,7 @@ function normalizeClientContactNumber(value) {
         return `0${digits}`;
     }
 
-    return '';
+    return digits;
 }
 
 function normalizeWifiRateMbps(value) {
@@ -275,7 +275,7 @@ function normalizeGcashNumber(value) {
         return `+${digits}`;
     }
 
-    return '';
+    return digits;
 }
 
 function getRedeemComputation() {
@@ -1600,8 +1600,8 @@ function validatePersonalInfo() {
         return null;
     }
     
-    if (!/^\+₱63[0-9]{10}$/.test(contactNumber)) {
-        alert('Please enter a valid Philippine phone number');
+    if (!/^\+?[0-9\s-]{10,15}$/.test(contactNumber)) {
+        alert('Please enter a valid phone number (e.g., 09505339963)');
         return;
     }
 
@@ -1652,8 +1652,8 @@ async function completeTransaction() {
         return;
     }
 
-    if (!/^\+₱63[0-9]{10}$/.test(contactNumber)) {
-        alert('Please enter a valid Philippine phone number');
+    if (!/^\+?[0-9\s-]{10,15}$/.test(contactNumber)) {
+        alert('Please enter a valid phone number (e.g., 09505339963)');
         return;
     }
 
