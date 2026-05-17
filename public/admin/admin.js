@@ -343,14 +343,19 @@ async function saveClient() {
             body: JSON.stringify({ balance: Number(balance), is_banned })
         });
         
+        const result = await res.json();
+        
         if (res.ok) {
             closeModal('clientModal');
             loadClients();
+            if (result._banError) {
+                alert('Balance saved!\n\nNote: The "Ban" feature needs a Supabase column.\nRun this in your Supabase SQL Editor:\n\nALTER TABLE public.piso_clients\nADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;');
+            }
         } else {
-            alert('Failed to update client');
+            alert('Failed to update client:\n' + (result?.error || 'Unknown error'));
         }
     } catch (err) {
-        alert('Error updating client');
+        alert('Network error: ' + err.message);
     } finally {
         btn.innerText = 'Save Client';
     }

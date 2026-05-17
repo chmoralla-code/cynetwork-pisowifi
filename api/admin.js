@@ -64,9 +64,22 @@ async function handleClients(req, res) {
   }
   if (req.method === 'PUT') {
     const { id } = req.query;
-    const { data, error } = await supabase.from('piso_clients').update(req.body).eq('client_id', id).select().single();
+    if (!id) return res.status(400).json({ error: 'Client ID is required' });
+    
+    const updates = {};
+    if (req.body.balance !== undefined) updates.balance = Number(req.body.balance);
+    
+    // Try is_banned update separately — column may not exist yet
+    let banError = null;
+    if (req.body.is_banned !== undefined) {
+      const { error: be } = await supabase.from('piso_clients').update({ is_banned: req.body.is_banned }).eq('client_id', id);
+      if (be) banError = be.message; // Log but don't fail entirely
+    }
+    
+    const { data, error } = await supabase.from('piso_clients').update(updates).eq('client_id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+    
+    return res.json({ ...data, _banError: banError });
   }
   res.setHeader('Allow', ['GET', 'PUT']);
   return res.status(405).end();
