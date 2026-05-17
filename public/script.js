@@ -2778,30 +2778,78 @@ function initPackage3dViewer() {
 }
 
 function viewFullPicture(packageNum) {
-    const images = packageImages[packageNum];
-    if (images && images.length > 0) {
-        activeModalPackageNum = packageNum;
-        currentImageIndex = 0;
-        const modal = document.getElementById('pictureModal');
-        const imgElement = document.getElementById('pictureModalImg');
-        const shell = document.getElementById('package3dShell');
-        if (shell) {
-            shell.setAttribute('data-package', String(packageNum));
-        }
-        imgElement.onerror = () => {
-            imgElement.onerror = null;
-            imgElement.src = packageImageFallbacks[activeModalPackageNum] || images[0];
-        };
-        imgElement.src = images[0];
-        modal.classList.add('active');
-        resetPackage3dTransform();
+    activeModalPackageNum = packageNum;
+    currentImageIndex = 0;
+    
+    let mediaUrl = `assets/images/package${packageNum}.png`;
+    
+    if (typeof packages !== 'undefined' && packages[packageNum]) {
+        const pkg = packages[packageNum];
+        mediaUrl = pkg.media_url || packageImages[packageNum]?.[0] || packageImageFallbacks[packageNum] || mediaUrl;
+    } else if (packageImages[packageNum] && packageImages[packageNum].length > 0) {
+        mediaUrl = packageImages[packageNum][0];
     }
+    
+    const modal = document.getElementById('pictureModal');
+    const shell = document.getElementById('package3dShell');
+    
+    if (shell) {
+        shell.setAttribute('data-package', String(packageNum));
+        
+        let existingImg = document.getElementById('pictureModalImg');
+        let existingVideo = document.getElementById('pictureModalVideo');
+        
+        if (mediaUrl.match(/\.(mp4|webm|ogg)$/i)) {
+            if (existingImg) existingImg.style.display = 'none';
+            if (!existingVideo) {
+                existingVideo = document.createElement('video');
+                existingVideo.id = 'pictureModalVideo';
+                existingVideo.className = 'picture-modal-img';
+                existingVideo.autoplay = true;
+                existingVideo.loop = true;
+                existingVideo.muted = true;
+                existingVideo.playsInline = true;
+                existingVideo.style.objectFit = 'cover';
+                shell.appendChild(existingVideo);
+            }
+            existingVideo.src = mediaUrl;
+            existingVideo.style.display = 'block';
+            existingVideo.play().catch(e => console.warn('Auto-play prevented:', e));
+        } else {
+            if (existingVideo) {
+                existingVideo.style.display = 'none';
+                existingVideo.pause();
+            }
+            if (!existingImg) {
+                existingImg = document.createElement('img');
+                existingImg.id = 'pictureModalImg';
+                existingImg.alt = 'Package Preview';
+                existingImg.className = 'picture-modal-img';
+                shell.appendChild(existingImg);
+            }
+            existingImg.onerror = () => {
+                existingImg.onerror = null;
+                existingImg.src = packageImageFallbacks[packageNum] || `assets/images/package1.png`;
+            };
+            existingImg.src = mediaUrl;
+            existingImg.style.display = 'block';
+        }
+    }
+    
+    modal.classList.add('active');
+    resetPackage3dTransform();
 }
 
 function closePictureModal() {
     const modal = document.getElementById('pictureModal');
     modal.classList.remove('active');
     currentImageIndex = 0;
+    
+    const existingVideo = document.getElementById('pictureModalVideo');
+    if (existingVideo) {
+        existingVideo.pause();
+    }
+    
     resetPackage3dTransform();
 }
 
