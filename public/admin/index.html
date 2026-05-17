@@ -436,6 +436,10 @@
                 <label>Features (comma separated)</label>
                 <textarea id="pkg-features" rows="3" placeholder="50 Meters, Anti Lag" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
             </div>
+            <div class="filter-group" style="margin-bottom: 15px;">
+                <label>Media URL (Image or .mp4 Video)</label>
+                <input type="text" id="pkg-media" placeholder="/assets/images/package1.png or https://example.com/video.mp4">
+            </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn-secondary" style="flex: 1;" onclick="closeModal('packageModal')">Cancel</button>
                 <button class="btn-primary" style="flex: 1;" onclick="savePackage()">Save Package</button>
@@ -449,6 +453,10 @@
             <div class="filter-group" style="margin-bottom: 15px;">
                 <label>Client Balance (₱)</label>
                 <input type="number" id="edit-client-balance" placeholder="0">
+            </div>
+            <div class="filter-group" style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="edit-client-banned" style="width: auto;">
+                <label for="edit-client-banned" style="margin: 0;">Ban IP / Account Access</label>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn-secondary" style="flex: 1;" onclick="closeModal('clientModal')">Cancel</button>

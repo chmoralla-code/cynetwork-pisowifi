@@ -107,9 +107,9 @@ async function handleImages(req, res) {
 // Handler: /api/admin/packages
 async function handlePackages(req, res) {
   if (req.method === 'POST') {
-    const { id, name, price, originalPrice, duration, description, features, popular } = req.body;
+    const { id, name, price, originalPrice, duration, description, features, popular, media_url } = req.body;
     const { data, error } = await supabase.from('piso_packages').upsert([{ 
-      id, name, price, originalPrice, duration, description, features, popular 
+      id, name, price, originalPrice, duration, description, features, popular, media_url 
     }]).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);

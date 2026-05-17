@@ -740,8 +740,12 @@
                     <input type="number" id="voucherAmount" min="100" max="50000" value="500" step="100" required>
                     <p class="quantity-summary">Total: PHP <span id="voucherTotalDisplay">500</span>.00</p>
                 </div>
+                <div class="qr-container">
+                    <img src="assets/images/gcash-static-qr.png?v=20260517-1" alt="GCash QR Code" class="static-gcash-qr-image" style="width: min(100%, 280px); display: block; margin: 1.5rem auto; border-radius: 10px;">
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay, then proceed.</p>
+                </div>
                 <div class="form-actions">
-                    <button class="next-btn" onclick="proceedVoucherToPayment()">Next</button>
+                    <button class="next-btn" onclick="proceedVoucherToPayment()">Submit Order</button>
                 </div>
             </div>
         </div>
@@ -798,8 +802,12 @@
                     <label for="eap110Address">Full Address *</label>
                     <textarea id="eap110Address" placeholder="Street Address, Barangay, City, Province" rows="3" required></textarea>
                 </div>
+                <div class="qr-container">
+                    <img src="assets/images/gcash-static-qr.png?v=20260517-1" alt="GCash QR Code" class="static-gcash-qr-image" style="width: min(100%, 280px); display: block; margin: 1.5rem auto; border-radius: 10px;">
+                    <p class="qr-instruction">Scan this QR code with your GCash app to pay, then proceed.</p>
+                </div>
                 <div class="form-actions">
-                    <button class="next-btn" onclick="proceedEap110ToPayment()">Next</button>
+                    <button class="next-btn" onclick="proceedEap110ToPayment()">Submit Order</button>
                 </div>
             </div>
         </div>

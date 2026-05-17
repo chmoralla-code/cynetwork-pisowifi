@@ -13,6 +13,7 @@ function normalizeAccount(row) {
     referralBalance: Number(row.referral_balance) || 0,
     inviteCount: Number(row.invite_count) || 0,
     convertedInviteCount: Number(row.converted_invite_count) || 0,
+    is_banned: !!row.is_banned,
     createdAt: row.created_at
   };
 }
@@ -44,6 +45,9 @@ async function handleLogin(req, res) {
     if (authError) throw authError;
     const { data: profile, error: profileError } = await supabase.from('piso_clients').select('*').eq('email', email).single();
     if (profileError) throw profileError;
+    if (profile.is_banned) {
+      return res.status(403).json({ error: 'Your account has been banned. Please contact support.' });
+    }
     return res.json({ token: authData.session?.access_token, account: normalizeAccount(profile) });
   } catch (error) {
     return res.status(400).json({ error: error.message });
@@ -83,6 +87,7 @@ async function handleMe(req, res) {
   if (!user) return res.status(401).json({ error: 'Invalid or expired token' });
   const { data: profile, error } = await supabase.from('piso_clients').select('*').eq('email', user.email).single();
   if (error) return res.status(404).json({ error: 'Client profile not found' });
+  if (profile.is_banned) return res.status(403).json({ error: 'Your account has been banned. Please contact support.' });
   return res.json({ account: normalizeAccount(profile) });
 }
 

@@ -2633,12 +2633,14 @@ async function loadPackagesFromAPI() {
         const newPackages = {};
         apiPackages.forEach(pkg => {
             newPackages[pkg.id] = {
+                id: pkg.id,
                 name: pkg.name,
                 price: pkg.price,
                 originalPrice: pkg.original_price,
                 duration: pkg.duration,
                 description: pkg.description,
-                features: pkg.features
+                features: pkg.features,
+                media_url: pkg.media_url
             };
         });
         
@@ -2655,31 +2657,54 @@ async function loadPackagesFromAPI() {
 }
 
 function updatePackageDisplayOnPage() {
-    [1, 2, 3].forEach((packageNum) => {
-        const packageData = packages[packageNum];
-        if (!packageData) return;
+    const grid = document.querySelector('.packages-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = ''; // Clear hardcoded packages
+    
+    Object.keys(packages).forEach((packageNum) => {
+        const pkg = packages[packageNum];
+        let mediaHtml = '';
+        const mediaUrl = pkg.media_url || packageImages[packageNum]?.[0] || packageImageFallbacks[packageNum] || `assets/images/package${packageNum}.png`;
         
-        const packageCard = document.querySelector(`.package-card[data-package="${packageNum}"]`);
-        if (!packageCard) return;
-        
-        // Update price
-        const priceEl = packageCard.querySelector('.package-price');
-        if (priceEl) {
-            const oldPrice = packageData.originalPrice ? `<span class="package-old-price">₱${formatMoney(packageData.originalPrice)}</span>` : '';
-            priceEl.innerHTML = oldPrice + `\n                            ₱${formatMoney(packageData.price)}`;
+        // Support short videos
+        if (mediaUrl.match(/\.(mp4|webm|ogg)$/i)) {
+            mediaHtml = `<video src="${mediaUrl}" class="package-image" autoplay loop muted playsinline style="object-fit: cover;"></video>`;
+        } else {
+            mediaHtml = `<img src="${mediaUrl}" alt="${pkg.name}" class="package-image" onerror="this.src='assets/images/package1.png'">`;
         }
-        
-        // Update name
-        const titleEl = packageCard.querySelector('.package-title');
-        if (titleEl) {
-            titleEl.textContent = packageData.name;
-        }
-        
-        // Update duration
-        const durationEl = packageCard.querySelector('.package-duration');
-        if (durationEl) {
-            durationEl.textContent = packageData.duration;
-        }
+
+        const featuresHtml = (Array.isArray(pkg.features) ? pkg.features : []).map(f => `<li>✓ ${f}</li>`).join('');
+        const oldPriceHtml = pkg.originalPrice ? `<span class="package-old-price">₱${formatMoney(pkg.originalPrice)}</span>` : '';
+        const badgeHtml = pkg.originalPrice ? `<span class="package-sale-badge">SALE</span>` : '';
+        const popularHtml = pkg.id == 2 ? `<div class="package-label">Most Popular</div>` : '';
+        const isFeatured = pkg.id == 2 ? 'featured' : '';
+
+        const card = `
+            <div class="package-card ${isFeatured}" data-package="${packageNum}">
+                ${popularHtml}
+                <div class="package-image-container">
+                    ${mediaHtml}
+                    <button class="view-full-btn" onclick="viewFullPicture('${packageNum}')">View Package</button>
+                </div>
+                <div class="package-content">
+                    <h3 class="package-title">${pkg.name}</h3>
+                    <p class="package-duration">${pkg.duration}</p>
+                    <div class="package-price-wrap">
+                        ${badgeHtml}
+                        <p class="package-price">
+                            ${oldPriceHtml}
+                            ₱${formatMoney(pkg.price)}
+                        </p>
+                    </div>
+                    <ul class="package-features">
+                        ${featuresHtml}
+                    </ul>
+                    <button class="select-package-btn" onclick="selectPackage('${packageNum}')">BUY</button>
+                </div>
+            </div>
+        `;
+        grid.innerHTML += card;
     });
 }
 

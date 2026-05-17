@@ -301,9 +301,9 @@ async function loadClients() {
         tbody.innerHTML = '';
 
         clients.forEach(c => {
-            const row = `<tr>
+            const row = `<tr style="${c.is_banned ? 'opacity: 0.5; background: rgba(255,0,0,0.1);' : ''}">
                 <td>${c.client_id}</td>
-                <td>${c.full_name}</td>
+                <td>${c.full_name} ${c.is_banned ? '<span style="color:var(--danger);font-size:0.8em;font-weight:bold;">[BANNED]</span>' : ''}</td>
                 <td>${c.email}</td>
                 <td>₱${(Number(c.balance) || 0).toLocaleString()}</td>
                 <td><button class="btn-view" onclick="editClient('${c.client_id}')">Edit</button></td>
@@ -321,6 +321,7 @@ function editClient(id) {
     
     document.getElementById('edit-client-id').value = client.client_id;
     document.getElementById('edit-client-balance').value = client.balance || 0;
+    document.getElementById('edit-client-banned').checked = !!client.is_banned;
     
     document.getElementById('clientModal').style.display = 'flex';
 }
@@ -328,6 +329,7 @@ function editClient(id) {
 async function saveClient() {
     const id = document.getElementById('edit-client-id').value;
     const balance = document.getElementById('edit-client-balance').value;
+    const is_banned = document.getElementById('edit-client-banned').checked;
     
     if (!id) return;
     
@@ -338,7 +340,7 @@ async function saveClient() {
         const res = await fetch('/api/admin/clients?id=' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ balance: Number(balance) })
+            body: JSON.stringify({ balance: Number(balance), is_banned })
         });
         
         if (res.ok) {
@@ -549,6 +551,7 @@ function openAddPackageModal() {
     document.getElementById('pkg-price').value = '';
     document.getElementById('pkg-duration').value = '';
     document.getElementById('pkg-features').value = '';
+    document.getElementById('pkg-media').value = '';
     document.getElementById('packageModal').style.display = 'flex';
 }
 
@@ -559,6 +562,7 @@ function editPackage(p) {
     document.getElementById('pkg-price').value = p.price;
     document.getElementById('pkg-duration').value = p.duration;
     document.getElementById('pkg-features').value = Array.isArray(p.features) ? p.features.join(', ') : p.features;
+    document.getElementById('pkg-media').value = p.media_url || '';
     document.getElementById('packageModal').style.display = 'flex';
 }
 
@@ -568,11 +572,12 @@ async function savePackage() {
     const price = document.getElementById('pkg-price').value;
     const duration = document.getElementById('pkg-duration').value;
     const featuresRaw = document.getElementById('pkg-features').value;
+    const media_url = document.getElementById('pkg-media').value;
     
     if (!name || !price || !duration) return alert('Please fill in all required fields');
 
     const features = featuresRaw.split(',').map(s => s.trim()).filter(s => s);
-    const pkg = { id, name, price, originalPrice: Number(price) + 1199, duration, features, description: '' };
+    const pkg = { id, name, price, originalPrice: Number(price) + 1199, duration, features, description: '', media_url };
 
     const btn = document.querySelector('#packageModal .btn-primary');
     btn.innerText = 'Saving...';
