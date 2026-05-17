@@ -89,3 +89,29 @@ ALTER TABLE piso_clients ADD COLUMN IF NOT EXISTS converted_invite_count INTEGER
 -- ALTER TABLE piso_clients ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE piso_chats ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE piso_harvests ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- Chat Sessions Table (for AI/Live Support)
+-- ============================================
+CREATE TABLE IF NOT EXISTS piso_chat_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id TEXT NOT NULL,
+  order_id BIGINT REFERENCES piso_orders(id) ON DELETE SET NULL,
+  tracking_number TEXT,
+  customer_name TEXT,
+  customer_contact TEXT,
+  status TEXT DEFAULT 'ai',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add session_id column to existing piso_chats table
+ALTER TABLE piso_chats ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES piso_chat_sessions(id) ON DELETE CASCADE;
+
+-- Enable realtime for chat sessions
+ALTER PUBLICATION supabase_realtime ADD TABLE piso_chat_sessions;
+
+-- Index for faster session lookups
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_client_id ON piso_chat_sessions(client_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_status ON piso_chat_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_chats_session_id ON piso_chats(session_id);
