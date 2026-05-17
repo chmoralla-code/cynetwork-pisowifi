@@ -3232,6 +3232,13 @@ function initSupportChat() {
         })
         .catch((error) => {
             console.warn('Support session initialization failed:', error.message);
+            if (chatMessages.children.length === 0) {
+                addSupportMessage(
+                    'bot',
+                    'Hello! I am your PisoWiFi AI support bot.\nI can help with package pricing, preorder steps, shipping details, installation tips, and speed concerns.\n\nType "I need live customer support" anytime to connect with admin.',
+                    'welcome-bot'
+                );
+            }
         });
 
     const openChat = () => {
@@ -3266,7 +3273,6 @@ function initSupportChat() {
         } catch (error) {
             addSupportMessage('user', message);
             addSupportMessage('status', 'Message saved locally. Support server is temporarily unreachable.');
-            return;
         }
 
         if (isLiveSupportRequest(message) && supportChatStatus !== 'live') {
@@ -3409,7 +3415,7 @@ async function generateSupportReply(userMessage) {
         return trackingReply;
     }
 
-    // Puter AI Integration
+    // Puter AI Integration with Smart Conversational Memory/History
     try {
         const systemPrompt = `You are a smart AI support assistant for CYNETWORK PISOWIFI. 
         Creator: Cyrhiel Moralla. 
@@ -3428,7 +3434,33 @@ async function generateSupportReply(userMessage) {
         - Facebook: https://www.facebook.com/profile.php?id=61584774638218
         Be polite, concise, and helpful. Answer based on this information.`;
 
-        const response = await puter.ai.chat(userMessage, { system_prompt: systemPrompt });
+        const messages = [
+            { role: 'system', content: systemPrompt }
+        ];
+
+        // Retrieve last 10 support messages from UI DOM to build conversation history context
+        const chatMessages = document.getElementById('supportMessages');
+        if (chatMessages) {
+            const msgEls = chatMessages.querySelectorAll('.support-message');
+            const startIdx = Math.max(0, msgEls.length - 10);
+            for (let i = startIdx; i < msgEls.length; i++) {
+                const el = msgEls[i];
+                if (el.id?.includes('supportTyping') || el.classList.contains('status')) continue;
+
+                let role = 'user';
+                if (el.classList.contains('bot') || el.classList.contains('agent')) {
+                    role = 'assistant';
+                }
+                messages.push({ role, content: el.textContent.trim() });
+            }
+        }
+
+        // Ensure the current userMessage is appended if not already the last item
+        if (messages.length === 1 || messages[messages.length - 1].role !== 'user') {
+            messages.push({ role: 'user', content: userMessage });
+        }
+
+        const response = await puter.ai.chat(messages);
         return response.toString();
     } catch (error) {
         console.error('Puter AI error:', error);
