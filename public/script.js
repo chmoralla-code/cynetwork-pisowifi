@@ -3455,18 +3455,39 @@ async function generateSupportReply(userMessage) {
             }
         }
 
-        // Ensure the current userMessage is appended if not already the last item
         if (messages.length === 1 || messages[messages.length - 1].role !== 'user') {
             messages.push({ role: 'user', content: userMessage });
         }
 
+        // Try local Ollama first (llama3.2:3b for this laptop's specs)
+        try {
+            const ollamaRes = await fetch('http://127.0.0.1:11434/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama3.2:3b',
+                    messages: messages,
+                    stream: false
+                })
+            });
+            if (ollamaRes.ok) {
+                const ollamaData = await ollamaRes.json();
+                if (ollamaData?.message?.content) {
+                    return ollamaData.message.content.trim();
+                }
+            }
+        } catch (ollamaErr) {
+            console.log('Local Ollama unavailable or CORS blocked. Falling back to Puter AI...');
+        }
+
+        // Fallback to Puter AI
         const response = await puter.ai.chat(messages, { model: 'meta-llama/llama-3.3-70b-instruct:free' });
         // puter.ai.chat with messages array returns an object; extract text from .message.content
         const aiText = response?.message?.content ?? response?.toString?.() ?? String(response);
         return aiText.trim() || null;
     } catch (error) {
-        console.error('Puter AI error:', error);
-        // Fallback to existing logic if Puter fails
+        console.error('AI error:', error);
+        // Fallback to existing logic if both fail
     }
 
     if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
