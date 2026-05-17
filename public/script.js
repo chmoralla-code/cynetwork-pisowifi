@@ -3648,3 +3648,100 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.head.appendChild(styles);
 })();
+
+// =====================================================
+// AI CHATBOT WIDGET (Puter.js integration)
+// =====================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const chatWidget = document.getElementById('aiChatWidget');
+    if (!chatWidget) return;
+
+    const toggleBtn = document.getElementById('aiChatToggleBtn');
+    const closeBtn = document.getElementById('aiChatCloseBtn');
+    const chatWindow = document.getElementById('aiChatWindow');
+    const chatForm = document.getElementById('aiChatForm');
+    const messageInput = document.getElementById('aiChatMessageInput');
+    const sendBtn = document.getElementById('aiChatSendBtn');
+    const chatHistory = document.getElementById('aiChatHistory');
+
+    // Toggle chat window
+    toggleBtn.addEventListener('click', () => {
+        chatWindow.classList.toggle('hidden');
+        if (!chatWindow.classList.contains('hidden')) {
+            messageInput.focus();
+        }
+    });
+
+    closeBtn.addEventListener('click', () => {
+        chatWindow.classList.add('hidden');
+    });
+
+    // Enable/disable send button
+    messageInput.addEventListener('input', () => {
+        sendBtn.disabled = messageInput.value.trim() === '';
+    });
+
+    // Append a message to the chat history
+    const appendMessage = (role, text) => {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `ai-message ${role}`;
+        
+        // Simple markdown parsing for bold and line breaks
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        formattedText = formattedText.replace(/\n/g, '<br>');
+        
+        msgDiv.innerHTML = formattedText;
+        chatHistory.appendChild(msgDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        return msgDiv;
+    };
+
+    // Handle form submission
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        // Add user message
+        appendMessage('user', message);
+        messageInput.value = '';
+        sendBtn.disabled = true;
+
+        // Add loading indicator
+        const loadingMsg = appendMessage('loading', 'Thinking...');
+
+        try {
+            // Define a system prompt to give the AI context about the site
+            const systemPrompt = `You are the CYNETWORK PISOWIFI AI Assistant. 
+You help customers understand our WiFi packages, installation processes, and troubleshoot basic issues. 
+Be helpful, concise, and friendly. Our packages include:
+1. Starter: ₱5,800 (1 Year License | 50 Meters)
+2. Professional: ₱8,500 (3 Years License | 100 Meters)
+3. Enterprise: ₱11,000 (Lifetime License | 250 Meters)
+We also offer ADDING EAP for PHP 350. Shipping is FREE nationwide.`;
+
+            // Call Puter.js AI chat
+            const response = await puter.ai.chat(
+                systemPrompt + "\n\nUser: " + message,
+                { model: 'claude-3-5-sonnet' }
+            );
+
+            // Remove loading indicator
+            loadingMsg.remove();
+
+            // Add AI response
+            appendMessage('model', response.toString());
+
+        } catch (error) {
+            loadingMsg.remove();
+            console.error('Puter AI Error:', error);
+            
+            let errorMessage = 'Sorry, I encountered an error. Please try again.';
+            if (error.message && error.message.toLowerCase().includes('login')) {
+                errorMessage = 'Please sign in to Puter to use the AI chat feature.';
+            }
+            appendMessage('system', errorMessage);
+        }
+    });
+});
