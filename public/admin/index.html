@@ -303,14 +303,25 @@
         </main>
         <main id="tab-chat" style="display: none;">
             <div class="page-header"><h1>AI Chat Support</h1></div>
-            <div style="background: var(--bg-card); backdrop-filter: blur(10px); padding: 30px; border-radius: 10px; box-shadow: var(--shadow); height: 500px; display: flex; flex-direction: column;">
-                <div id="chat-list" style="flex: 1; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: rgba(0,0,0,0.2);">
-                    <div class="text-muted">Loading chats...</div>
+            <div style="background: var(--bg-card); backdrop-filter: blur(10px); padding: 20px; border-radius: 10px; box-shadow: var(--shadow); height: 600px; display: flex; gap: 20px;">
+                <!-- Chat Sessions List (Left) -->
+                <div style="width: 30%; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); padding-right: 10px;">
+                    <h3 style="margin-top: 0;">Active Chats</h3>
+                    <div id="chat-list" style="flex: 1; overflow-y: auto;">
+                        <div class="text-muted">Loading chats...</div>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <input type="hidden" id="active-chat-id">
-                    <input type="text" id="chat-input" style="flex: 1; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.3); color: white;" placeholder="Type a reply...">
-                    <button class="btn-primary" onclick="sendChat()">Send</button>
+                
+                <!-- Chat Messages & Input (Right) -->
+                <div style="width: 70%; display: flex; flex-direction: column;">
+                    <div id="chat-box-display" style="flex: 1; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: rgba(0,0,0,0.2);">
+                        <div class="text-muted" style="display:flex; justify-content:center; align-items:center; height:100%;">Select a chat to view messages</div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="hidden" id="active-chat-id">
+                        <input type="text" id="chat-input" style="flex: 1; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.3); color: white;" placeholder="Type a reply...">
+                        <button class="btn-primary" onclick="sendChat()">Send</button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -378,6 +389,60 @@
     </div>
 
     <!-- Modals -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content" style="padding: 25px; max-width: 600px;">
+            <h2 style="margin-bottom: 20px;">Order Details</h2>
+            <div id="order-details-content" style="margin-bottom: 20px; line-height: 1.6; color: var(--text-color);">
+                <!-- Dynamic Content -->
+            </div>
+            <div class="filter-group" style="margin-bottom: 20px;">
+                <label>Update Status</label>
+                <select id="order-status-select">
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="delivery">For Delivery</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <input type="hidden" id="current-order-id">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-secondary" style="flex: 1;" onclick="closeModal('orderModal')">Close</button>
+                <button class="btn-primary" style="flex: 1;" onclick="updateOrderStatus()">Save Status</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="packageModal" class="modal">
+        <div class="modal-content" style="padding: 25px; max-width: 500px;">
+            <h2 id="package-modal-title" style="margin-bottom: 20px;">Add New Package</h2>
+            <input type="hidden" id="pkg-id">
+            <div class="filter-group" style="margin-bottom: 15px;">
+                <label>Package Name (e.g. Starter)</label>
+                <input type="text" id="pkg-name">
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div class="filter-group" style="flex: 1;">
+                    <label>Price (₱)</label>
+                    <input type="number" id="pkg-price">
+                </div>
+                <div class="filter-group" style="flex: 1;">
+                    <label>Duration</label>
+                    <input type="text" id="pkg-duration" placeholder="e.g. 1 Year">
+                </div>
+            </div>
+            <div class="filter-group" style="margin-bottom: 15px;">
+                <label>Features (comma separated)</label>
+                <textarea id="pkg-features" rows="3" placeholder="50 Meters, Anti Lag" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-secondary" style="flex: 1;" onclick="closeModal('packageModal')">Cancel</button>
+                <button class="btn-primary" style="flex: 1;" onclick="savePackage()">Save Package</button>
+            </div>
+        </div>
+    </div>
+
     <div id="harvestModal" class="modal">
         <div class="modal-content" style="padding: 25px;">
             <h2 style="margin-bottom: 20px;">Record Harvest</h2>

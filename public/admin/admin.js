@@ -316,8 +316,69 @@ function editClient(id) {
     alert('Editing client: ' + id);
 }
 
-function viewOrder(id) {
-    alert('Viewing details for Order #' + id);
+async function viewOrder(id) {
+    try {
+        const res = await fetch('/api/orders?id=' + id);
+        if (!res.ok) throw new Error('Order fetch failed');
+        const order = await res.json();
+        
+        document.getElementById('current-order-id').value = order.order_id || order.orderId;
+        document.getElementById('order-status-select').value = order.status || 'pending';
+        
+        const content = document.getElementById('order-details-content');
+        content.innerHTML = `
+            <p><strong>Order ID:</strong> ${order.order_id || order.orderId}</p>
+            <p><strong>Customer Name:</strong> ${order.full_name || order.fullName}</p>
+            <p><strong>Contact:</strong> ${order.contact_number || order.contactNumber}</p>
+            <p><strong>Email:</strong> ${order.contact_email || 'N/A'}</p>
+            <p><strong>Address:</strong> ${order.full_address || 'N/A'}</p>
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
+            <p><strong>Package:</strong> ${order.package_name || order.package || 'Unknown'}</p>
+            <p><strong>Unit Price:</strong> ₱${(order.unit_price || order.price || 0).toLocaleString()}</p>
+            <p><strong>Quantity:</strong> ${order.quantity || 1}</p>
+            <p><strong>Shipping Fee:</strong> ₱${(order.shipping_fee || 0).toLocaleString()}</p>
+            <p><strong>Total Price:</strong> <span style="color: var(--primary); font-weight: bold;">₱${(order.total_price || order.price || 0).toLocaleString()}</span></p>
+            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 10px 0;">
+            <p><strong>WiFi Name:</strong> ${order.wifi_name || 'N/A'}</p>
+            <p><strong>GCash Ref Number:</strong> ${order.ref_number || 'N/A'}</p>
+            ${order.proof_image ? `<p><strong>Proof of Payment:</strong> <br><img src="${order.proof_image}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 5px;"></p>` : ''}
+        `;
+        
+        document.getElementById('orderModal').style.display = 'flex';
+    } catch (err) {
+        alert('Failed to load order details');
+    }
+}
+
+async function updateOrderStatus() {
+    const id = document.getElementById('current-order-id').value;
+    const status = document.getElementById('order-status-select').value;
+    
+    if (!id) return;
+    
+    const btn = document.querySelector('#orderModal .btn-primary');
+    btn.innerText = 'Saving...';
+    
+    try {
+        const res = await fetch('/api/orders?id=' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        
+        if (res.ok) {
+            closeModal('orderModal');
+            refreshData();
+            if (currentTab === 'orders') loadAllOrders();
+            if (currentTab === 'pending') loadPendingOrders();
+        } else {
+            alert('Failed to update status');
+        }
+    } catch (err) {
+        alert('Error updating status');
+    } finally {
+        btn.innerText = 'Save Status';
+    }
 }
 
 async function logout() {
@@ -372,18 +433,22 @@ async function loadChatList() {
 async function selectChat(id) {
     document.getElementById('active-chat-id').value = id;
     document.getElementById('chat-input').focus();
+    
+    // Highlight selected chat in the list
+    document.querySelectorAll('#chat-list > div').forEach(div => div.style.background = 'transparent');
+    const selectedDiv = document.querySelector(`div[onclick="selectChat('${id}')"]`);
+    if(selectedDiv) selectedDiv.style.background = 'rgba(255, 255, 255, 0.05)';
+
     const res = await fetch('/api/chat/messages?sessionId=' + id);
     if (res.ok) {
         const data = await res.json();
-        const chatBox = document.querySelector('.admin-card:nth-child(2) div[style*="height: 400px"]');
-        if (chatBox) chatBox.id = 'chat-box-display'; // ensuring we have an ID to target
         const displayBox = document.getElementById('chat-box-display');
         displayBox.innerHTML = '';
         (data.messages || []).forEach(m => {
             const isSelf = m.sender === 'admin';
             displayBox.innerHTML += `
                 <div style="margin-bottom: 10px; text-align: ${isSelf ? 'right' : 'left'};">
-                    <span style="background: ${isSelf ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}; padding: 8px 12px; border-radius: 8px; display: inline-block;">
+                    <span style="background: ${isSelf ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}; padding: 8px 12px; border-radius: 8px; display: inline-block; text-align: left;">
                         ${m.message}
                     </span>
                 </div>
@@ -429,7 +494,7 @@ async function loadPackages() {
                     <td>${p.duration}</td>
                     <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${featuresList}</td>
                     <td>
-                        <button class="btn-view" onclick="alert('Editing requires piso_packages DB setup')">Edit</button>
+                        <button class="btn-view" onclick='editPackage(${JSON.stringify(p).replace(/'/g, "&apos;")})'>Edit</button>
                     </td>
                 </tr>
             `;
@@ -440,7 +505,54 @@ async function loadPackages() {
 }
 
 function openAddPackageModal() {
-    alert('Add Package Modal not implemented yet.');
+    document.getElementById('package-modal-title').innerText = 'Add New Package';
+    document.getElementById('pkg-id').value = '';
+    document.getElementById('pkg-name').value = '';
+    document.getElementById('pkg-price').value = '';
+    document.getElementById('pkg-duration').value = '';
+    document.getElementById('pkg-features').value = '';
+    document.getElementById('packageModal').style.display = 'flex';
+}
+
+function editPackage(p) {
+    document.getElementById('package-modal-title').innerText = 'Edit Package';
+    document.getElementById('pkg-id').value = p.id;
+    document.getElementById('pkg-name').value = p.name;
+    document.getElementById('pkg-price').value = p.price;
+    document.getElementById('pkg-duration').value = p.duration;
+    document.getElementById('pkg-features').value = Array.isArray(p.features) ? p.features.join(', ') : p.features;
+    document.getElementById('packageModal').style.display = 'flex';
+}
+
+async function savePackage() {
+    const id = document.getElementById('pkg-id').value || 'pkg_' + Date.now();
+    const name = document.getElementById('pkg-name').value;
+    const price = document.getElementById('pkg-price').value;
+    const duration = document.getElementById('pkg-duration').value;
+    const featuresRaw = document.getElementById('pkg-features').value;
+    
+    if (!name || !price || !duration) return alert('Please fill in all required fields');
+
+    const features = featuresRaw.split(',').map(s => s.trim()).filter(s => s);
+    const pkg = { id, name, price, originalPrice: Number(price) + 1199, duration, features, description: '' };
+
+    const btn = document.querySelector('#packageModal .btn-primary');
+    btn.innerText = 'Saving...';
+
+    const res = await fetch('/api/admin/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pkg)
+    });
+
+    btn.innerText = 'Save Package';
+    
+    if (res.ok) {
+        closeModal('packageModal');
+        loadPackages();
+    } else {
+        alert('Failed to save package. Please ensure the piso_packages table exists in Supabase.');
+    }
 }
 
 async function loadImages() {
