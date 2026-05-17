@@ -1,7 +1,19 @@
 const { supabase } = require('./_lib/supabase');
 
-function normalizeAccount(row) {
+// Helper to get banned client IDs from piso_settings as a fallback
+async function getBannedClientIds() {
+  try {
+    const { data, error } = await supabase.from('piso_settings').select('*').eq('key', 'banned_clients').single();
+    if (error || !data) return [];
+    return data.value ? data.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function normalizeAccount(row, bannedList = []) {
   if (!row) return null;
+  const isBannedMerged = row.is_banned !== undefined && row.is_banned !== null ? !!row.is_banned : bannedList.includes(row.client_id);
   return {
     id: row.id,
     clientId: row.client_id,
@@ -13,7 +25,7 @@ function normalizeAccount(row) {
     referralBalance: Number(row.referral_balance) || 0,
     inviteCount: Number(row.invite_count) || 0,
     convertedInviteCount: Number(row.converted_invite_count) || 0,
-    is_banned: !!row.is_banned,
+    is_banned: isBannedMerged,
     createdAt: row.created_at
   };
 }
@@ -45,10 +57,12 @@ async function handleLogin(req, res) {
     if (authError) throw authError;
     const { data: profile, error: profileError } = await supabase.from('piso_clients').select('*').eq('email', email).single();
     if (profileError) throw profileError;
-    if (profile.is_banned) {
+    const bannedList = await getBannedClientIds();
+    const isBannedMerged = profile.is_banned !== undefined && profile.is_banned !== null ? !!profile.is_banned : bannedList.includes(profile.client_id);
+    if (isBannedMerged) {
       return res.status(403).json({ error: 'Your account has been banned. Please contact support.' });
     }
-    return res.json({ token: authData.session?.access_token, account: normalizeAccount(profile) });
+    return res.json({ token: authData.session?.access_token, account: normalizeAccount(profile, bannedList) });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
@@ -87,8 +101,10 @@ async function handleMe(req, res) {
   if (!user) return res.status(401).json({ error: 'Invalid or expired token' });
   const { data: profile, error } = await supabase.from('piso_clients').select('*').eq('email', user.email).single();
   if (error) return res.status(404).json({ error: 'Client profile not found' });
-  if (profile.is_banned) return res.status(403).json({ error: 'Your account has been banned. Please contact support.' });
-  return res.json({ account: normalizeAccount(profile) });
+  const bannedList = await getBannedClientIds();
+  const isBannedMerged = profile.is_banned !== undefined && profile.is_banned !== null ? !!profile.is_banned : bannedList.includes(profile.client_id);
+  if (isBannedMerged) return res.status(403).json({ error: 'Your account has been banned. Please contact support.' });
+  return res.json({ account: normalizeAccount(profile, bannedList) });
 }
 
 // Handler: POST /api/client/forgot-password

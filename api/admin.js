@@ -1,6 +1,36 @@
 const { supabase } = require('./_lib/supabase');
 const { list, del } = require('@vercel/blob');
 
+// Helper to get banned client IDs from piso_settings as a fallback
+async function getBannedClientIds() {
+  try {
+    const { data, error } = await supabase.from('piso_settings').select('*').eq('key', 'banned_clients').single();
+    if (error || !data) return [];
+    return data.value ? data.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Helper to update ban status in piso_settings as a fallback
+async function setClientBanStatus(clientId, isBanned) {
+  try {
+    const banned = await getBannedClientIds();
+    const index = banned.indexOf(clientId);
+    if (isBanned) {
+      if (index === -1) banned.push(clientId);
+    } else {
+      if (index !== -1) banned.splice(index, 1);
+    }
+    const val = banned.join(',');
+    await supabase.from('piso_settings').upsert([{ key: 'banned_clients', value: val }], { onConflict: 'key' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+
 // Handler: GET /api/admin/stats
 async function handleStats(req, res) {
   try {
@@ -60,7 +90,15 @@ async function handleClients(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('piso_clients').select('*').order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+    
+    // Enriched with virtual fallback if is_banned column is missing
+    const bannedList = await getBannedClientIds();
+    const enriched = (data || []).map(c => ({
+      ...c,
+      is_banned: c.is_banned !== undefined && c.is_banned !== null ? !!c.is_banned : bannedList.includes(c.client_id)
+    }));
+    
+    return res.json(enriched);
   }
   if (req.method === 'PUT') {
     const { id } = req.query;
@@ -69,21 +107,30 @@ async function handleClients(req, res) {
     const updates = {};
     if (req.body.balance !== undefined) updates.balance = Number(req.body.balance);
     
-    // Try is_banned update separately — column may not exist yet
+    // Try is_banned update, fall back transparently to Settings if column is missing
     let banError = null;
     if (req.body.is_banned !== undefined) {
       const { error: be } = await supabase.from('piso_clients').update({ is_banned: req.body.is_banned }).eq('client_id', id);
-      if (be) banError = be.message; // Log but don't fail entirely
+      if (be) {
+        // Transparent fallback to settings table
+        const success = await setClientBanStatus(id, req.body.is_banned);
+        if (!success) banError = be.message;
+      }
     }
     
     const { data, error } = await supabase.from('piso_clients').update(updates).eq('client_id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });
     
-    return res.json({ ...data, _banError: banError });
+    // Merge virtual status into response
+    const bannedList = await getBannedClientIds();
+    const isBannedMerged = data.is_banned !== undefined && data.is_banned !== null ? !!data.is_banned : bannedList.includes(data.client_id);
+    
+    return res.json({ ...data, is_banned: isBannedMerged, _banError: banError });
   }
   res.setHeader('Allow', ['GET', 'PUT']);
   return res.status(405).end();
 }
+
 
 // Handler: /api/admin/chats
 async function handleChats(req, res) {
