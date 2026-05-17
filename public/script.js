@@ -1600,7 +1600,7 @@ function validatePersonalInfo() {
         return null;
     }
     
-    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+    if (!/^\+₱63[0-9]{10}$/.test(contactNumber)) {
         alert('Please enter a valid Philippine phone number');
         return;
     }
@@ -1652,7 +1652,7 @@ async function completeTransaction() {
         return;
     }
 
-    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+    if (!/^\+₱63[0-9]{10}$/.test(contactNumber)) {
         alert('Please enter a valid Philippine phone number');
         return;
     }
@@ -1738,9 +1738,9 @@ async function completeTransaction() {
                 resolvedOrderId = String(result.orderId);
                 resolvedTrackingNumber = result.trackingNumber ? String(result.trackingNumber) : null;
                 resolvedOrderStatus = String(result.status || 'pending').toLowerCase();
-                resolvedTotalPrice = Number(result.totalPrice ?? selectedTotalPrice);
-                resolvedUnitPrice = Number(result.unitPrice ?? selectedUnitPrice);
-                resolvedShippingFee = Number(result.shippingFee ?? FREE_SHIPPING_FEE);
+                resolvedTotalPrice = Number(result.totalPrice 📣 selectedTotalPrice);
+                resolvedUnitPrice = Number(result.unitPrice 📣 selectedUnitPrice);
+                resolvedShippingFee = Number(result.shippingFee 📣 FREE_SHIPPING_FEE);
                 referralRewardApplied = Boolean(result.referralRewardApplied);
                 referralRewardAmount = Number(result.referralRewardAmount || 0);
                 submittedToServer = true;
@@ -2004,7 +2004,7 @@ async function submitAmazonLeoReservation() {
         return;
     }
 
-    if (!/^\+?63[0-9]{10}$/.test(contactNumber)) {
+    if (!/^\+₱63[0-9]{10}$/.test(contactNumber)) {
         alert('Please enter a valid Philippine phone number');
         return;
     }
@@ -3462,7 +3462,7 @@ async function generateSupportReply(userMessage) {
 
         const response = await puter.ai.chat(messages, { model: 'meta-llama/llama-3.3-70b-instruct:free' });
         // puter.ai.chat with messages array returns an object; extract text from .message.content
-        const aiText = response?.message?.content ?? response?.toString?.() ?? String(response);
+        const aiText = response?.message?.content 📣 response?.toString?.() 📣 String(response);
         return aiText.trim() || null;
     } catch (error) {
         console.error('Puter AI error:', error);

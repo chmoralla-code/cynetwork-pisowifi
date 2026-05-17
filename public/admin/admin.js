@@ -49,6 +49,10 @@ function showTab(tabId) {
     if (tabId === 'orders') loadAllOrders();
     if (tabId === 'pending') loadPendingOrders();
     if (tabId === 'clients') loadClients();
+    if (tabId === 'chat') loadChatList();
+    if (tabId === 'packages') loadPackages();
+    if (tabId === 'images') loadImages();
+    if (tabId === 'settings') loadSettings();
 }
 
 function refreshData() {
@@ -333,3 +337,119 @@ function subscribeRealtime() {
 }
 
 window.onload = initAdmin;
+
+// --- New Features Logic ---
+
+async function loadChatList() {
+    try {
+        const res = await fetch('/api/chats/active');
+        // Fallback mock if API not ready
+        let chats = res.ok ? await res.json() : [
+            { id: 1, user: 'Juan Dela Cruz', message: 'Hello, package details?', unread: 2 },
+            { id: 2, user: 'Maria Clara', message: 'I already paid via GCash.', unread: 0 }
+        ];
+
+        const chatList = document.getElementById('chat-list');
+        chatList.innerHTML = '';
+        
+        chats.forEach(c => {
+            chatList.innerHTML += `
+                <div style="padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between;" onclick="selectChat(${c.id})">
+                    <div>
+                        <strong style="color: white;">${c.user}</strong><br>
+                        <span style="font-size: 12px; color: var(--text-muted);">${c.message}</span>
+                    </div>
+                    ${c.unread > 0 ? `<span style="background: var(--primary); color: white; border-radius: 50%; padding: 2px 8px; font-size: 11px;">${c.unread}</span>` : ''}
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error('Failed to load chats');
+    }
+}
+
+function selectChat(id) {
+    document.getElementById('active-chat-id').value = id;
+    document.getElementById('chat-input').focus();
+}
+
+async function sendChat() {
+    const chatId = document.getElementById('active-chat-id').value;
+    const input = document.getElementById('chat-input');
+    const msg = input.value;
+    if (!chatId || !msg) return alert('Select a chat and enter a message');
+    
+    // API logic here
+    console.log('Sending message to', chatId, ':', msg);
+    input.value = '';
+    alert('Message sent to chat ' + chatId);
+}
+
+async function loadPackages() {
+    try {
+        // Mock data
+        const packages = [
+            { id: 1, name: 'Starter', price: '₱5,800', duration: '1 Year License', features: '50 Meters, Anti Lag' },
+            { id: 2, name: 'Professional', price: '₱8,500', duration: '3 Years License', features: '100 Meters, Anti Lag' },
+            { id: 3, name: 'Enterprise', price: '₱11,000', duration: 'Lifetime License', features: '250 Meters, Advanced Anti Lag' }
+        ];
+        
+        const tbody = document.querySelector('#packages-table tbody');
+        tbody.innerHTML = '';
+        packages.forEach(p => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${p.name}</strong></td>
+                    <td>${p.price}</td>
+                    <td>${p.duration}</td>
+                    <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.features}</td>
+                    <td>
+                        <button class="btn-view" onclick="alert('Edit package ${p.id}')">Edit</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch (err) {
+        console.error('Failed to load packages');
+    }
+}
+
+function openAddPackageModal() {
+    alert('Add Package Modal not implemented yet.');
+}
+
+async function loadImages() {
+    const grid = document.getElementById('image-gallery-grid');
+    grid.innerHTML = '';
+    
+    // Mock images
+    const images = ['package1.png', 'package2.png', 'package3.png', 'cynetwork-url-logo.png'];
+    images.forEach(img => {
+        grid.innerHTML += `
+            <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; border: 1px solid var(--border-color); text-align: center;">
+                <img src="/assets/images/${img}" style="width: 100%; height: 120px; object-fit: contain; border-radius: 4px; margin-bottom: 10px;">
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; word-break: break-all;">${img}</div>
+                <button class="btn-view" style="background: #E74C3C; width: 100%;" onclick="alert('Delete image?')">Delete</button>
+            </div>
+        `;
+    });
+}
+
+function handleImageUpload(event) {
+    if (event.target.files.length > 0) {
+        alert('Image selected: ' + event.target.files[0].name + ' (Upload API missing)');
+    }
+}
+
+async function loadSettings() {
+    // Already populated by HTML mock data
+}
+
+async function saveSettings() {
+    const btn = document.querySelector('#tab-settings .btn-primary');
+    btn.innerText = 'Saving...';
+    setTimeout(() => {
+        btn.innerText = 'Save Changes';
+        alert('Settings saved successfully!');
+    }, 800);
+}

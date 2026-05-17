@@ -303,25 +303,77 @@
         </main>
         <main id="tab-chat" style="display: none;">
             <div class="page-header"><h1>AI Chat Support</h1></div>
-            <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: var(--shadow); height: 500px; display: flex; flex-direction: column;">
-                <div id="chat-list" style="flex: 1; overflow-y: auto; margin-bottom: 20px;"></div>
+            <div style="background: var(--bg-card); backdrop-filter: blur(10px); padding: 30px; border-radius: 10px; box-shadow: var(--shadow); height: 500px; display: flex; flex-direction: column;">
+                <div id="chat-list" style="flex: 1; overflow-y: auto; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: rgba(0,0,0,0.2);">
+                    <div class="text-muted">Loading chats...</div>
+                </div>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="chat-input" style="flex: 1; padding: 10px; border: 1px solid #DDD; border-radius: 4px;" placeholder="Select a chat to reply...">
+                    <input type="hidden" id="active-chat-id">
+                    <input type="text" id="chat-input" style="flex: 1; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(0,0,0,0.3); color: white;" placeholder="Type a reply...">
                     <button class="btn-primary" onclick="sendChat()">Send</button>
                 </div>
             </div>
         </main>
         <main id="tab-packages" style="display: none;">
-            <div class="page-header"><h1>Manage Packages</h1></div>
-            <div class="data-card"><table id="packages-table"><thead><tr><th>Package Name</th><th>Price</th><th>Units Sold</th><th>Action</th></tr></thead><tbody></tbody></table></div>
+            <div class="page-header">
+                <h1>Manage Packages</h1>
+                <div class="header-actions">
+                    <button class="btn-primary" onclick="openAddPackageModal()">+ Add New Package</button>
+                </div>
+            </div>
+            <div class="data-card">
+                <table id="packages-table">
+                    <thead><tr><th>Package Name</th><th>Price</th><th>Duration</th><th>Features</th><th>Action</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </main>
         <main id="tab-images" style="display: none;">
-            <div class="page-header"><h1>Image Management</h1></div>
-            <div class="data-card" style="padding: 20px;">Upload and manage package images here.</div>
+            <div class="page-header">
+                <h1>Image Management</h1>
+                <div class="header-actions">
+                    <button class="btn-primary" onclick="document.getElementById('upload-image-input').click()">+ Upload Image</button>
+                    <input type="file" id="upload-image-input" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
+                </div>
+            </div>
+            <div class="data-card" style="padding: 20px;">
+                <div class="stats-grid" id="image-gallery-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px;">
+                    <!-- Images populated by JS -->
+                </div>
+            </div>
         </main>
         <main id="tab-settings" style="display: none;">
-            <div class="page-header"><h1>Settings</h1></div>
-            <div class="data-card" style="padding: 20px;">Admin and system configuration.</div>
+            <div class="page-header">
+                <h1>Settings</h1>
+                <div class="header-actions">
+                    <button class="btn-primary" onclick="saveSettings()">Save Changes</button>
+                </div>
+            </div>
+            <div class="data-card" style="padding: 30px;">
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <label>Admin Email</label>
+                    <input type="email" id="setting-admin-email" value="cyrhielmaot@gmail.com">
+                </div>
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <label>Admin Password</label>
+                    <input type="password" id="setting-admin-password" placeholder="Leave blank to keep current">
+                </div>
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <label>Telegram Bot Token</label>
+                    <input type="text" id="setting-telegram-token" placeholder="Bot Token">
+                </div>
+                <div class="filter-group" style="margin-bottom: 20px;">
+                    <label>Telegram Chat ID</label>
+                    <input type="text" id="setting-telegram-chat" placeholder="Chat ID">
+                </div>
+                <div class="filter-group">
+                    <label>Site Maintenance Mode</label>
+                    <select id="setting-maintenance">
+                        <option value="false">Disabled</option>
+                        <option value="true">Enabled</option>
+                    </select>
+                </div>
+            </div>
         </main>
     </div>
 
