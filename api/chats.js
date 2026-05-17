@@ -4,6 +4,9 @@ module.exports = async function handler(req, res) {
   const { orderId } = req.query;
 
   if (req.method === 'GET') {
+    if (orderId === 'active') {
+      return res.status(501).json({ error: 'Active chats query not implemented yet' });
+    }
     if (!orderId) return res.status(400).json({ error: 'Order ID required' });
 
     const { data, error } = await supabase
