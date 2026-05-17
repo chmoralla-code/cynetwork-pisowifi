@@ -1,4 +1,97 @@
 // =====================================================
+// TRACK ORDER MODAL FUNCTIONS
+// =====================================================
+
+function openTrackModal(e) {
+    if (e) e.preventDefault();
+    document.getElementById('trackOrderModal').style.display = 'block';
+    document.getElementById('trackOrderResult').style.display = 'none';
+    document.getElementById('trackOrderIdInput').value = '';
+    document.body.style.overflow = 'hidden'; // Prevent scrolling
+}
+
+function closeTrackOrderModal() {
+    document.getElementById('trackOrderModal').style.display = 'none';
+    document.body.style.overflow = 'auto'; // Re-enable scrolling
+}
+
+async function trackOrder() {
+    const input = document.getElementById('trackOrderIdInput');
+    const resultDiv = document.getElementById('trackOrderResult');
+    const lookup = input.value.trim();
+
+    if (!lookup) {
+        alert('Please enter an Order ID or Tracking Number');
+        return;
+    }
+
+    const btn = document.querySelector('#trackOrderModal .next-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Searching...';
+    btn.disabled = true;
+
+    try {
+        const result = await getTrackedOrderFromLookup(lookup);
+
+        if (result.error === 'not_found') {
+            alert(`No order found for "${lookup}". Please check your ID and try again.`);
+            resultDiv.style.display = 'none';
+        } else if (result.error) {
+            alert('Server error. Please try again later.');
+            resultDiv.style.display = 'none';
+        } else {
+            document.getElementById('trackResultOrderId').textContent = result.order_id || result.orderId || '--';
+            document.getElementById('trackResultTracking').textContent = result.tracking_number || result.trackingNumber || '--';
+            
+            const status = (result.status || 'pending').toUpperCase();
+            const statusBadge = document.getElementById('trackResultStatus');
+            statusBadge.textContent = status;
+            statusBadge.className = 'track-status-badge ' + status.toLowerCase();
+            
+            document.getElementById('trackResultPackage').textContent = result.package_name || '--';
+            document.getElementById('trackResultQuantity').textContent = result.quantity || '1';
+            document.getElementById('trackResultTotal').textContent = formatMoney(result.total_price || result.totalPrice || 0);
+            document.getElementById('trackResultShipping').textContent = result.shipping_fee === 0 ? 'FREE' : ('PHP ' + formatMoney(result.shipping_fee));
+            document.getElementById('trackResultDate').textContent = formatTrackDate(result.created_at || result.timestamp);
+            document.getElementById('trackResultUpdated').textContent = formatTrackDate(result.updated_at || result.timestamp);
+
+            const reasonWrap = document.getElementById('trackResultReasonWrap');
+            const reasonText = document.getElementById('trackResultReason');
+            if (result.rejection_reason || result.notes || result.admin_notes) {
+                reasonText.textContent = result.rejection_reason || result.notes || result.admin_notes;
+                reasonWrap.style.display = 'block';
+            } else {
+                reasonWrap.style.display = 'none';
+            }
+
+            resultDiv.style.display = 'block';
+        }
+    } catch (e) {
+        console.error(e);
+        alert('An error occurred. Please try again.');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function formatTrackDate(dateStr) {
+    if (!dateStr) return '--';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+// =====================================================
 // GLOBAL VARIABLES
 // =====================================================
 
@@ -3110,9 +3203,22 @@ function extractTrackingLookupFromText(message) {
         return '';
     }
 
-    const trackingMatch = raw.toUpperCase().match(/CYN-\d{8}-\d{6}/);
+    // Match order_id (CNW-XXXXXX)
+    const orderIdMatch = raw.toUpperCase().match(/CNW-[A-Z0-7]{6}/);
+    if (orderIdMatch) {
+        return orderIdMatch[0];
+    }
+
+    // Match tracking_number (TRK-XXXXXXYYYY)
+    const trackingMatch = raw.toUpperCase().match(/TRK-[A-Z0-9]{10,12}/);
     if (trackingMatch) {
         return trackingMatch[0];
+    }
+
+    // Fallback for CYN formats (legacy)
+    const legacyMatch = raw.toUpperCase().match(/CYN-\d{8}-\d{6}/);
+    if (legacyMatch) {
+        return legacyMatch[0];
     }
 
     const orderMatch = raw.match(/(?:order(?:\s*id)?|\bid\b|#)\s*[:#-]?\s*(\d{1,9})/i);

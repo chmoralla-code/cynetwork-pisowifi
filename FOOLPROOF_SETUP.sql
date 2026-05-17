@@ -35,14 +35,6 @@ CREATE TABLE IF NOT EXISTS piso_orders (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS piso_chats (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id TEXT REFERENCES piso_orders(order_id) ON DELETE CASCADE,
-  sender TEXT NOT NULL,
-  message TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS piso_clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id TEXT UNIQUE NOT NULL,
@@ -83,6 +75,46 @@ CREATE TABLE IF NOT EXISTS piso_harvests (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS piso_packages (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  price NUMERIC,
+  "originalPrice" NUMERIC,
+  duration TEXT,
+  description TEXT,
+  features JSONB,
+  media_url TEXT,
+  popular BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS piso_chat_sessions (
+  id TEXT PRIMARY KEY,
+  client_id TEXT,
+  order_id TEXT,
+  tracking_number TEXT,
+  customer_name TEXT,
+  customer_contact TEXT,
+  status TEXT DEFAULT 'ai',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS piso_chats (
+  id BIGSERIAL PRIMARY KEY,
+  session_id TEXT REFERENCES piso_chat_sessions(id) ON DELETE CASCADE,
+  order_id TEXT REFERENCES piso_orders(order_id) ON DELETE CASCADE,
+  sender TEXT NOT NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS piso_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key TEXT UNIQUE NOT NULL,
+  value TEXT
+);
+
 -- 3. ENABLE REALTIME SAFELY
 DO $$
 BEGIN
@@ -113,6 +145,13 @@ BEGIN
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE piso_harvests;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'piso_chat_sessions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE piso_chat_sessions;
+  END IF;
 END $$;
 
 -- 4. ENABLE RLS (Row Level Security)
@@ -120,6 +159,9 @@ ALTER TABLE piso_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE piso_chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE piso_clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE piso_harvests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE piso_chat_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE piso_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE piso_settings ENABLE ROW LEVEL SECURITY;
 
 -- 5. CREATE POLICIES (Allow all access for now to ensure site works)
 -- Note: You can tighten these later.
@@ -129,9 +171,15 @@ BEGIN
     DROP POLICY IF EXISTS "Enable all for all" ON piso_chats;
     DROP POLICY IF EXISTS "Enable all for all" ON piso_clients;
     DROP POLICY IF EXISTS "Enable all for all" ON piso_harvests;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_chat_sessions;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_packages;
+    DROP POLICY IF EXISTS "Enable all for all" ON piso_settings;
 END $$;
 
 CREATE POLICY "Enable all for all" ON piso_orders FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all for all" ON piso_chats FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all for all" ON piso_clients FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all for all" ON piso_harvests FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for all" ON piso_chat_sessions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for all" ON piso_packages FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for all" ON piso_settings FOR ALL USING (true) WITH CHECK (true);

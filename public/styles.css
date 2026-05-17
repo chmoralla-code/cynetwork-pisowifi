@@ -2902,3 +2902,46 @@ body {
     }
 }
 
+/* Track Order Modal */
+#trackOrderModal .modal-content {
+    max-width: 500px;
+}
+
+.track-order-result {
+    margin-top: 25px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.track-order-result h3 {
+    margin-bottom: 15px;
+    color: #E63946;
+    font-size: 1.2rem;
+}
+
+.track-order-result p {
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+    padding-bottom: 5px;
+}
+
+.track-status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.track-status-badge.pending { background: #F39C12; color: white; }
+.track-status-badge.approved { background: #27AE60; color: white; }
+.track-status-badge.shipping { background: #3498DB; color: white; }
+.track-status-badge.completed { background: #2ECC71; color: white; }
+.track-status-badge.rejected { background: #E74C3C; color: white; }
+.track-status-badge.cancelled { background: #95A5A6; color: white; }
+
