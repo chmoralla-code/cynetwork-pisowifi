@@ -1,5 +1,4 @@
 const { supabase } = require('./_lib/supabase');
-const { list, del } = require('@vercel/blob');
 
 // Helper to get banned client IDs from piso_settings as a fallback
 async function getBannedClientIds() {
@@ -70,8 +69,10 @@ async function handleJuanfi(req, res) {
     return res.json(data);
   }
   if (req.method === 'POST') {
-    const { machine_name, amount, note } = req.body;
-    const { data, error } = await supabase.from('piso_harvests').insert([{ machine_name, amount: Number(amount), note }]).select().single();
+    const { machine_name, amount, note, harvest_date } = req.body;
+    const insertData = { machine_name, amount: Number(amount), note };
+    if (harvest_date) insertData.harvest_date = harvest_date;
+    const { data, error } = await supabase.from('piso_harvests').insert([insertData]).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
@@ -146,7 +147,12 @@ async function handleChats(req, res) {
 async function handleImages(req, res) {
   if (req.method === 'GET') {
     try {
-      const { blobs } = await list();
+      const { data, error } = await supabase.storage.from('piso_images').list();
+      if (error) throw error;
+      const blobs = data.map(f => {
+        const { data: publicUrlData } = supabase.storage.from('piso_images').getPublicUrl(f.name);
+        return { url: publicUrlData.publicUrl, pathname: f.name };
+      });
       return res.json(blobs);
     } catch (error) {
       return res.status(500).json({ error: error.message });
@@ -155,7 +161,10 @@ async function handleImages(req, res) {
   if (req.method === 'DELETE') {
     try {
       const { url } = req.query;
-      await del(url);
+      if (!url) return res.status(400).json({ error: 'URL required' });
+      const filename = url.split('/').pop();
+      const { error } = await supabase.storage.from('piso_images').remove([filename]);
+      if (error) throw error;
       return res.json({ message: 'Deleted' });
     } catch (error) {
       return res.status(500).json({ error: error.message });

@@ -262,6 +262,7 @@ async function submitHarvest() {
     const machine_name = document.getElementById('harvest-machine').value;
     const amount = document.getElementById('harvest-amount').value;
     const note = document.getElementById('harvest-note').value;
+    const harvest_date = document.getElementById('harvest-date').value;
 
     if (!machine_name || !amount) return showToast('Warning', 'Please fill in machine and amount', 'warning');
 
@@ -269,7 +270,7 @@ async function submitHarvest() {
         const res = await fetch('/api/admin/juanfi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ machine_name, amount, note })
+            body: JSON.stringify({ machine_name, amount, note, harvest_date })
         });
         if (res.ok) {
             closeModal('harvestModal');
@@ -322,10 +323,35 @@ function editClient(id) {
     if (!client) return showToast('Error', 'Client data not found', 'error');
     
     document.getElementById('edit-client-id').value = client.client_id;
+    document.getElementById('edit-client-email').value = client.email;
     document.getElementById('edit-client-balance').value = client.balance || 0;
     document.getElementById('edit-client-banned').checked = !!client.is_banned;
     
     document.getElementById('clientModal').style.display = 'flex';
+}
+
+async function sendClientPasswordReset() {
+    const email = document.getElementById('edit-client-email').value;
+    if (!email) return showToast('Error', 'Client email not found', 'error');
+    
+    if (!confirm('Are you sure you want to send a password reset link to ' + email + '?')) return;
+    
+    try {
+        const res = await fetch('/api/client?action=forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        if (res.ok) {
+            showToast('Success', 'Password reset link sent to ' + email, 'success');
+        } else {
+            const data = await res.json();
+            showToast('Error', data.error || 'Failed to send reset link', 'error');
+        }
+    } catch (err) {
+        showToast('Error', 'Network error: ' + err.message, 'error');
+    }
 }
 
 async function saveClient() {
@@ -378,6 +404,7 @@ async function viewOrder(id) {
         
         document.getElementById('current-order-id').value = order.order_id || order.orderId;
         document.getElementById('order-status-select').value = order.status || 'pending';
+        document.getElementById('order-admin-note').value = order.admin_note || '';
         
         const content = document.getElementById('order-details-content');
         content.innerHTML = `
@@ -407,6 +434,7 @@ async function viewOrder(id) {
 async function updateOrderStatusFromModal() {
     const id = document.getElementById('current-order-id').value;
     const status = document.getElementById('order-status-select').value;
+    const admin_note = document.getElementById('order-admin-note').value;
     
     if (!id) return;
     
@@ -417,7 +445,7 @@ async function updateOrderStatusFromModal() {
         const res = await fetch('/api/orders?id=' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
+            body: JSON.stringify({ status, admin_note })
         });
         
         if (res.ok) {
@@ -425,13 +453,15 @@ async function updateOrderStatusFromModal() {
             refreshData();
             if (currentTab === 'orders') loadAllOrders();
             if (currentTab === 'pending') loadPendingOrders();
+            showToast('Success', 'Status and Note saved successfully', 'success');
         } else {
-            showToast('Error', 'Failed to update status', 'error');
+            const data = await res.json();
+            showToast('Error', data.error || 'Failed to update status', 'error');
         }
     } catch (err) {
         showToast('Error', 'Error updating status: ' + err.message, 'error');
     } finally {
-        btn.innerText = 'Save Status';
+        btn.innerText = 'Save Status & Note';
     }
 }
 
@@ -481,6 +511,10 @@ async function loadChatList() {
         });
     } catch (err) {
         console.error('Failed to load chats');
+        const chatList = document.getElementById('chat-list');
+        if (chatList) {
+            chatList.innerHTML = '<div style="padding: 15px; color: var(--danger);">Failed to load chats. Make sure the piso_chat_sessions table exists in Supabase.</div>';
+        }
     }
 }
 
@@ -607,8 +641,37 @@ async function savePackage() {
     if (res.ok) {
         closeModal('packageModal');
         loadPackages();
+        showToast('Success', 'Package saved successfully', 'success');
     } else {
-        showToast('Error', 'Failed to save package. Please ensure the piso_packages table exists in Supabase.', 'error');
+        showToast('Error', 'Failed to save package. Please run this in your Supabase SQL Editor:<br><code>CREATE TABLE IF NOT EXISTS public.piso_packages ( id TEXT PRIMARY KEY, name TEXT, price NUMERIC, "originalPrice" NUMERIC, duration TEXT, description TEXT, features JSONB, media_url TEXT, popular BOOLEAN DEFAULT false, created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone(\'utc\'::text, now()) );</code>', 'error', 0);
+    }
+}
+
+async function handlePkgMediaUpload(event) {
+    if (event.target.files.length > 0) {
+        const file = event.target.files[0];
+        const btn = document.querySelector('button[onclick="document.getElementById(\'upload-pkg-media\').click()"]');
+        const oldText = btn.innerText;
+        btn.innerText = 'Uploading...';
+        try {
+            const res = await fetch('/api/upload?filename=pkg-' + Date.now() + '-' + encodeURIComponent(file.name), {
+                method: 'POST',
+                headers: { 'Content-Type': file.type || 'application/octet-stream' },
+                body: file
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('pkg-media').value = data.url;
+                showToast('Success', 'Media uploaded successfully!', 'success');
+            } else {
+                showToast('Error', data.error || 'Failed to upload media.', 'error');
+            }
+        } catch (e) {
+            showToast('Error', 'Upload failed: ' + e.message, 'error');
+        } finally {
+            btn.innerText = oldText;
+            event.target.value = '';
+        }
     }
 }
 
@@ -635,7 +698,7 @@ async function loadImages() {
             `;
         });
     } catch(e) {
-        grid.innerHTML = '<div style="color: #E74C3C; grid-column: 1/-1;">Failed to load images from Vercel Blob. Is BLOB_READ_WRITE_TOKEN configured?</div>';
+        grid.innerHTML = '<div style="color: #E74C3C; grid-column: 1/-1;">Failed to load images from Supabase. Ensure "piso_images" bucket exists in your Storage dashboard and is set to public.</div>';
     }
 }
 
@@ -660,7 +723,7 @@ async function handleImageUpload(event) {
             showToast('Success', 'Image uploaded successfully!', 'success');
             loadImages();
         } else {
-            showToast('Error', 'Failed to upload. Ensure Vercel BLOB_READ_WRITE_TOKEN is set in your environment.', 'error');
+            showToast('Error', 'Failed to upload. Ensure "piso_images" bucket exists in Supabase and is public.', 'error');
         }
     }
 }

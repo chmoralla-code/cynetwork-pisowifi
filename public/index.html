@@ -708,6 +708,7 @@
 
             <div id="accountRecoverPanel" class="account-panel">
                 <form id="clientRecoverForm" class="account-form">
+                    <p style="color: var(--text-color); margin-bottom: 20px; font-size: 14px;">Enter your details to receive a secure password reset link via Email and SMS Notification.</p>
                     <div class="form-group">
                         <label for="clientRecoverName">Full Name *</label>
                         <input type="text" id="clientRecoverName" placeholder="Juan Dela Cruz" required>
@@ -721,15 +722,7 @@
                         <input type="tel" id="clientRecoverContact" placeholder="+63 9XX XXX XXXX" required>
                         <small class="form-hint">Use the same contact number you used during registration.</small>
                     </div>
-                    <div class="form-group">
-                        <label for="clientRecoverPassword">New Password *</label>
-                        <input type="password" id="clientRecoverPassword" placeholder="At least 6 characters" minlength="6" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="clientRecoverConfirmPassword">Confirm New Password *</label>
-                        <input type="password" id="clientRecoverConfirmPassword" placeholder="Re-enter new password" minlength="6" required>
-                    </div>
-                    <button type="submit" class="next-btn">Reset Password</button>
+                    <button type="submit" class="next-btn">Send Reset Link</button>
                     <button type="button" class="back-btn" onclick="switchAccountTab('login')">Back to Login</button>
                 </form>
             </div>

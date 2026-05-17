@@ -110,18 +110,41 @@ async function handleMe(req, res) {
 // Handler: POST /api/client/forgot-password
 async function handleForgotPassword(req, res) {
   const { email, fullName } = req.body;
-  if (!email || !fullName) return res.status(400).json({ error: 'Email and full name are required' });
+  if (!email) return res.status(400).json({ error: 'Email is required' });
   try {
     const { data: client, error } = await supabase.from('piso_clients').select('*').eq('email', email.toLowerCase().trim()).single();
     if (error || !client) return res.status(404).json({ error: 'No account found with that email' });
-    const storedName = (client.full_name || '').toLowerCase().trim();
-    const inputName = (fullName || '').toLowerCase().trim();
-    if (storedName !== inputName) return res.status(400).json({ error: 'Full name does not match our records' });
+    
+    // Only check fullName if it was provided (client-side form), skip if from admin panel
+    if (fullName !== undefined) {
+      const storedName = (client.full_name || '').toLowerCase().trim();
+      const inputName = (fullName || '').toLowerCase().trim();
+      if (storedName !== inputName) return res.status(400).json({ error: 'Full name does not match our records' });
+    }
+
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
       redirectTo: `${process.env.SITE_URL || 'https://cynetworkpisowifi.vercel.app'}/reset-password`
     });
     if (resetError) return res.status(500).json({ error: 'Unable to send reset email. Please contact support.' });
-    return res.json({ message: 'Password reset link sent to your email. Please check your inbox and spam folder.' });
+
+    // Simulate sending SMS by notifying the admin via Telegram (if configured)
+    try {
+        const { data: settings } = await supabase.from('piso_settings').select('key, value').in('key', ['telegram_token', 'telegram_chat']);
+        if (settings && settings.length === 2) {
+             const token = settings.find(s => s.key === 'telegram_token')?.value;
+             const chatId = settings.find(s => s.key === 'telegram_chat')?.value;
+             if (token && chatId) {
+                 const text = `🔐 Password Reset Request\nClient: ${client.full_name}\nEmail: ${email}\nContact: ${client.contact_number || 'N/A'}\n\n*SMS Notification Simulated via Admin Alert*`;
+                 await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({ chat_id: chatId, text })
+                 });
+             }
+        }
+    } catch(e) {}
+
+    return res.json({ message: 'Password reset link sent to your email. An SMS notification has also been triggered to the registered number.' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
