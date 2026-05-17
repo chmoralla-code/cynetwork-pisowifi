@@ -290,10 +290,13 @@ async function removeHarvestRecord(id) {
     }
 }
 
+let currentClients = [];
+
 async function loadClients() {
     try {
         const res = await fetch('/api/admin/clients');
         const clients = await res.json();
+        currentClients = clients; // Store globally for edit lookup
         const tbody = document.querySelector('#clients-table tbody');
         tbody.innerHTML = '';
 
@@ -313,7 +316,42 @@ async function loadClients() {
 }
 
 function editClient(id) {
-    alert('Editing client: ' + id);
+    const client = currentClients.find(c => c.client_id === id);
+    if (!client) return alert('Client data not found');
+    
+    document.getElementById('edit-client-id').value = client.client_id;
+    document.getElementById('edit-client-balance').value = client.balance || 0;
+    
+    document.getElementById('clientModal').style.display = 'flex';
+}
+
+async function saveClient() {
+    const id = document.getElementById('edit-client-id').value;
+    const balance = document.getElementById('edit-client-balance').value;
+    
+    if (!id) return;
+    
+    const btn = document.querySelector('#clientModal .btn-primary');
+    btn.innerText = 'Saving...';
+    
+    try {
+        const res = await fetch('/api/admin/clients?id=' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ balance: Number(balance) })
+        });
+        
+        if (res.ok) {
+            closeModal('clientModal');
+            loadClients();
+        } else {
+            alert('Failed to update client');
+        }
+    } catch (err) {
+        alert('Error updating client');
+    } finally {
+        btn.innerText = 'Save Client';
+    }
 }
 
 async function viewOrder(id) {
@@ -350,7 +388,7 @@ async function viewOrder(id) {
     }
 }
 
-async function updateOrderStatus() {
+async function updateOrderStatusFromModal() {
     const id = document.getElementById('current-order-id').value;
     const status = document.getElementById('order-status-select').value;
     
@@ -609,14 +647,45 @@ async function handleImageUpload(event) {
 }
 
 async function loadSettings() {
-    // Already populated by HTML mock data
+    try {
+        const res = await fetch('/api/admin/settings');
+        if (res.ok) {
+            const settings = await res.json();
+            if (settings.admin_email) document.getElementById('setting-admin-email').value = settings.admin_email;
+            if (settings.telegram_token) document.getElementById('setting-telegram-token').value = settings.telegram_token;
+            if (settings.telegram_chat) document.getElementById('setting-telegram-chat').value = settings.telegram_chat;
+            if (settings.maintenance_mode) document.getElementById('setting-maintenance').value = settings.maintenance_mode;
+        }
+    } catch (e) {
+        console.error('Settings load failed');
+    }
 }
 
 async function saveSettings() {
     const btn = document.querySelector('#tab-settings .btn-primary');
     btn.innerText = 'Saving...';
-    setTimeout(() => {
+    
+    const settings = {
+        admin_email: document.getElementById('setting-admin-email').value,
+        telegram_token: document.getElementById('setting-telegram-token').value,
+        telegram_chat: document.getElementById('setting-telegram-chat').value,
+        maintenance_mode: document.getElementById('setting-maintenance').value
+    };
+    
+    try {
+        const res = await fetch('/api/admin/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        if (res.ok) {
+            alert('Settings saved successfully!');
+        } else {
+            alert('Failed to save settings. Please ensure piso_settings table exists.');
+        }
+    } catch (e) {
+        alert('Error saving settings');
+    } finally {
         btn.innerText = 'Save Changes';
-        alert('Settings saved successfully!');
-    }, 800);
+    }
 }

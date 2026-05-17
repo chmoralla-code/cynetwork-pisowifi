@@ -117,6 +117,24 @@ async function handlePackages(req, res) {
   return res.status(405).end();
 }
 
+// Handler: /api/admin/settings
+async function handleSettings(req, res) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('piso_settings').select('*');
+    if (error) return res.json({}); // graceful fallback if table missing
+    const settingsObj = {};
+    if (data) data.forEach(row => settingsObj[row.key] = row.value);
+    return res.json(settingsObj);
+  }
+  if (req.method === 'POST') {
+    const updates = Object.entries(req.body).map(([key, value]) => ({ key, value }));
+    const { data, error } = await supabase.from('piso_settings').upsert(updates, { onConflict: 'key' }).select();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+  return res.status(405).end();
+}
+
 // Main router for /api/admin/[action]
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -141,6 +159,8 @@ module.exports = async function handler(req, res) {
       return handleImages(req, res);
     case 'packages':
       return handlePackages(req, res);
+    case 'settings':
+      return handleSettings(req, res);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }

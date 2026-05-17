@@ -409,7 +409,7 @@
             <input type="hidden" id="current-order-id">
             <div style="display: flex; gap: 10px;">
                 <button class="btn-secondary" style="flex: 1;" onclick="closeModal('orderModal')">Close</button>
-                <button class="btn-primary" style="flex: 1;" onclick="updateOrderStatus()">Save Status</button>
+                <button class="btn-primary" style="flex: 1;" onclick="updateOrderStatusFromModal()">Save Status</button>
             </div>
         </div>
     </div>
@@ -439,6 +439,20 @@
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn-secondary" style="flex: 1;" onclick="closeModal('packageModal')">Cancel</button>
                 <button class="btn-primary" style="flex: 1;" onclick="savePackage()">Save Package</button>
+            </div>
+        </div>
+    </div>
+    <div id="clientModal" class="modal">
+        <div class="modal-content" style="padding: 25px; max-width: 400px;">
+            <h2 style="margin-bottom: 20px;">Edit Client</h2>
+            <input type="hidden" id="edit-client-id">
+            <div class="filter-group" style="margin-bottom: 15px;">
+                <label>Client Balance (₱)</label>
+                <input type="number" id="edit-client-balance" placeholder="0">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-secondary" style="flex: 1;" onclick="closeModal('clientModal')">Cancel</button>
+                <button class="btn-primary" style="flex: 1;" onclick="saveClient()">Save Client</button>
             </div>
         </div>
     </div>
