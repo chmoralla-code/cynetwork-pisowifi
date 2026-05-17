@@ -61,7 +61,14 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        // Return the default packages
+        const { supabase } = require('./_lib/supabase');
+        const { data, error } = await supabase.from('piso_packages').select('*').order('id', { ascending: true });
+        
+        if (!error && data && data.length > 0) {
+            return res.status(200).json(data);
+        }
+
+        // Fallback to the default packages
         const packagesArray = Object.entries(DEFAULT_PACKAGES).map(([key, pkg]) => ({
             id: key,
             name: pkg.name,

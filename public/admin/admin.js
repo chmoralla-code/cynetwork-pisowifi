@@ -342,24 +342,25 @@ window.onload = initAdmin;
 
 async function loadChatList() {
     try {
-        const res = await fetch('/api/chats/active');
-        // Fallback mock if API not ready
-        let chats = res.ok ? await res.json() : [
-            { id: 1, user: 'Juan Dela Cruz', message: 'Hello, package details?', unread: 2 },
-            { id: 2, user: 'Maria Clara', message: 'I already paid via GCash.', unread: 0 }
-        ];
-
+        const res = await fetch('/api/admin/chats');
+        if (!res.ok) throw new Error('API failed');
+        let sessions = await res.json();
+        
         const chatList = document.getElementById('chat-list');
         chatList.innerHTML = '';
         
-        chats.forEach(c => {
+        if (sessions.length === 0) {
+             chatList.innerHTML = '<div style="padding: 15px; color: var(--text-muted);">No active chats found.</div>';
+             return;
+        }
+
+        sessions.forEach(s => {
             chatList.innerHTML += `
-                <div style="padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between;" onclick="selectChat(${c.id})">
+                <div style="padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between;" onclick="selectChat('${s.id}')">
                     <div>
-                        <strong style="color: white;">${c.user}</strong><br>
-                        <span style="font-size: 12px; color: var(--text-muted);">${c.message}</span>
+                        <strong style="color: white;">${s.customer_name || 'Client ' + (s.client_id ? s.client_id.substring(0,6) : '')}</strong><br>
+                        <span style="font-size: 12px; color: var(--text-muted);">Status: ${s.status}</span>
                     </div>
-                    ${c.unread > 0 ? `<span style="background: var(--primary); color: white; border-radius: 50%; padding: 2px 8px; font-size: 11px;">${c.unread}</span>` : ''}
                 </div>
             `;
         });
@@ -368,9 +369,28 @@ async function loadChatList() {
     }
 }
 
-function selectChat(id) {
+async function selectChat(id) {
     document.getElementById('active-chat-id').value = id;
     document.getElementById('chat-input').focus();
+    const res = await fetch('/api/chat/messages?sessionId=' + id);
+    if (res.ok) {
+        const data = await res.json();
+        const chatBox = document.querySelector('.admin-card:nth-child(2) div[style*="height: 400px"]');
+        if (chatBox) chatBox.id = 'chat-box-display'; // ensuring we have an ID to target
+        const displayBox = document.getElementById('chat-box-display');
+        displayBox.innerHTML = '';
+        (data.messages || []).forEach(m => {
+            const isSelf = m.sender === 'admin';
+            displayBox.innerHTML += `
+                <div style="margin-bottom: 10px; text-align: ${isSelf ? 'right' : 'left'};">
+                    <span style="background: ${isSelf ? 'var(--primary)' : 'rgba(255,255,255,0.1)'}; padding: 8px 12px; border-radius: 8px; display: inline-block;">
+                        ${m.message}
+                    </span>
+                </div>
+            `;
+        });
+        displayBox.scrollTop = displayBox.scrollHeight;
+    }
 }
 
 async function sendChat() {
@@ -379,32 +399,37 @@ async function sendChat() {
     const msg = input.value;
     if (!chatId || !msg) return alert('Select a chat and enter a message');
     
-    // API logic here
-    console.log('Sending message to', chatId, ':', msg);
-    input.value = '';
-    alert('Message sent to chat ' + chatId);
+    const res = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: chatId, senderType: 'admin', message: msg })
+    });
+    
+    if (res.ok) {
+        input.value = '';
+        selectChat(chatId);
+    } else {
+        alert('Failed to send message');
+    }
 }
 
 async function loadPackages() {
     try {
-        // Mock data
-        const packages = [
-            { id: 1, name: 'Starter', price: '₱5,800', duration: '1 Year License', features: '50 Meters, Anti Lag' },
-            { id: 2, name: 'Professional', price: '₱8,500', duration: '3 Years License', features: '100 Meters, Anti Lag' },
-            { id: 3, name: 'Enterprise', price: '₱11,000', duration: 'Lifetime License', features: '250 Meters, Advanced Anti Lag' }
-        ];
+        const res = await fetch('/api/packages');
+        const packages = await res.json();
         
         const tbody = document.querySelector('#packages-table tbody');
         tbody.innerHTML = '';
         packages.forEach(p => {
+            const featuresList = Array.isArray(p.features) ? p.features.join(', ') : p.features;
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${p.name}</strong></td>
-                    <td>${p.price}</td>
+                    <td>₱${p.price}</td>
                     <td>${p.duration}</td>
-                    <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.features}</td>
+                    <td style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${featuresList}</td>
                     <td>
-                        <button class="btn-view" onclick="alert('Edit package ${p.id}')">Edit</button>
+                        <button class="btn-view" onclick="alert('Editing requires piso_packages DB setup')">Edit</button>
                     </td>
                 </tr>
             `;
@@ -420,24 +445,54 @@ function openAddPackageModal() {
 
 async function loadImages() {
     const grid = document.getElementById('image-gallery-grid');
-    grid.innerHTML = '';
-    
-    // Mock images
-    const images = ['package1.png', 'package2.png', 'package3.png', 'cynetwork-url-logo.png'];
-    images.forEach(img => {
-        grid.innerHTML += `
-            <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; border: 1px solid var(--border-color); text-align: center;">
-                <img src="/assets/images/${img}" style="width: 100%; height: 120px; object-fit: contain; border-radius: 4px; margin-bottom: 10px;">
-                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; word-break: break-all;">${img}</div>
-                <button class="btn-view" style="background: #E74C3C; width: 100%;" onclick="alert('Delete image?')">Delete</button>
-            </div>
-        `;
-    });
+    grid.innerHTML = 'Loading images...';
+    try {
+        const res = await fetch('/api/admin/images');
+        if (!res.ok) throw new Error('API failed');
+        const blobs = await res.json();
+        grid.innerHTML = '';
+        
+        if (blobs.length === 0) {
+            grid.innerHTML = '<div style="color: var(--text-muted); grid-column: 1/-1;">No images uploaded yet.</div>';
+        }
+        
+        blobs.forEach(b => {
+            grid.innerHTML += `
+                <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; border: 1px solid var(--border-color); text-align: center;">
+                    <img src="${b.url}" style="width: 100%; height: 120px; object-fit: contain; border-radius: 4px; margin-bottom: 10px;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; word-break: break-all;">${b.pathname}</div>
+                    <button class="btn-view" style="background: #E74C3C; width: 100%;" onclick="deleteImage('${b.url}')">Delete</button>
+                </div>
+            `;
+        });
+    } catch(e) {
+        grid.innerHTML = '<div style="color: #E74C3C; grid-column: 1/-1;">Failed to load images from Vercel Blob. Is BLOB_READ_WRITE_TOKEN configured?</div>';
+    }
 }
 
-function handleImageUpload(event) {
+async function deleteImage(url) {
+    if (!confirm('Delete this image permanently?')) return;
+    const res = await fetch('/api/admin/images?url=' + encodeURIComponent(url), { method: 'DELETE' });
+    if (res.ok) {
+        loadImages();
+    } else {
+        alert('Failed to delete image');
+    }
+}
+
+async function handleImageUpload(event) {
     if (event.target.files.length > 0) {
-        alert('Image selected: ' + event.target.files[0].name + ' (Upload API missing)');
+        const file = event.target.files[0];
+        const res = await fetch('/api/upload?filename=' + encodeURIComponent(file.name), {
+            method: 'POST',
+            body: file
+        });
+        if (res.ok) {
+            alert('Image uploaded successfully!');
+            loadImages();
+        } else {
+            alert('Failed to upload. Ensure Vercel BLOB_READ_WRITE_TOKEN is set in your environment.');
+        }
     }
 }
 

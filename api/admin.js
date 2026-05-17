@@ -1,4 +1,5 @@
 const { supabase } = require('./_lib/supabase');
+const { list, del } = require('@vercel/blob');
 
 // Handler: GET /api/admin/stats
 async function handleStats(req, res) {
@@ -71,6 +72,51 @@ async function handleClients(req, res) {
   return res.status(405).end();
 }
 
+// Handler: /api/admin/chats
+async function handleChats(req, res) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('piso_chat_sessions').select('*').order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+  return res.status(405).end();
+}
+
+// Handler: /api/admin/images
+async function handleImages(req, res) {
+  if (req.method === 'GET') {
+    try {
+      const { blobs } = await list();
+      return res.json(blobs);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+  if (req.method === 'DELETE') {
+    try {
+      const { url } = req.query;
+      await del(url);
+      return res.json({ message: 'Deleted' });
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+  return res.status(405).end();
+}
+
+// Handler: /api/admin/packages
+async function handlePackages(req, res) {
+  if (req.method === 'POST') {
+    const { id, name, price, originalPrice, duration, description, features, popular } = req.body;
+    const { data, error } = await supabase.from('piso_packages').upsert([{ 
+      id, name, price, originalPrice, duration, description, features, popular 
+    }]).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+  return res.status(405).end();
+}
+
 // Main router for /api/admin/[action]
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -89,6 +135,12 @@ module.exports = async function handler(req, res) {
       return handleJuanfi(req, res);
     case 'clients':
       return handleClients(req, res);
+    case 'chats':
+      return handleChats(req, res);
+    case 'images':
+      return handleImages(req, res);
+    case 'packages':
+      return handlePackages(req, res);
     default:
       return res.status(404).json({ error: `Unknown admin action: ${action}` });
   }
