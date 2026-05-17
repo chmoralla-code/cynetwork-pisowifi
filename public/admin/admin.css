@@ -528,3 +528,105 @@ tr:last-child td {
         grid-template-columns: 1fr;
     }
 }
+
+/* Premium Glassmorphic Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 420px;
+    width: calc(100% - 40px);
+}
+
+.toast {
+    background: rgba(18, 25, 43, 0.85);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--text-main);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+    gap: 14px;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.hide {
+    transform: translateY(-20px);
+    opacity: 0;
+}
+
+.toast-icon {
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+}
+
+.toast-success .toast-icon { color: #48BB78; }
+.toast-warning .toast-icon { color: #ECC94B; }
+.toast-error .toast-icon { color: #E63946; }
+.toast-info .toast-icon { color: #4299E1; }
+
+.toast-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.toast-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: white;
+}
+
+.toast-message {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.toast-message code {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #FF6B6B;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.toast-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+

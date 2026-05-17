@@ -186,7 +186,7 @@ async function updateOrderStatus(id, status) {
             if (currentTab === 'pending') loadPendingOrders();
         }
     } catch (err) {
-        alert('Failed to update status');
+        showToast('Error', 'Failed to update status', 'error');
     }
 }
 
@@ -263,7 +263,7 @@ async function submitHarvest() {
     const amount = document.getElementById('harvest-amount').value;
     const note = document.getElementById('harvest-note').value;
 
-    if (!machine_name || !amount) return alert('Please fill in machine and amount');
+    if (!machine_name || !amount) return showToast('Warning', 'Please fill in machine and amount', 'warning');
 
     try {
         const res = await fetch('/api/admin/juanfi', {
@@ -274,9 +274,10 @@ async function submitHarvest() {
         if (res.ok) {
             closeModal('harvestModal');
             loadJuanFiData();
+            showToast('Success', 'Harvest record saved successfully!', 'success');
         }
     } catch (err) {
-        alert('Failed to record harvest');
+        showToast('Error', 'Failed to record harvest: ' + err.message, 'error');
     }
 }
 
@@ -285,8 +286,9 @@ async function removeHarvestRecord(id) {
     try {
         await fetch(`/api/admin/juanfi?id=${id}`, { method: 'DELETE' });
         loadJuanFiData();
+        showToast('Success', 'Harvest record removed successfully!', 'success');
     } catch (err) {
-        alert('Failed to delete record');
+        showToast('Error', 'Failed to delete record: ' + err.message, 'error');
     }
 }
 
@@ -317,7 +319,7 @@ async function loadClients() {
 
 function editClient(id) {
     const client = currentClients.find(c => c.client_id === id);
-    if (!client) return alert('Client data not found');
+    if (!client) return showToast('Error', 'Client data not found', 'error');
     
     document.getElementById('edit-client-id').value = client.client_id;
     document.getElementById('edit-client-balance').value = client.balance || 0;
@@ -349,13 +351,20 @@ async function saveClient() {
             closeModal('clientModal');
             loadClients();
             if (result._banError) {
-                alert('Balance saved!\n\nNote: The "Ban" feature needs a Supabase column.\nRun this in your Supabase SQL Editor:\n\nALTER TABLE public.piso_clients\nADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;');
+                showToast(
+                    'Balance Saved!',
+                    'But the "Ban" feature needs a Supabase column. Run this in your Supabase SQL Editor:<br><code>ALTER TABLE public.piso_clients ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;</code>',
+                    'warning',
+                    0 // Keep persistent so they can copy it
+                );
+            } else {
+                showToast('Success', 'Client details updated successfully!', 'success');
             }
         } else {
-            alert('Failed to update client:\n' + (result?.error || 'Unknown error'));
+            showToast('Error', 'Failed to update client: ' + (result?.error || 'Unknown error'), 'error');
         }
     } catch (err) {
-        alert('Network error: ' + err.message);
+        showToast('Error', 'Network error: ' + err.message, 'error');
     } finally {
         btn.innerText = 'Save Client';
     }
@@ -391,7 +400,7 @@ async function viewOrder(id) {
         
         document.getElementById('orderModal').style.display = 'flex';
     } catch (err) {
-        alert('Failed to load order details');
+        showToast('Error', 'Failed to load order details', 'error');
     }
 }
 
@@ -417,10 +426,10 @@ async function updateOrderStatusFromModal() {
             if (currentTab === 'orders') loadAllOrders();
             if (currentTab === 'pending') loadPendingOrders();
         } else {
-            alert('Failed to update status');
+            showToast('Error', 'Failed to update status', 'error');
         }
     } catch (err) {
-        alert('Error updating status');
+        showToast('Error', 'Error updating status: ' + err.message, 'error');
     } finally {
         btn.innerText = 'Save Status';
     }
@@ -507,7 +516,7 @@ async function sendChat() {
     const chatId = document.getElementById('active-chat-id').value;
     const input = document.getElementById('chat-input');
     const msg = input.value;
-    if (!chatId || !msg) return alert('Select a chat and enter a message');
+    if (!chatId || !msg) return showToast('Warning', 'Select a chat and enter a message', 'warning');
     
     const res = await fetch('/api/chat/messages', {
         method: 'POST',
@@ -519,7 +528,7 @@ async function sendChat() {
         input.value = '';
         selectChat(chatId);
     } else {
-        alert('Failed to send message');
+        showToast('Error', 'Failed to send message', 'error');
     }
 }
 
@@ -579,7 +588,7 @@ async function savePackage() {
     const featuresRaw = document.getElementById('pkg-features').value;
     const media_url = document.getElementById('pkg-media').value;
     
-    if (!name || !price || !duration) return alert('Please fill in all required fields');
+    if (!name || !price || !duration) return showToast('Warning', 'Please fill in all required fields', 'warning');
 
     const features = featuresRaw.split(',').map(s => s.trim()).filter(s => s);
     const pkg = { id, name, price, originalPrice: Number(price) + 1199, duration, features, description: '', media_url };
@@ -599,7 +608,7 @@ async function savePackage() {
         closeModal('packageModal');
         loadPackages();
     } else {
-        alert('Failed to save package. Please ensure the piso_packages table exists in Supabase.');
+        showToast('Error', 'Failed to save package. Please ensure the piso_packages table exists in Supabase.', 'error');
     }
 }
 
@@ -636,7 +645,7 @@ async function deleteImage(url) {
     if (res.ok) {
         loadImages();
     } else {
-        alert('Failed to delete image');
+        showToast('Error', 'Failed to delete image', 'error');
     }
 }
 
@@ -648,10 +657,10 @@ async function handleImageUpload(event) {
             body: file
         });
         if (res.ok) {
-            alert('Image uploaded successfully!');
+            showToast('Success', 'Image uploaded successfully!', 'success');
             loadImages();
         } else {
-            alert('Failed to upload. Ensure Vercel BLOB_READ_WRITE_TOKEN is set in your environment.');
+            showToast('Error', 'Failed to upload. Ensure Vercel BLOB_READ_WRITE_TOKEN is set in your environment.', 'error');
         }
     }
 }
@@ -689,13 +698,53 @@ async function saveSettings() {
             body: JSON.stringify(settings)
         });
         if (res.ok) {
-            alert('Settings saved successfully!');
+            showToast('Success', 'Settings saved successfully!', 'success');
         } else {
-            alert('Failed to save settings. Please ensure piso_settings table exists.');
+            showToast('Error', 'Failed to save settings. Please ensure piso_settings table exists.', 'error');
         }
     } catch (e) {
-        alert('Error saving settings');
+        showToast('Error', 'Error saving settings: ' + e.message, 'error');
     } finally {
         btn.innerText = 'Save Changes';
+    }
+}
+
+// Premium Toast Notification System
+function showToast(title, message, type = 'success', duration = 5000) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    else if (type === 'warning') icon = '⚠️';
+    else if (type === 'error') icon = '❌';
+    
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">✕</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Trigger transition
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Auto-remove
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.classList.add('hide');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, duration);
     }
 }
