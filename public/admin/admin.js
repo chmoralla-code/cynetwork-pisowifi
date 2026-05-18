@@ -747,12 +747,19 @@ async function saveSettings() {
     const btn = document.querySelector('#tab-settings .btn-primary');
     btn.innerText = 'Saving...';
     
+    const pwdInput = document.getElementById('setting-admin-password');
+    const pwd = pwdInput ? pwdInput.value.trim() : '';
+    
     const settings = {
         admin_email: document.getElementById('setting-admin-email').value,
         telegram_token: document.getElementById('setting-telegram-token').value,
         telegram_chat: document.getElementById('setting-telegram-chat').value,
         maintenance_mode: document.getElementById('setting-maintenance').value
     };
+    
+    if (pwd) {
+        settings.admin_password = pwd;
+    }
     
     try {
         const res = await fetch('/api/admin/settings', {
@@ -762,6 +769,7 @@ async function saveSettings() {
         });
         if (res.ok) {
             showToast('Success', 'Settings saved successfully!', 'success');
+            if (pwdInput) pwdInput.value = ''; // clear password input for security after saving
         } else {
             showToast('Error', 'Failed to save settings. Please ensure piso_settings table exists.', 'error');
         }

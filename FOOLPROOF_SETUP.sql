@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS piso_clients (
   referral_balance NUMERIC DEFAULT 0,
   invite_count INTEGER DEFAULT 0,
   converted_invite_count INTEGER DEFAULT 0,
+  is_banned BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -64,7 +65,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='converted_invite_count') THEN
         ALTER TABLE piso_clients ADD COLUMN converted_invite_count INTEGER DEFAULT 0;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='piso_clients' AND column_name='is_banned') THEN
+        ALTER TABLE piso_clients ADD COLUMN is_banned BOOLEAN DEFAULT false;
+    END IF;
 END $$;
+
 
 CREATE TABLE IF NOT EXISTS piso_harvests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

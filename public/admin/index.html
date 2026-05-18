@@ -50,9 +50,6 @@
                 <a onclick="showTab('packages')" id="nav-packages">
                     <span class="emoji">📦</span> Manage Packages
                 </a>
-                <a onclick="showTab('images')" id="nav-images">
-                    <span class="emoji">🖼️</span> Image Management
-                </a>
                 <a onclick="showTab('settings')" id="nav-settings">
                     <span class="emoji">⚙️</span> Settings
                 </a>
@@ -337,20 +334,6 @@
                     <thead><tr><th>Package Name</th><th>Price</th><th>Duration</th><th>Features</th><th>Action</th></tr></thead>
                     <tbody></tbody>
                 </table>
-            </div>
-        </main>
-        <main id="tab-images" style="display: none;">
-            <div class="page-header">
-                <h1>Image Management</h1>
-                <div class="header-actions">
-                    <button class="btn-primary" onclick="document.getElementById('upload-image-input').click()">+ Upload Image</button>
-                    <input type="file" id="upload-image-input" style="display: none;" accept="image/*" onchange="handleImageUpload(event)">
-                </div>
-            </div>
-            <div class="data-card" style="padding: 20px;">
-                <div class="stats-grid" id="image-gallery-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px;">
-                    <!-- Images populated by JS -->
-                </div>
             </div>
         </main>
         <main id="tab-settings" style="display: none;">

@@ -64,11 +64,11 @@ module.exports = async function handler(req, res) {
         const { supabase } = require('./_lib/supabase');
         const { data, error } = await supabase.from('piso_packages').select('*').order('id', { ascending: true });
         
-        if (!error && data && data.length > 0) {
+        if (!error && data && data.length >= 3) {
             return res.status(200).json(data);
         }
 
-        // Fallback to the default packages
+        // Fallback to the default packages and seed them
         const packagesArray = Object.entries(DEFAULT_PACKAGES).map(([key, pkg]) => ({
             id: key,
             name: pkg.name,
@@ -79,6 +79,12 @@ module.exports = async function handler(req, res) {
             features: pkg.features,
             popular: pkg.popular || false
         }));
+
+        try {
+            await supabase.from('piso_packages').upsert(packagesArray, { onConflict: 'id' });
+        } catch (seedErr) {
+            console.error('Failed to auto-seed packages:', seedErr);
+        }
 
         return res.status(200).json(packagesArray);
     } catch (error) {

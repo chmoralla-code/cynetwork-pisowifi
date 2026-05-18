@@ -18,10 +18,21 @@ loginForm.addEventListener('submit', async (e) => {
     loginBtn.disabled = true;
     loginBtn.textContent = 'Logging in...';
 
-    // Simulate a brief delay for UX
-    await new Promise(r => setTimeout(r, 600));
+    // Fetch dynamic settings to check for updated custom admin password
+    let validPassword = ADMIN_PASSWORD;
+    try {
+        const res = await fetch('/api/admin/settings');
+        if (res.ok) {
+            const settings = await res.json();
+            if (settings && settings.admin_password) {
+                validPassword = settings.admin_password.trim();
+            }
+        }
+    } catch (err) {
+        console.warn('Unable to retrieve admin settings, using local fallback credentials.', err);
+    }
 
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    if (username === ADMIN_USERNAME && password === validPassword) {
         // Store session in localStorage
         const session = {
             username: ADMIN_USERNAME,

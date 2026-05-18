@@ -179,7 +179,7 @@ async function handlePackages(req, res) {
     const { id, name, price, originalPrice, duration, description, features, popular, media_url } = req.body;
     const { data, error } = await supabase.from('piso_packages').upsert([{ 
       id, name, price, originalPrice, duration, description, features, popular, media_url 
-    }]).select().single();
+    }], { onConflict: 'id' }).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
