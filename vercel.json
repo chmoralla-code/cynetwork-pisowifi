@@ -9,6 +9,7 @@
     { "source": "/api/admin/chats", "destination": "/api/admin" },
     { "source": "/api/admin/images", "destination": "/api/admin" },
     { "source": "/api/admin/packages", "destination": "/api/admin" },
+    { "source": "/api/admin/settings", "destination": "/api/admin" },
     { "source": "/api/client/login", "destination": "/api/client" },
     { "source": "/api/client/register", "destination": "/api/client" },
     { "source": "/api/client/me", "destination": "/api/client" },
