@@ -502,6 +502,8 @@ function saveClientSession(token, account) {
             account: clientAccount
         })
     );
+
+    window.dispatchEvent(new Event('auth-change'));
 }
 
 function loadClientSession() {
@@ -527,6 +529,7 @@ function clearClientSession() {
     clientAuthToken = null;
     clientAccount = null;
     localStorage.removeItem(CLIENT_AUTH_STORAGE_KEY);
+    window.dispatchEvent(new Event('auth-change'));
 }
 
 function buildReferralLink(code) {

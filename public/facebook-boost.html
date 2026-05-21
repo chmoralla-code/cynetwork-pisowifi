@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -9,15 +9,54 @@
     <title>Facebook Boost Packages | CYNETWORK PISOWIFI</title>
     <link rel="canonical" href="https://cynetwork-pisowifi.onrender.com/facebook-boost.html">
     <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
+    <link rel="stylesheet" href="styles.css?v=20260426-1">
     <link rel="stylesheet" href="facebook-boost.css?v=20260425-1">
+    <style>
+        .boost-page { margin-top: 80px; }
+        @media (max-width: 1150px) {
+            .boost-page { margin-top: 60px; }
+        }
+    </style>
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">🌐</span>
+                <a href="index.html" style="text-decoration:none;display:flex;align-items:center;gap:0.35rem;">
+                    <span class="logo-text">CYNETWORK</span>
+                    <span class="logo-subtext">PISOWIFI</span>
+                </a>
+            </div>
+            <button
+                id="mobileMenuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-label="Toggle navigation menu"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+            >
+                ☰
+            </button>
+            <ul id="mainNavMenu" class="nav-menu">
+                <li><a href="index.html#home" class="nav-link">Home</a></li>
+                <li><a href="index.html#packages" class="nav-link">Packages</a></li>
+                <li><a href="other-packages.html" class="nav-link">Other Offers</a></li>
+                <li><a href="#" class="nav-link" onclick="openTrackModal(event)">Track Order</a></li>
+                <li><a href="index.html#tutorials" class="nav-link">Tutorials</a></li>
+                <li><a href="index.html#about" class="nav-link">About</a></li>
+                <li><a href="index.html#contact" class="nav-link">Contact</a></li>
+                <li><button type="button" class="account-nav-btn" onclick="openAccountModal()">Client Account</button></li>
+            </ul>
+        </div>
+    </nav>
+
     <div class="stars"></div>
     <div class="aurora aurora-a"></div>
     <div class="aurora aurora-b"></div>
 
     <main class="boost-page">
-        <a href="other-packages.html" class="back-link">â† Back to Other Offers</a>
 
         <section class="hero-card">
             <p class="hero-tag">SOCIAL GROWTH SERVICE</p>
@@ -169,6 +208,185 @@
         </section>
     </main>
 
+    <!-- Track Order Modal -->
+    <div id="trackOrderModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTrackOrderModal()">&times;</span>
+            <h2>Track Your Order</h2>
+            <p>Enter your order ID to check the latest status.</p>
+
+            <div class="form-group">
+                <label for="trackOrderIdInput">Order ID *</label>
+                <input type="text" id="trackOrderIdInput" placeholder="e.g., CYN-20260419-000101 or 101">
+            </div>
+
+            <div class="form-actions">
+                <button class="back-btn" onclick="closeTrackOrderModal()">Close</button>
+                <button class="next-btn" onclick="trackOrder()">Track Order</button>
+            </div>
+
+            <div id="trackOrderResult" class="track-order-result" style="display: none;">
+                <h3>Tracking Result</h3>
+                <p><strong>Order ID:</strong> <span id="trackResultOrderId"></span></p>
+                <p><strong>Tracking Number:</strong> <span id="trackResultTracking"></span></p>
+                <p><strong>Status:</strong> <span id="trackResultStatus" class="track-status-badge">PENDING</span></p>
+                <p><strong>Package:</strong> <span id="trackResultPackage"></span></p>
+                <p><strong>Quantity:</strong> <span id="trackResultQuantity"></span></p>
+                <p><strong>Preorder Total:</strong> &#8369;<span id="trackResultTotal"></span>.00</p>
+                <p><strong>Shipping Fee:</strong> <span id="trackResultShipping"></span></p>
+                <p><strong>Date Submitted:</strong> <span id="trackResultDate"></span></p>
+                <p><strong>Last Updated:</strong> <span id="trackResultUpdated"></span></p>
+                <p id="trackResultReasonWrap" style="display: none;"><strong>Notes:</strong> <span id="trackResultReason"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Account Modal -->
+    <div id="accountModal" class="modal">
+        <div class="modal-content account-modal">
+            <span class="close" onclick="closeAccountModal()">&times;</span>
+            <h2>Client Account & Referral</h2>
+            <p class="account-modal-subtitle">Create a simple account, share your referral code, and earn ₱100 for every invite who buys.</p>
+
+            <div class="account-tabs" role="tablist" aria-label="Client account tabs">
+                <button type="button" id="accountTabLogin" class="account-tab-btn active" onclick="switchAccountTab('login')">Login</button>
+                <button type="button" id="accountTabRegister" class="account-tab-btn" onclick="switchAccountTab('register')">Register</button>
+                <button type="button" id="accountTabRecover" class="account-tab-btn" onclick="switchAccountTab('recover')">Forgot Password</button>
+                <button type="button" id="accountTabDashboard" class="account-tab-btn" onclick="switchAccountTab('dashboard')">My Account</button>
+            </div>
+
+            <div id="accountAuthMessage" class="account-auth-message" style="display: none;"></div>
+
+            <div id="accountLoginPanel" class="account-panel active">
+                <form id="clientLoginForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientLoginEmail">Email *</label>
+                        <input type="email" id="clientLoginEmail" placeholder="you@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientLoginPassword">Password *</label>
+                        <input type="password" id="clientLoginPassword" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="next-btn">Login</button>
+                    <button type="button" class="account-inline-action" onclick="switchAccountTab('recover')">Forgot your password?</button>
+                </form>
+            </div>
+
+            <div id="accountRecoverPanel" class="account-panel">
+                <form id="clientRecoverForm" class="account-form">
+                    <p style="color: var(--text-color); margin-bottom: 20px; font-size: 14px;">Enter your details to receive a secure password reset link via Email and SMS Notification.</p>
+                    <div class="form-group">
+                        <label for="clientRecoverName">Full Name *</label>
+                        <input type="text" id="clientRecoverName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverEmail">Email *</label>
+                        <input type="email" id="clientRecoverEmail" placeholder="you@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRecoverContact">Registered Contact Number *</label>
+                        <input type="tel" id="clientRecoverContact" placeholder="+63 9XX XXX XXXX" required>
+                        <small class="form-hint">Use the same contact number you used during registration.</small>
+                    </div>
+                    <button type="submit" class="next-btn">Send Reset Link</button>
+                    <button type="button" class="back-btn" onclick="switchAccountTab('login')">Back to Login</button>
+                </form>
+            </div>
+
+            <div id="accountRegisterPanel" class="account-panel">
+                <form id="clientRegisterForm" class="account-form">
+                    <div class="form-group">
+                        <label for="clientRegisterName">Full Name *</label>
+                        <input type="text" id="clientRegisterName" placeholder="Juan Dela Cruz" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterEmail">Email *</label>
+                        <input type="email" id="clientRegisterEmail" placeholder="you@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterContact">Contact Number *</label>
+                        <input type="tel" id="clientRegisterContact" placeholder="+63 9XX XXX XXXX" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientRegisterPassword">Password *</label>
+                        <input type="password" id="clientRegisterPassword" placeholder="Create a password (min 6 characters)" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerReferralCode">Referral Code (optional)</label>
+                        <input type="text" id="registerReferralCode" placeholder="Example: CYNABC123">
+                    </div>
+                    <button type="submit" class="next-btn">Create Account</button>
+                </form>
+            </div>
+
+            <div id="accountDashboardPanel" class="account-panel">
+                <div id="accountDashboardLoggedOut" class="account-dashboard-logged-out">
+                    <p>Please login or register to access your account and referral dashboard.</p>
+                </div>
+
+                <div id="accountDashboardLoggedIn" class="account-dashboard-logged-in" style="display: none;">
+                    <div class="account-summary-grid">
+                        <div class="account-summary-item">
+                            <span class="summary-label">Name</span>
+                            <span id="clientAccountName" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Email</span>
+                            <span id="clientAccountEmail" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Code</span>
+                            <span id="clientReferralCode" class="summary-value">--</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Referral Balance</span>
+                            <span id="clientReferralBalance" class="summary-value">₱0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Total Invites</span>
+                            <span id="clientInviteCount" class="summary-value">0</span>
+                        </div>
+                        <div class="account-summary-item">
+                            <span class="summary-label">Converted Invites</span>
+                            <span id="clientConvertedInviteCount" class="summary-value">0</span>
+                        </div>
+                    </div>
+
+                    <div class="redeem-section">
+                        <h3>Redeem Referral Rewards</h3>
+                        <div class="redeem-breakdown">
+                            <p><strong>Available Rewards:</strong> &#8369;<span id="redeemGrossAmount">0</span>.00</p>
+                            <p><strong>Less 10%:</strong> &#8369;<span id="redeemVatAmount">0</span>.00</p>
+                            <p><strong>Estimated Payout:</strong> &#8369;<span id="redeemNetAmount">0</span>.00</p>
+                        </div>
+
+                        <form id="referralRedeemForm" class="account-form redeem-form">
+                            <div class="form-group">
+                                <label for="redeemGcashName">GCash Name *</label>
+                                <input type="text" id="redeemGcashName" placeholder="Enter your GCash account name" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="redeemGcashNumber">GCash Number *</label>
+                                <input type="tel" id="redeemGcashNumber" placeholder="09XXXXXXXXX or +639XXXXXXXXX" required>
+                            </div>
+                            <button type="submit" class="next-btn">Redeem via GCash</button>
+                        </form>
+
+                        <p id="redeemReferralNotice" class="redeem-referral-notice" style="display: none;"></p>
+                    </div>
+
+                    <div class="account-dashboard-actions">
+                        <button type="button" class="next-btn" onclick="refreshClientAccountSummary()">Refresh Account</button>
+                        <button type="button" class="back-btn" onclick="logoutClientAccount()">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.puter.com/v2/"></script>
+    <script src="script.js?v=20260428-1"></script>
     <script src="facebook-boost.js?v=20260423-3"></script>
 </body>
 </html>

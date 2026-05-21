@@ -60,7 +60,7 @@ body {
     }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
     .nav-menu {
         background: #121212;
         border: 1px solid #313131;
@@ -1990,7 +1990,7 @@ body {
    RESPONSIVE DESIGN
    ===================================================== */
 
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
     .navbar {
         padding: 0.7rem 0;
     }
@@ -2626,7 +2626,7 @@ body {
     border-bottom-color: #3a3a3a;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1150px) {
     .nav-menu {
         background: #101010 !important;
         border: 1px solid #323232 !important;

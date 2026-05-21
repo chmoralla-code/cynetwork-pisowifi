@@ -6,10 +6,48 @@
     <title>Other Packages | CYNETWORK PISOWIFI</title>
     <link rel="icon" type="image/png" href="assets/images/cynetwork-url-logo.png?v=20260419-1">
     <link rel="stylesheet" href="styles.css?v=20260426-1">
+    <style>
+        .other-packages-page { margin-top: 80px; }
+        @media (max-width: 1150px) {
+            .other-packages-page { margin-top: 60px; }
+        }
+    </style>
 </head>
 <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <span class="logo-icon">🌐</span>
+                <a href="index.html" style="text-decoration:none;display:flex;align-items:center;gap:0.35rem;">
+                    <span class="logo-text">CYNETWORK</span>
+                    <span class="logo-subtext">PISOWIFI</span>
+                </a>
+            </div>
+            <button
+                id="mobileMenuToggle"
+                class="mobile-menu-toggle"
+                type="button"
+                aria-label="Toggle navigation menu"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+            >
+                ☰
+            </button>
+            <ul id="mainNavMenu" class="nav-menu">
+                <li><a href="index.html#home" class="nav-link">Home</a></li>
+                <li><a href="index.html#packages" class="nav-link">Packages</a></li>
+                <li><a href="#other-offers" class="nav-link">Other Offers</a></li>
+                <li><a href="#" class="nav-link" onclick="openTrackModal(event)">Track Order</a></li>
+                <li><a href="index.html#tutorials" class="nav-link">Tutorials</a></li>
+                <li><a href="index.html#about" class="nav-link">About</a></li>
+                <li><a href="index.html#contact" class="nav-link">Contact</a></li>
+                <li><button type="button" class="account-nav-btn" onclick="openAccountModal()">Client Account</button></li>
+            </ul>
+        </div>
+    </nav>
+
     <main class="other-packages-page">
-        <a href="index.html" class="back-link">â† Back to Main Site</a>
 
         <!-- Other Offer Packages (moved from index) -->
         <section id="other-offers" class="other-offers-section">

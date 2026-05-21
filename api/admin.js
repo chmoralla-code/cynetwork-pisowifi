@@ -107,6 +107,7 @@ async function handleClients(req, res) {
     
     const updates = {};
     if (req.body.balance !== undefined) updates.balance = Number(req.body.balance);
+    if (req.body.referral_balance !== undefined) updates.referral_balance = Number(req.body.referral_balance);
     if (req.body.is_banned !== undefined) updates.is_banned = !!req.body.is_banned;
     
     let data = null;
@@ -128,9 +129,11 @@ async function handleClients(req, res) {
         if (Object.keys(fallbackUpdates).length > 0) {
           retryRes = await supabase.from('piso_clients').update(fallbackUpdates).eq('client_id', id).select().single();
           data = retryRes.data;
+          error = retryRes.error;
         } else {
           retryRes = await supabase.from('piso_clients').select('*').eq('client_id', id).single();
           data = retryRes.data;
+          error = retryRes.error;
         }
         
         const success = await setClientBanStatus(id, req.body.is_banned);

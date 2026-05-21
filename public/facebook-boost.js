@@ -445,7 +445,29 @@ function setupReferralExplainButtons() {
 document.addEventListener('DOMContentLoaded', () => {
     updatePricePanel();
     showAuthNotice();
+    autoPopulateFromSession();
     showStep(1);
     bindEvents();
     setupReferralExplainButtons();
+
+    // Listen for cross-script auth state changes (login/logout from script.js)
+    window.addEventListener('auth-change', () => {
+        showAuthNotice();
+        autoPopulateFromSession();
+    });
 });
+
+function autoPopulateFromSession() {
+    const { account } = getClientSession();
+    const nameInput = document.getElementById('fullNameInput');
+    const contactInput = document.getElementById('contactInput');
+
+    if (account) {
+        if (nameInput && !nameInput.value) {
+            nameInput.value = account.fullName || '';
+        }
+        if (contactInput && !contactInput.value) {
+            contactInput.value = account.contactNumber || '';
+        }
+    }
+}

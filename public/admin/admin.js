@@ -320,6 +320,7 @@ async function loadClients() {
                 <td>${c.full_name} ${c.is_banned ? '<span style="color:var(--danger);font-size:0.8em;font-weight:bold;">[BANNED]</span>' : ''}</td>
                 <td>${c.email}</td>
                 <td>₱${(Number(c.balance) || 0).toLocaleString()}</td>
+                <td>₱${(Number(c.referral_balance) || 0).toLocaleString()}</td>
                 <td><button class="btn-view" onclick="editClient('${c.client_id}')">Edit</button></td>
             </tr>`;
             tbody.innerHTML += row;
@@ -336,6 +337,7 @@ function editClient(id) {
     document.getElementById('edit-client-id').value = client.client_id;
     document.getElementById('edit-client-email').value = client.email;
     document.getElementById('edit-client-balance').value = client.balance || 0;
+    document.getElementById('edit-client-referral-balance').value = client.referral_balance || 0;
     document.getElementById('edit-client-banned').checked = !!client.is_banned;
     
     document.getElementById('clientModal').style.display = 'flex';
@@ -368,6 +370,7 @@ async function sendClientPasswordReset() {
 async function saveClient() {
     const id = document.getElementById('edit-client-id').value;
     const balance = document.getElementById('edit-client-balance').value;
+    const referral_balance = document.getElementById('edit-client-referral-balance').value;
     const is_banned = document.getElementById('edit-client-banned').checked;
     
     if (!id) return;
@@ -379,7 +382,7 @@ async function saveClient() {
         const res = await fetch('/api/admin/clients?id=' + id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ balance: Number(balance), is_banned })
+            body: JSON.stringify({ balance: Number(balance), referral_balance: Number(referral_balance), is_banned })
         });
         
         const result = await res.json();
