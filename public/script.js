@@ -3652,7 +3652,29 @@ async function generateSupportReply(userMessage) {
             messages.push({ role: 'user', content: userMessage });
         }
 
-        // Try local Ollama first (llama3.2:3b for this laptop's specs)
+        // Try Pollinations AI first (Free, anonymous, fast, OpenAI-compatible text generation)
+        try {
+            const pollRes = await fetch('https://text.pollinations.ai/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: messages,
+                    model: 'openai'
+                })
+            });
+            if (pollRes.ok) {
+                const pollText = await pollRes.text();
+                if (pollText && pollText.trim()) {
+                    return pollText.trim();
+                }
+            } else {
+                console.warn('Pollinations AI returned non-OK status:', pollRes.status);
+            }
+        } catch (pollErr) {
+            console.warn('Pollinations AI failed, trying local Ollama fallback...', pollErr);
+        }
+
+        // Try local Ollama (llama3.2:3b for this laptop's specs)
         try {
             const ollamaRes = await fetch('http://127.0.0.1:11434/api/chat', {
                 method: 'POST',
@@ -3674,22 +3696,30 @@ async function generateSupportReply(userMessage) {
         }
 
         // Fallback to Puter AI
-        const response = await puter.ai.chat(messages, { model: 'meta-llama/llama-3.3-70b-instruct:free' });
-        // puter.ai.chat with messages array returns an object; extract text from .message.content
-        const aiText = response?.message?.content ?? response?.toString?.() ?? String(response);
-        return aiText.trim() || null;
+        try {
+            const response = await puter.ai.chat(messages, { model: 'meta-llama/llama-3.3-70b-instruct:free' });
+            // puter.ai.chat with messages array returns an object; extract text from .message.content
+            const aiText = response?.message?.content ?? response?.toString?.() ?? String(response);
+            if (aiText && aiText.trim()) {
+                return aiText.trim();
+            }
+        } catch (puterErr) {
+            console.warn('Puter AI failed:', puterErr);
+        }
     } catch (error) {
-        console.error('AI error:', error);
-        // Fallback to existing logic if both fail
+        console.error('All AI engines failed:', error);
+        // Fallback to existing logic if everything fails
     }
 
     if (hasKeyword(text, ['hello', 'hi', 'hey', 'good day'])) {
-// ... rest of the function
         return 'Hi! Welcome to CYNETWORK PisoWiFi support.\nAsk me anything about package pricing, preorder, setup, or troubleshooting.';
     }
 
     if (hasKeyword(text, ['price', 'prices', 'cost', 'package', 'plan', 'magkano'])) {
-        return `Here are our SALE package prices (per piece):\n\n1) Starter - from PHP ${formatMoney(packages[1].originalPrice)} to PHP ${formatMoney(packages[1].price)} (${packages[1].duration})\n2) Professional - from PHP ${formatMoney(packages[2].originalPrice)} to PHP ${formatMoney(packages[2].price)} (${packages[2].duration})\n3) Enterprise - from PHP ${formatMoney(packages[3].originalPrice)} to PHP ${formatMoney(packages[3].price)} (${packages[3].duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
+        const p1 = packages[1] || { price: 5800, originalPrice: 7500, duration: '1 Year License | 50 Meters' };
+        const p2 = packages[2] || { price: 8500, originalPrice: 10000, duration: '3 Years License | 100 Meters' };
+        const p3 = packages[3] || { price: 11000, originalPrice: 15000, duration: 'LIFETIME LICENSE | 250 Meters' };
+        return `Here are our SALE package prices (per piece):\n\n1) Starter - from PHP ${formatMoney(p1.originalPrice)} to PHP ${formatMoney(p1.price)} (${p1.duration})\n2) Professional - from PHP ${formatMoney(p2.originalPrice)} to PHP ${formatMoney(p2.price)} (${p2.duration})\n3) Enterprise - from PHP ${formatMoney(p3.originalPrice)} to PHP ${formatMoney(p3.price)} (${p3.duration})\n\nShipping fee is FREE (PHP 0), and preorder total is computed automatically based on quantity.\nTell me your target number of users and I can suggest the best package.`;
     }
 
     if (hasKeyword(text, ['amazon leo', 'leo package'])) {
