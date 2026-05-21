@@ -394,33 +394,34 @@ body {
 }
 
 /* =====================================================
-   MONOCHROME MODERN THEME OVERRIDES
+   MONOCHROME MODERN LIGHT THEME OVERRIDES
    ===================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-    --mono-bg-0: #0a0a0a;
-    --mono-bg-1: #131313;
-    --mono-bg-2: #1c1c1c;
-    --mono-surface: rgba(18, 18, 18, 0.9);
-    --mono-border: rgba(255, 255, 255, 0.16);
-    --mono-text: #f1f1f1;
-    --mono-text-muted: #bdbdbd;
+    --mono-bg-0: #ffffff;
+    --mono-bg-1: #ffffff;
+    --mono-bg-2: #ffffff;
+    --mono-surface: #ffffff;
+    --mono-surface-soft: #f8fafc;
+    --mono-border: #e2e8f0;
+    --mono-text: #0f172a;
+    --mono-text-muted: #334155;
+    --mono-highlight: #0f172a;
 }
 
 body {
     font-family: "Manrope", "Segoe UI", sans-serif;
-    background:
-        radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.08), transparent 38%),
-        radial-gradient(circle at 84% 14%, rgba(255, 255, 255, 0.06), transparent 34%),
-        linear-gradient(165deg, var(--mono-bg-0) 0%, var(--mono-bg-1) 56%, var(--mono-bg-2) 100%);
-    color: var(--mono-text);
+    background: #ffffff !important;
+    background-image: none !important;
+    animation: none !important;
+    color: var(--mono-text) !important;
 }
 
 .stars,
 .aurora {
-    opacity: 0.3;
+    display: none !important;
 }
 
 .hero-card,
@@ -430,19 +431,25 @@ body {
 .price-panel,
 .upload-area,
 .qr-wrap {
-    background: var(--mono-surface);
-    border-color: var(--mono-border);
-    color: var(--mono-text);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    background: var(--mono-surface) !important;
+    border: 1px solid var(--mono-border) !important;
+    color: var(--mono-text) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03) !important;
 }
 
-.hero-tag,
-.metric-value,
+.hero-tag {
+    color: #e63946 !important;
+}
+
+.metric-value {
+    color: #e63946 !important;
+}
+
 .flow-card h2,
 .referral-panel h3,
 .confirm-grid strong,
 .back-link:hover {
-    color: #ffffff;
+    color: var(--mono-highlight) !important;
 }
 
 .hero-sub,
@@ -454,14 +461,14 @@ body {
 .upload-sub,
 .back-link,
 .referral-panel ol {
-    color: var(--mono-text-muted);
+    color: var(--mono-text-muted) !important;
 }
 
 .reactions-soon,
 .auth-notice {
-    background: #1a1a1a;
-    border-color: #3a3a3a;
-    color: #ededed;
+    background: #fee2e2 !important;
+    border: 1px solid #fca5a5 !important;
+    color: #ef4444 !important;
 }
 
 .field-label input,
@@ -471,27 +478,43 @@ body {
 .proof-preview img,
 .qr-image,
 .ghost-btn {
-    background: #101010;
-    border-color: #333333;
-    color: var(--mono-text);
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: var(--mono-text) !important;
 }
 
 .field-label input:focus,
 .field-label select:focus,
 .field-label textarea:focus {
-    border-color: #898989;
-    box-shadow: 0 0 0 2px rgba(170, 170, 170, 0.24);
+    border-color: #e63946 !important;
+    box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.15) !important;
 }
 
 .action-btn,
 .action-link,
 .info-btn[aria-expanded="true"] {
-    background: linear-gradient(135deg, #f3f3f3 0%, #cfcfcf 100%);
-    color: #101010;
-    border: 1px solid #afafaf;
+    background: linear-gradient(135deg, #e63946 0%, #d62828 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+.action-btn:hover,
+.action-link:hover {
+    background: linear-gradient(135deg, #ff4d6d 0%, #d62828 100%) !important;
+    box-shadow: 0 10px 24px rgba(230, 57, 70, 0.2) !important;
 }
 
 .ghost-btn {
-    background: #1a1a1a;
-    color: #efefef;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.ghost-btn:hover {
+    background: #e2e8f0 !important;
+}
+
+.price-line.total {
+    color: var(--mono-text) !important;
+    font-weight: 700;
 }
