@@ -3599,16 +3599,24 @@ async function generateSupportReply(userMessage) {
 
     // Puter AI Integration with Smart Conversational Memory/History
     try {
+        let packagesSummary = '';
+        if (typeof packages !== 'undefined' && Object.keys(packages).length > 0) {
+            packagesSummary = Object.keys(packages).map(id => {
+                const pkg = packages[id];
+                return `        - ${pkg.name} Package: PHP ${formatMoney(pkg.price)} (Original: PHP ${formatMoney(pkg.originalPrice || pkg.original_price || 0)}). ${pkg.duration || ''}`;
+            }).join('\n');
+        } else {
+            packagesSummary = `        - Starter Package: PHP 5,800 (1 Year License, 50 Meters range). Best for small setups!\n        - Professional Package: PHP 8,500 (3 Years License, 100 Meters range). Great for moderate users!\n        - Enterprise Package: PHP 11,000 (Lifetime License, 250 Meters range). The ultimate long-term investment!`;
+        }
+
         const systemPrompt = `You are a highly energetic, tech-savvy, and friendly AI support assistant for CYNETWORK PISOWIFI, a premium gaming-optimized PisoWiFi service in the Philippines.
         Your tone should be engaging, polite, and slightly casual. You may use occasional natural Taglish (Tagalog-English) like "boss", "po", "mga ka-gaming", but keep it professional and easy to understand.
         
         Creator: Cyrhiel Moralla. 
         If anyone asks "who created this website" or "who is the owner", proudly answer "Cyrhiel Moralla".
         
-        Core Offerings (Anti-Lag / Gaming Optimized):
-        - Starter Package: PHP 5,800 (1 Year License, 50 Meters range). Best for small setups!
-        - Professional Package: PHP 8,500 (3 Years License, 100 Meters range). Great for moderate users!
-        - Enterprise Package: PHP 11,000 (Lifetime License, 250 Meters range). The ultimate long-term investment!
+        Core Offerings (REAL-TIME prices currently active on the site):
+${packagesSummary}
         - Extra Services: Starlink Inquiry, Adding TP-Link EAP (PHP 350), Voucher Credits.
         
         Logistics & Payment:
