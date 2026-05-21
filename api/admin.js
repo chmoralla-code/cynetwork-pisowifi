@@ -107,22 +107,48 @@ async function handleClients(req, res) {
     
     const updates = {};
     if (req.body.balance !== undefined) updates.balance = Number(req.body.balance);
+    if (req.body.is_banned !== undefined) updates.is_banned = !!req.body.is_banned;
     
-    // Try is_banned update, fall back transparently to Settings if column is missing
+    let data = null;
+    let error = null;
     let banError = null;
-    if (req.body.is_banned !== undefined) {
-      const { error: be } = await supabase.from('piso_clients').update({ is_banned: req.body.is_banned }).eq('client_id', id);
-      if (be) {
-        // Transparent fallback to settings table
+    
+    if (Object.keys(updates).length > 0) {
+      // Attempt unified update
+      const resUpdate = await supabase.from('piso_clients').update(updates).eq('client_id', id).select().single();
+      data = resUpdate.data;
+      error = resUpdate.error;
+      
+      // Transparent fallback if is_banned column is missing or update throws an error
+      if (error && req.body.is_banned !== undefined) {
+        const fallbackUpdates = { ...updates };
+        delete fallbackUpdates.is_banned;
+        
+        let retryRes = null;
+        if (Object.keys(fallbackUpdates).length > 0) {
+          retryRes = await supabase.from('piso_clients').update(fallbackUpdates).eq('client_id', id).select().single();
+          data = retryRes.data;
+        } else {
+          retryRes = await supabase.from('piso_clients').select('*').eq('client_id', id).single();
+          data = retryRes.data;
+        }
+        
         const success = await setClientBanStatus(id, req.body.is_banned);
-        if (!success) banError = be.message;
+        if (success) {
+          error = null; // Suppress error since fallback worked
+        } else {
+          banError = 'Failed to set ban status in settings fallback';
+        }
       }
+    } else {
+      const resSelect = await supabase.from('piso_clients').select('*').eq('client_id', id).single();
+      data = resSelect.data;
+      error = resSelect.error;
     }
     
-    const { data, error } = await supabase.from('piso_clients').update(updates).eq('client_id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Client not found' });
     
-    // Merge virtual status into response
     const bannedList = await getBannedClientIds();
     const isBannedMerged = data.is_banned !== undefined && data.is_banned !== null ? !!data.is_banned : bannedList.includes(data.client_id);
     

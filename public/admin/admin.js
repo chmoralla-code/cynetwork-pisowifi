@@ -1,7 +1,5 @@
-// Supabase Configuration
-const SUPABASE_URL = 'https://ppfelwqvolaxismdpjjc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwZmVsd3F2b2xheGlzbWRwampjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MDY4NTUsImV4cCI6MjA5MzI4Mjg1NX0.zT6SyMaEoMQaOSOmkFX_OfwZ4wkOfb__rRIjVtUoFGg';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Dynamic Supabase Client Initialization
+let supabaseClient = null;
 
 let currentTab = 'dashboard';
 
@@ -24,6 +22,19 @@ async function checkAuth() {
 
 async function initAdmin() {
     if (!(await checkAuth())) return;
+    
+    // Dynamically fetch Supabase credentials
+    try {
+        const configRes = await fetch('/api/config');
+        if (configRes.ok) {
+            const config = await configRes.json();
+            if (config.supabaseUrl && config.supabaseAnonKey) {
+                supabaseClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load dynamic Supabase configuration:', err);
+    }
     
     loadStats();
     loadRecentOrders();

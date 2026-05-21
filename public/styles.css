@@ -60,7 +60,7 @@ body {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .nav-menu {
         background: #121212;
         border: 1px solid #313131;
@@ -141,7 +141,8 @@ body {
 .nav-menu {
     display: flex;
     list-style: none;
-    gap: 2.5rem;
+    gap: clamp(0.6rem, 1.35vw, 1.8rem);
+    align-items: center;
 }
 
 .nav-link {
@@ -150,6 +151,7 @@ body {
     font-weight: 500;
     transition: var(--transition);
     position: relative;
+    white-space: nowrap;
 }
 
 .nav-link::after {
@@ -176,6 +178,7 @@ body {
     padding: 0.42rem 0.9rem;
     cursor: pointer;
     transition: var(--transition);
+    white-space: nowrap;
 }
 
 .account-nav-btn:hover {
@@ -1987,7 +1990,7 @@ body {
    RESPONSIVE DESIGN
    ===================================================== */
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .navbar {
         padding: 0.7rem 0;
     }
@@ -2623,7 +2626,7 @@ body {
     border-bottom-color: #3a3a3a;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .nav-menu {
         background: #101010 !important;
         border: 1px solid #323232 !important;

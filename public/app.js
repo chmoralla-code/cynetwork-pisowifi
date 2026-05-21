@@ -1,6 +1,4 @@
-// Supabase Client for Frontend (Realtime)
-const SUPABASE_URL = 'https://ppfelwqvolaxismdpjjc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwZmVsd3F2b2xheGlzbWRwampjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3MDY4NTUsImV4cCI6MjA5MzI4Mjg1NX0.zT6SyMaEoMQaOSOmkFX_OfwZ4wkOfb__rRIjVtUoFGg';
+// Dynamic Supabase Configurations loaded from secure backend endpoints
 
 (function() {
     // Replacement for Socket.IO using Supabase Realtime

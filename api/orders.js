@@ -35,6 +35,58 @@ module.exports = async function handler(req, res) {
     const order_id = 'CNW-' + Math.random().toString(36).substr(2,6).toUpperCase();
     const tracking_number = 'TRK-' + Date.now().toString().slice(-6) + Math.random().toString(36).substr(2,4).toUpperCase();
     
+    // Auth check to determine if the buying client was referred and this is their first order
+    let referralRewardApplied = false;
+    let referralRewardAmount = 0;
+    
+    try {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (!authError && user) {
+          const { data: clientProfile } = await supabase.from('piso_clients').select('*').eq('email', user.email).single();
+          
+          if (clientProfile && clientProfile.referred_by) {
+            // Check if this is the client's first order
+            const { count, error: countError } = await supabase
+              .from('piso_orders')
+              .select('*', { count: 'exact', head: true })
+              .eq('contact_email', user.email);
+            
+            if (!countError && count === 0) {
+              const { data: referrer } = await supabase
+                .from('piso_clients')
+                .select('*')
+                .eq('client_id', clientProfile.referred_by)
+                .single();
+              
+              if (referrer) {
+                // Credit PHP 100 to referrer
+                const newReferralBalance = (Number(referrer.referral_balance) || 0) + 100;
+                const newConvertedCount = (Number(referrer.converted_invite_count) || 0) + 1;
+                
+                await supabase
+                  .from('piso_clients')
+                  .update({
+                    referral_balance: newReferralBalance,
+                    converted_invite_count: newConvertedCount
+                  })
+                  .eq('client_id', referrer.client_id);
+                
+                referralRewardApplied = true;
+                referralRewardAmount = 100;
+                console.log(`Referral reward credited to ${referrer.client_id} (referred client ${clientProfile.client_id})`);
+              }
+            }
+          }
+        }
+      }
+    } catch (refErr) {
+      console.error('Error during referral crediting check:', refErr.message);
+    }
+
     const { data, error } = await supabase
       .from('piso_orders')
       .insert([{ 
@@ -70,7 +122,9 @@ module.exports = async function handler(req, res) {
     return res.json({
         ...data,
         orderId: data.order_id,
-        trackingNumber: data.tracking_number
+        trackingNumber: data.tracking_number,
+        referralRewardApplied,
+        referralRewardAmount
     });
   }
 

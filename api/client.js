@@ -25,6 +25,7 @@ function normalizeAccount(row, bannedList = []) {
     referralBalance: Number(row.referral_balance) || 0,
     inviteCount: Number(row.invite_count) || 0,
     convertedInviteCount: Number(row.converted_invite_count) || 0,
+    referredBy: row.referred_by || null,
     is_banned: isBannedMerged,
     createdAt: row.created_at
   };
@@ -77,17 +78,28 @@ async function handleRegister(req, res) {
     if (authError) throw authError;
     const client_id = 'CLI-' + Math.random().toString(36).substr(2,6).toUpperCase();
     const referral_code = generateReferralCode();
-    const { data: profile, error: profileError } = await supabase.from('piso_clients').insert([{
-      client_id, full_name: fullName, email, contact_number: contactNumber || '',
-      balance: 0, referral_code, referral_balance: 0, invite_count: 0, converted_invite_count: 0,
-      created_at: new Date().toISOString()
-    }]).select().single();
-    if (profileError) throw profileError;
+    
+    // Find referrer if referral code was used
+    let referred_by = null;
+    let referrerProfile = null;
     if (usedReferralCode) {
       const { data: referrer } = await supabase.from('piso_clients').select('client_id, invite_count').eq('referral_code', usedReferralCode.toUpperCase()).single();
       if (referrer) {
-        await supabase.from('piso_clients').update({ invite_count: (Number(referrer.invite_count) || 0) + 1 }).eq('client_id', referrer.client_id);
+        referred_by = referrer.client_id;
+        referrerProfile = referrer;
       }
+    }
+
+    const { data: profile, error: profileError } = await supabase.from('piso_clients').insert([{
+      client_id, full_name: fullName, email, contact_number: contactNumber || '',
+      balance: 0, referral_code, referral_balance: 0, invite_count: 0, converted_invite_count: 0,
+      referred_by,
+      created_at: new Date().toISOString()
+    }]).select().single();
+    if (profileError) throw profileError;
+
+    if (referrerProfile) {
+      await supabase.from('piso_clients').update({ invite_count: (Number(referrerProfile.invite_count) || 0) + 1 }).eq('client_id', referrerProfile.client_id);
     }
     return res.json({ token: authData.session?.access_token || null, account: normalizeAccount(profile) });
   } catch (error) {

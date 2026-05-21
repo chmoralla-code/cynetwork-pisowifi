@@ -5,11 +5,91 @@ const http = require('http');
 const { Server } = require('socket.io');
 const multer = require('multer');
 
+// Load environment variables from .env.local if present, else .env
+function loadEnv() {
+  const envLocalPath = path.join(__dirname, '.env.local');
+  const envPath = path.join(__dirname, '.env');
+  const targetPath = fs.existsSync(envLocalPath) ? envLocalPath : (fs.existsSync(envPath) ? envPath : null);
+  
+  if (targetPath) {
+    console.log(`Loading environment variables from: ${path.basename(targetPath)}`);
+    const content = fs.readFileSync(targetPath, 'utf8');
+    content.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+      const index = trimmed.indexOf('=');
+      if (index === -1) return;
+      const key = trimmed.slice(0, index).trim();
+      let val = trimmed.slice(index + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    });
+  }
+}
+loadEnv();
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.json());
+
+// Emulate Vercel Serverless Function Routes locally in Express
+app.all('/api/*', async (req, res, next) => {
+  const pathParts = req.path.split('/').filter(Boolean); // e.g. ["api", "admin", "stats"]
+  if (pathParts[0] === 'api') {
+    pathParts.shift(); // Remove "api"
+  }
+
+  // Rewrite map
+  const rewrites = {
+    'submit-order': 'orders',
+    'track-order': 'orders'
+  };
+
+  if (pathParts.length > 0 && rewrites[pathParts[0]]) {
+    pathParts[0] = rewrites[pathParts[0]];
+  }
+
+  let matchedFile = null;
+  let remainingParts = [];
+  
+  for (let i = pathParts.length; i > 0; i--) {
+    const subPath = pathParts.slice(0, i).join('/');
+    const fullPath = path.join(__dirname, 'api', `${subPath}.js`);
+    if (fs.existsSync(fullPath)) {
+      matchedFile = fullPath;
+      remainingParts = pathParts.slice(i);
+      break;
+    }
+  }
+
+  if (matchedFile) {
+    try {
+      if (matchedFile.endsWith('messages.js') && remainingParts.length > 0) {
+        req.query.sessionId = remainingParts[0];
+      }
+      if (matchedFile.endsWith('orders.js') && remainingParts.length > 0) {
+        req.query.id = remainingParts[0];
+      }
+      
+      const handler = require(matchedFile);
+      if (typeof handler === 'function') {
+        return await handler(req, res);
+      }
+    } catch (err) {
+      console.error(`Error executing API handler ${matchedFile}:`, err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure uploads directory exists
