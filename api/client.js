@@ -142,18 +142,20 @@ async function handleForgotPassword(req, res) {
     // Simulate sending SMS by notifying the admin via Telegram (if configured)
     try {
         const { data: settings } = await supabase.from('piso_settings').select('key, value').in('key', ['telegram_token', 'telegram_chat']);
-        if (settings && settings.length === 2) {
-             const token = settings.find(s => s.key === 'telegram_token')?.value;
-             const chatId = settings.find(s => s.key === 'telegram_chat')?.value;
-             if (token && chatId) {
-                 const text = `🔐 Password Reset Request\nClient: ${client.full_name}\nEmail: ${email}\nContact: ${client.contact_number || 'N/A'}\n\n*SMS Notification Simulated via Admin Alert*`;
-                 await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                     method: 'POST',
-                     headers: {'Content-Type': 'application/json'},
-                     body: JSON.stringify({ chat_id: chatId, text })
-                 });
-             }
-        }
+         if (settings && settings.length === 2) {
+              let token = settings.find(s => s.key === 'telegram_token')?.value;
+              let chatId = settings.find(s => s.key === 'telegram_chat')?.value;
+              if (token) token = token.trim();
+              if (chatId) chatId = chatId.trim();
+              if (token && chatId) {
+                  const text = `🔐 Password Reset Request\nClient: ${client.full_name}\nEmail: ${email}\nContact: ${client.contact_number || 'N/A'}\n\n*SMS Notification Simulated via Admin Alert*`;
+                  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({ chat_id: chatId, text })
+                  });
+              }
+         }
     } catch(e) {}
 
     return res.json({ message: 'Password reset link sent to your email. An SMS notification has also been triggered to the registered number.' });

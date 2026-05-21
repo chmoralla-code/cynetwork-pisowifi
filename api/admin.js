@@ -101,6 +101,26 @@ async function handleStats(req, res) {
   }
 }
 
+// Helper to sanitize Telegram Bot Token
+function sanitizeTelegramToken(t) {
+  if (!t) return '';
+  let cleaned = t.trim();
+  if (cleaned.startsWith('https://api.telegram.org/')) {
+    cleaned = cleaned.replace('https://api.telegram.org/', '');
+  }
+  const botPrefixMatch = cleaned.match(/^bot(\d+:.+)$/i);
+  if (botPrefixMatch) {
+    cleaned = botPrefixMatch[1];
+  }
+  return cleaned.split('/')[0].trim();
+}
+
+// Helper to sanitize Telegram Chat ID
+function sanitizeTelegramChatId(c) {
+  if (!c) return '';
+  return c.toString().trim();
+}
+
 // Handler: POST /api/admin/test-telegram
 async function handleTestTelegram(req, res) {
   if (req.method !== 'POST') {
@@ -125,6 +145,9 @@ async function handleTestTelegram(req, res) {
         if (!chatId) chatId = settings.find(s => s.key === 'telegram_chat')?.value;
       }
     }
+
+    token = sanitizeTelegramToken(token);
+    chatId = sanitizeTelegramChatId(chatId);
 
     if (!token || !chatId) {
       return res.status(400).json({ error: 'Telegram Bot Token and Chat ID are required for testing. Please configure them in Settings.' });
@@ -164,8 +187,12 @@ async function handleTestTelegram(req, res) {
 
     const telegramResult = await telegramRes.json();
     if (!telegramRes.ok || !telegramResult.ok) {
+      let friendlyError = telegramResult.description || 'Failed to send message via Telegram API';
+      if (friendlyError.toLowerCase() === 'unauthorized' || telegramRes.status === 401) {
+        friendlyError = 'The Telegram Bot Token is invalid or unauthorized. Please verify that you copied the correct token from BotFather and that the bot has not been revoked.';
+      }
       return res.status(400).json({
-        error: telegramResult.description || 'Failed to send message via Telegram API'
+        error: friendlyError
       });
     }
 
@@ -339,7 +366,14 @@ async function handleSettings(req, res) {
     return res.json(settingsObj);
   }
   if (req.method === 'POST') {
-    const updates = Object.entries(req.body).map(([key, value]) => ({ key, value }));
+    const bodyCopy = { ...req.body };
+    if (bodyCopy.telegram_token !== undefined) {
+      bodyCopy.telegram_token = sanitizeTelegramToken(bodyCopy.telegram_token);
+    }
+    if (bodyCopy.telegram_chat !== undefined) {
+      bodyCopy.telegram_chat = sanitizeTelegramChatId(bodyCopy.telegram_chat);
+    }
+    const updates = Object.entries(bodyCopy).map(([key, value]) => ({ key, value }));
     const { data, error } = await supabase.from('piso_settings').upsert(updates, { onConflict: 'key' }).select();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);

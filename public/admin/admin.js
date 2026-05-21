@@ -811,10 +811,18 @@ async function saveSettings() {
     const pwdInput = document.getElementById('setting-admin-password');
     const pwd = pwdInput ? pwdInput.value.trim() : '';
     
+    const emailInput = document.getElementById('setting-admin-email');
+    const tokenInput = document.getElementById('setting-telegram-token');
+    const chatInput = document.getElementById('setting-telegram-chat');
+    
+    if (emailInput) emailInput.value = emailInput.value.trim();
+    if (tokenInput) tokenInput.value = tokenInput.value.trim();
+    if (chatInput) chatInput.value = chatInput.value.trim();
+    
     const settings = {
-        admin_email: document.getElementById('setting-admin-email').value,
-        telegram_token: document.getElementById('setting-telegram-token').value,
-        telegram_chat: document.getElementById('setting-telegram-chat').value,
+        admin_email: emailInput ? emailInput.value : '',
+        telegram_token: tokenInput ? tokenInput.value : '',
+        telegram_chat: chatInput ? chatInput.value : '',
         maintenance_mode: document.getElementById('setting-maintenance').value
     };
     
@@ -852,8 +860,14 @@ async function sendTelegramTest(type) {
     btn.innerHTML = type === 'sale' ? '⏳ Sending Alert...' : '⏳ Handshaking...';
 
     // Get current fields in case user modified them before saving
-    const overrideToken = document.getElementById('setting-telegram-token').value.trim();
-    const overrideChatId = document.getElementById('setting-telegram-chat').value.trim();
+    const tokenInput = document.getElementById('setting-telegram-token');
+    const chatInput = document.getElementById('setting-telegram-chat');
+    
+    if (tokenInput) tokenInput.value = tokenInput.value.trim();
+    if (chatInput) chatInput.value = chatInput.value.trim();
+    
+    const overrideToken = tokenInput ? tokenInput.value : '';
+    const overrideChatId = chatInput ? chatInput.value : '';
 
     try {
         const res = await fetch('/api/admin/test-telegram', {
