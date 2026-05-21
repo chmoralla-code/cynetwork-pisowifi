@@ -114,13 +114,25 @@ async function loadRecentOrders() {
         tbody.innerHTML = '';
 
         orders.slice(0, 5).forEach(o => {
+            let actionHtml = `<button class="btn-view" onclick="viewOrder('${o.order_id}')">View</button>`;
+            
+            if (o.status === 'pending') {
+                actionHtml = `
+                    <div style="display: flex; gap: 5px; justify-content: center; align-items: center;">
+                        <button class="btn-view" onclick="viewOrder('${o.order_id}')" title="View Details">View</button>
+                        <button class="btn-view btn-approve-quick" onclick="updateOrderStatus('${o.order_id}', 'approved')" style="background: linear-gradient(135deg, #00FF66 0%, #009933 100%); color: #000; font-weight: 700; border: none; padding: 6px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,255,102,0.3); font-size: 11px; cursor: pointer;">Approve</button>
+                        <button class="btn-view btn-reject-quick" onclick="updateOrderStatus('${o.order_id}', 'rejected')" style="background: linear-gradient(135deg, #FF2A5F 0%, #990022 100%); color: #FFF; font-weight: 700; border: none; padding: 6px 12px; border-radius: 4px; box-shadow: 0 0 10px rgba(255,42,95,0.3); font-size: 11px; cursor: pointer;">Reject</button>
+                    </div>
+                `;
+            }
+
             const row = `<tr>
                 <td>#${o.order_id}</td>
                 <td>${o.full_name}</td>
                 <td>${o.package}</td>
                 <td><span class="status-badge status-${o.status.toUpperCase()}">${o.status}</span></td>
                 <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                <td><button class="btn-view" onclick="viewOrder('${o.order_id}')">View</button></td>
+                <td>${actionHtml}</td>
             </tr>`;
             tbody.innerHTML += row;
         });
@@ -212,16 +224,51 @@ async function loadSalesAnalytics() {
         document.getElementById('sales-units').innerText = stats.unitsSold || 0;
         document.getElementById('sales-avg').innerText = stats.avgOrderValue || '₱0';
 
-        // Populate Package Table (Mocking for now if not in API)
+        // Populate Package Table
         const pkgBody = document.getElementById('sales-package-table');
-        pkgBody.innerHTML = `
-            <tr><td>Enterprise</td><td>1</td><td>16</td><td>₱176,000</td></tr>
-            <tr><td>Starter</td><td>4</td><td>4</td><td>₱23,200</td></tr>
-        `;
+        pkgBody.innerHTML = '';
+        
+        if (stats.salesByPackage && stats.salesByPackage.length > 0) {
+            const totalRevenue = stats.salesByPackage.reduce((sum, p) => sum + (p.sales || 0), 0);
+            
+            stats.salesByPackage.forEach(p => {
+                const percent = totalRevenue > 0 ? Math.round((p.sales / totalRevenue) * 100) : 0;
+                
+                const row = `<tr>
+                    <td>
+                        <div style="font-weight: 600; color: #FFF; margin-bottom: 4px;">${p.package}</div>
+                        <div class="neon-progress-container" title="${percent}% of package revenue">
+                            <div class="neon-progress-bar" style="width: ${percent}%;"></div>
+                        </div>
+                    </td>
+                    <td>${p.orders}</td>
+                    <td>${p.units}</td>
+                    <td style="color: var(--cyan); font-family: var(--font-heading); font-size: 13px;">₱${p.sales.toLocaleString()}</td>
+                </tr>`;
+                pkgBody.innerHTML += row;
+            });
+        } else {
+            pkgBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted); padding: 15px;">No package sales recorded yet</td></tr>';
+        }
 
         // Populate 7 Days Table
         const dayBody = document.getElementById('sales-7days-table');
-        dayBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No trend data yet</td></tr>';
+        dayBody.innerHTML = '';
+        
+        if (stats.last7DaysSales && stats.last7DaysSales.length > 0) {
+            const sortedTrend = [...stats.last7DaysSales].reverse();
+            sortedTrend.forEach(d => {
+                const row = `<tr>
+                    <td><strong>${d.date}</strong></td>
+                    <td>${d.orders}</td>
+                    <td>${d.units}</td>
+                    <td style="color: var(--cyan); font-family: var(--font-heading); font-size: 13px;">₱${d.sales.toLocaleString()}</td>
+                </tr>`;
+                dayBody.innerHTML += row;
+            });
+        } else {
+            dayBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted); padding: 15px;">No recent daily trends</td></tr>';
+        }
     } catch (err) {
         console.error('Sales analytics failed:', err);
     }
@@ -791,6 +838,46 @@ async function saveSettings() {
         showToast('Error', 'Error saving settings: ' + e.message, 'error');
     } finally {
         btn.innerText = 'Save Changes';
+    }
+}
+
+// Telegram Test notification triggers
+async function sendTelegramTest(type) {
+    const btnId = type === 'sale' ? 'btn-test-sale' : 'btn-test-connection';
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = type === 'sale' ? '⏳ Sending Alert...' : '⏳ Handshaking...';
+
+    // Get current fields in case user modified them before saving
+    const overrideToken = document.getElementById('setting-telegram-token').value.trim();
+    const overrideChatId = document.getElementById('setting-telegram-chat').value.trim();
+
+    try {
+        const res = await fetch('/api/admin/test-telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type,
+                token: overrideToken || undefined,
+                chatId: overrideChatId || undefined
+            })
+        });
+
+        const result = await res.json();
+        
+        if (res.ok && result.success) {
+            showToast('Success', `Telegram ${type === 'sale' ? 'sales alert' : 'connection'} sent successfully!`, 'success');
+        } else {
+            showToast('Error', result.error || 'Failed to send test message. Check your token/Chat ID.', 'error');
+        }
+    } catch (e) {
+        showToast('Error', 'API Exception during Telegram testing: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }
 }
 

@@ -374,6 +374,14 @@
                     <label>Telegram Chat ID</label>
                     <input type="text" id="setting-telegram-chat" placeholder="Chat ID">
                 </div>
+                <!-- Telegram Bot Testing Console -->
+                <div class="filter-group" style="margin-bottom: 25px; border-top: 1px dashed var(--border-color); padding-top: 15px;">
+                    <label style="color: var(--cyan); text-shadow: var(--glow-cyan); font-family: var(--font-heading); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">Telegram Bot Testing Console</label>
+                    <div style="display: flex; gap: 15px; width: 100%;">
+                        <button id="btn-test-connection" class="btn-secondary" style="flex: 1; padding: 10px 15px; font-size: 12px; border-color: var(--cyan); color: var(--cyan);" onclick="sendTelegramTest('connection')">⚡ Test Connection</button>
+                        <button id="btn-test-sale" class="btn-secondary" style="flex: 1; padding: 10px 15px; font-size: 12px; border-color: var(--primary); color: var(--primary);" onclick="sendTelegramTest('sale')">💰 Test Sales Alert</button>
+                    </div>
+                </div>
                 <div class="filter-group">
                     <label>Site Maintenance Mode</label>
                     <select id="setting-maintenance">

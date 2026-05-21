@@ -863,3 +863,38 @@ tr:last-child td {
 .toast-close:hover {
     opacity: 1;
 }
+
+/* Custom Neon Progress Bar */
+.neon-progress-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.neon-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--cyan) 0%, var(--primary) 100%);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 0 5px rgba(255, 42, 95, 0.4);
+    transition: width 1.2s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+/* Quick Action Dashboard Button Transitions */
+.btn-approve-quick, .btn-reject-quick {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.btn-approve-quick:hover {
+    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 0 15px rgba(0, 255, 102, 0.6) !important;
+}
+
+.btn-reject-quick:hover {
+    transform: scale(1.05) translateY(-1px);
+    box-shadow: 0 0 15px rgba(255, 42, 95, 0.6) !important;
+}

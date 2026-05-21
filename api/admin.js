@@ -33,7 +33,7 @@ async function setClientBanStatus(clientId, isBanned) {
 // Handler: GET /api/admin/stats
 async function handleStats(req, res) {
   try {
-    const { data: orders, error } = await supabase.from('piso_orders').select('price, status, created_at');
+    const { data: orders, error } = await supabase.from('piso_orders').select('price, status, created_at, package, package_name, quantity');
     if (error) throw error;
     const approved_statuses = ['approved', 'delivery', 'completed'];
     const revenue = orders.filter(o => approved_statuses.includes(o.status)).reduce((sum, o) => sum + (Number(o.price) || 0), 0);
@@ -50,12 +50,126 @@ async function handleStats(req, res) {
     const monthSales = orders.filter(o => o.created_at.startsWith(thisMonth) && approved_statuses.includes(o.status)).reduce((sum, o) => sum + (Number(o.price) || 0), 0);
     const unitsSold = orders.filter(o => approved_statuses.includes(o.status)).length;
     const avgOrderValue = unitsSold > 0 ? revenue / unitsSold : 0;
+
+    // Calculate dynamic Sales by Package
+    const approvedOrders = orders.filter(o => approved_statuses.includes(o.status));
+    const packageMap = {};
+    approvedOrders.forEach(o => {
+      const pkgName = o.package_name || o.package || 'Unknown';
+      if (!packageMap[pkgName]) {
+        packageMap[pkgName] = { package: pkgName, orders: 0, units: 0, sales: 0 };
+      }
+      packageMap[pkgName].orders += 1;
+      packageMap[pkgName].units += Number(o.quantity) || 1;
+      packageMap[pkgName].sales += Number(o.price) || 0;
+    });
+    const salesByPackage = Object.values(packageMap).sort((a, b) => b.sales - a.sales);
+
+    // Calculate dynamic 7 Days Sales Trend
+    const last7DaysSales = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      
+      const dayOrders = orders.filter(o => o.created_at.startsWith(dateStr));
+      const dayApproved = dayOrders.filter(o => approved_statuses.includes(o.status));
+      
+      const orderCount = dayOrders.length;
+      const units = dayApproved.reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
+      const sales = dayApproved.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+      const formattedDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      last7DaysSales.push({
+        date: formattedDate,
+        orders: orderCount,
+        units,
+        sales
+      });
+    }
+
     return res.json({
-      revenue: `\u20b1${revenue.toLocaleString()}`, totalOrders, pending, approved, delivery, rejected, completed, cancelled,
-      todaySales: `\u20b1${todaySales.toLocaleString()}`, monthSales: `\u20b1${monthSales.toLocaleString()}`,
-      unitsSold, avgOrderValue: `\u20b1${Math.round(avgOrderValue).toLocaleString()}`,
+      revenue: `₱${revenue.toLocaleString()}`, totalOrders, pending, approved, delivery, rejected, completed, cancelled,
+      todaySales: `₱${todaySales.toLocaleString()}`, monthSales: `₱${monthSales.toLocaleString()}`,
+      unitsSold, avgOrderValue: `₱${Math.round(avgOrderValue).toLocaleString()}`,
+      salesByPackage,
+      last7DaysSales,
       weeklySales: [], labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
     });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+// Handler: POST /api/admin/test-telegram
+async function handleTestTelegram(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).end();
+  }
+
+  try {
+    const { type, token: overrideToken, chatId: overrideChatId } = req.body;
+    let token = overrideToken;
+    let chatId = overrideChatId;
+
+    // Fallback to DB settings if overrides are not provided
+    if (!token || !chatId) {
+      const { data: settings, error: settingsError } = await supabase
+        .from('piso_settings')
+        .select('key, value')
+        .in('key', ['telegram_token', 'telegram_chat']);
+      
+      if (!settingsError && settings) {
+        if (!token) token = settings.find(s => s.key === 'telegram_token')?.value;
+        if (!chatId) chatId = settings.find(s => s.key === 'telegram_chat')?.value;
+      }
+    }
+
+    if (!token || !chatId) {
+      return res.status(400).json({ error: 'Telegram Bot Token and Chat ID are required for testing. Please configure them in Settings.' });
+    }
+
+    let messageText = '';
+    if (type === 'sale') {
+      const mockOrderId = 'CNW-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const mockRef = 'RF-' + Math.floor(1000000000 + Math.random() * 9000000000);
+      messageText = `💰 *CYNETWORK PisoWiFi Sales Alert* 💰\n\n` +
+        `📦 *Package:* Cyber Pro Premium (Test)\n` +
+        `💵 *Price:* ₱250.00\n` +
+        `🔢 *Quantity:* 1 unit(s)\n` +
+        `🏷️ *Order ID:* ${mockOrderId}\n` +
+        `👤 *Client:* Cyrhiel (Tester)\n` +
+        `📞 *Contact:* +639123456789\n` +
+        `🏠 *Address:* 127.0.0.1 (Localhost Testing)\n` +
+        `🔗 *GCash Reference:* \`${mockRef}\`\n\n` +
+        `🔥 *Status:* PENDING (Waiting for Admin approval)\n\n` +
+        `*SMS simulated via Admin Telegram notification.*`;
+    } else {
+      messageText = `⚡ *CYNETWORK Bot Connection Test* ⚡\n\n` +
+        `🎉 Congratulations! Your CYNETWORK PisoWiFi Admin Panel Telegram bot is properly configured and successfully connected.\n\n` +
+        `🤖 *Bot Status:* Online\n` +
+        `📅 *Time:* ${new Date().toLocaleString()}`;
+    }
+
+    const telegramRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: messageText,
+        parse_mode: 'Markdown'
+      })
+    });
+
+    const telegramResult = await telegramRes.json();
+    if (!telegramRes.ok || !telegramResult.ok) {
+      return res.status(400).json({
+        error: telegramResult.description || 'Failed to send message via Telegram API'
+      });
+    }
+
+    return res.json({ success: true, message: 'Test message sent successfully!' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
@@ -247,6 +361,8 @@ module.exports = async function handler(req, res) {
     case 'stats':
       if (req.method !== 'GET') return res.status(405).end();
       return handleStats(req, res);
+    case 'test-telegram':
+      return handleTestTelegram(req, res);
     case 'juanfi':
       return handleJuanfi(req, res);
     case 'clients':
